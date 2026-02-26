@@ -3025,7 +3025,6 @@ export async function registerRoutes(
     try {
       const submission = await storage.getHstcSubmission(req.params.id);
       if (!submission) return res.status(404).json({ error: "Submission not found" });
-      if (!submission.editAllowed) return res.status(403).json({ error: "EDIT_LOCKED", message: "Edit not allowed for this submission" });
 
       const data = { ...req.body };
       data.repairMaterialCost = parseInt(data.repairMaterialCost) || 0;

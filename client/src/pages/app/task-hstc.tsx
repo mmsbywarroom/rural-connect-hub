@@ -86,7 +86,11 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   upload: { en: "Upload", hi: "अपलोड", pa: "ਅੱਪਲੋਡ" },
   editApplication: { en: "Edit Application", hi: "आवेदन संपादित करें", pa: "ਅਰਜ਼ੀ ਸੋਧੋ" },
   updateApplication: { en: "Update Application", hi: "आवेदन अपडेट करें", pa: "ਅਰਜ਼ੀ ਅੱਪਡੇਟ ਕਰੋ" },
-  editAllowedMsg: { en: "Admin has allowed you to edit this submission", hi: "एडमिन ने आपको यह आवेदन संपादित करने की अनुमति दी है", pa: "ਐਡਮਿਨ ਨੇ ਤੁਹਾਨੂੰ ਇਹ ਅਰਜ਼ੀ ਸੋਧਣ ਦੀ ਇਜਾਜ਼ਤ ਦਿੱਤੀ ਹੈ" },
+  editAllowedMsg: {
+    en: "You can edit this submission until it is approved",
+    hi: "आप इस आवेदन को स्वीकृति से पहले कभी भी संपादित कर सकते हैं",
+    pa: "ਤੁਸੀਂ ਮਨਜ਼ੂਰੀ ਤੋਂ ਪਹਿਲਾਂ ਇਸ ਅਰਜ਼ੀ ਨੂੰ ਕਦੇ ਵੀ ਸੋਧ ਸਕਦੇ ਹੋ",
+  },
   duplicateError: { en: "You have already submitted for this mobile number", hi: "आपने इस मोबाइल नंबर के लिए पहले ही आवेदन किया है", pa: "ਤੁਸੀਂ ਇਸ ਮੋਬਾਈਲ ਨੰਬਰ ਲਈ ਪਹਿਲਾਂ ਹੀ ਅਰਜ਼ੀ ਦੇ ਚੁੱਕੇ ਹੋ" },
   done: { en: "Done", hi: "हो गया", pa: "ਹੋ ਗਿਆ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
@@ -276,7 +280,7 @@ function SubmissionCard({ sub, language, user, onEdit }: { sub: HstcSubmission; 
         </div>
       )}
 
-      {sub.editAllowed && onEdit && (
+      {onEdit && sub.status === "pending" && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-2 space-y-1">
           <p className="text-xs text-blue-700">{l("editAllowedMsg", language)}</p>
           <Button
