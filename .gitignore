@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+
+# Local environment and secrets
+.env
+
+# Local tooling and analysis configs
+.config/

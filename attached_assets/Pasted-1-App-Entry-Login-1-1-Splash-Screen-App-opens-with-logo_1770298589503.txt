@@ -1,0 +1,374 @@
+1. App Entry & Login
+1.1 Splash Screen
+App opens with logo and loading indicator.
+
+
+If user is already authenticated on this device → directly opens Task Home.
+
+
+Else → proceeds to Login.
+
+
+
+1.2 Login via Mobile Number
+Screen: Enter Mobile Number
+User enters 10-digit contact number.
+
+
+Taps Send OTP.
+
+
+Screen: OTP Verification
+User enters OTP.
+
+
+On success:
+
+
+If user exists → go to Task Home.
+
+
+If user does not exist → go to Registration Flow.
+
+
+
+2. Registration Flow (Only for New Users)
+2.1 Role Selection
+User selects one role:
+Volunteer
+
+
+Party Post Holder
+
+
+Tap Continue.
+
+3. Volunteer Registration
+3.1 Volunteer Details
+Fields:
+Name
+
+
+Tap Submit.
+➡ User is registered and taken directly to Task Home.
+
+4. Party Post Holder Registration
+4.1 Basic Details
+Fields:
+Name
+
+
+Current Position
+
+
+Tap Next.
+
+4.2 Position Mapping
+Fields:
+Level (Dropdown): District / Halka / Block / Village/Ward
+
+
+Mapped Area Name
+ (Auto-populated dropdown based on selected level from hierarchy)
+
+
+Wing (Dropdown):
+
+
+Main
+
+
+Youth
+
+
+Mahilla
+
+
+SC
+
+
+BC
+
+
+Kisan
+
+
+NMM
+
+
+Other
+
+
+If “Other” selected → show “Specify Wing” field
+
+
+Tap Next.
+
+4.3 Photo Upload
+Fields:
+Your Photo (Compulsory)
+
+
+Aadhaar Card Photo (Optional)
+
+
+Voter Card Photo (Optional)
+
+
+Tap Submit Registration.
+➡ User is registered and taken to Task Home.
+
+5. Task Home (Central Screen)
+5.1 Task Home Dashboard
+This is the main working screen of the platform.
+Behaviour
+No task is forced.
+
+
+No task is highlighted.
+
+
+User can perform any task in any order.
+
+
+Layout
+Header:
+
+
+User name
+
+
+Role
+
+
+Mapped village/area
+
+
+Scrollable list of available tasks:
+
+
+Task 1: CSC / Camp Report
+
+
+Task 2: Volunteer Mapping
+
+
+Task 3: Supporter Mapping
+
+
+Any future tasks added by admin
+
+
+Each task card shows:
+Task name
+
+
+One-line objective
+
+
+Button: Start / Continue
+
+
+
+6. Task 1 — CSC / Camp Report
+Objective
+Report working status of CSC/Camp only for the user’s mapped village.
+
+6.1 Select Village
+Village is auto-selected and locked (based on user mapping).
+
+
+User cannot change village.
+
+
+Tap Next.
+
+6.2 Select CSC / Camp
+Shows list of only active CSCs/Camps for that village.
+
+
+User selects one CSC/Camp.
+
+
+Tap Next.
+
+6.3 Mark Status
+Options:
+Working
+
+
+Closed
+
+
+Tap Submit.
+
+6.4 Confirmation
+Success message displayed.
+
+
+Option to:
+
+
+Submit another CSC/Camp report
+
+
+Return to Task Home
+
+
+
+7. Task 2 — Volunteer Mapping
+Objective
+Add more people to the organisation.
+
+7.1 Select Category
+Options:
+Active
+
+
+Inactive
+
+
+VIP
+
+
+Tap Continue.
+
+7.2 (Only if Active) OTP Verification
+User enters new volunteer’s contact number.
+
+
+OTP is sent to that number.
+
+
+OTP verified successfully.
+
+
+Tap Continue.
+(Inactive and VIP do not require OTP.)
+
+7.3 Volunteer Details
+Fields:
+Name
+
+
+Contact Number
+
+
+Aadhaar Card Photo (Optional)
+
+
+System Behaviour
+If contact number already exists:
+
+
+Show warning: “This number already exists in the system.”
+
+
+Allow user to either:
+
+
+Cancel
+
+
+Proceed anyway (if admin later wants merge logic)
+
+
+Tap Submit.
+
+7.4 Post-Submission
+Success message.
+
+
+Options:
+
+
+Add Another Volunteer
+
+
+Back to Task Home
+
+
+
+8. Task 3 — Supporter Mapping
+8.1 Supporter Details
+Fields:
+Name
+
+
+Contact Number
+
+
+Aadhaar Card Photo (Optional)
+
+
+Voter Card Photo (Optional)
+
+
+Tap Submit.
+
+8.2 Post-Submission
+Success message.
+
+
+Options:
+
+
+Add Another Supporter
+
+
+Back to Task Home
+
+
+
+9. Admin Control — Platform Behaviour (High Level)
+Admin Capabilities
+Upload hierarchy (Zone → District → Halka → Block → Village/Ward) via CSV.
+
+
+Create new tasks.
+
+
+Edit existing tasks.
+
+
+Add/remove fields inside any task.
+
+
+Control dropdown values and conditional fields.
+
+
+Enable/disable tasks without affecting existing data.
+
+
+View and export task submissions.
+
+
+Impact on User App
+Users automatically see updated tasks and fields.
+
+
+No app update or retraining required.
+
+
+
+10. Core Design Principles (Locked)
+Mobile-first.
+
+
+Fast, minimal steps.
+
+
+No forced task order.
+
+
+No unnecessary data entry.
+
+
+Village-restricted visibility.
+
+
+Admin-driven flexibility.
+
+
+Scales without changing user behaviour
+

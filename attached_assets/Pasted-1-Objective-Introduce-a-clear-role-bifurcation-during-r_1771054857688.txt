@@ -1,0 +1,105 @@
+1) Objective
+
+Introduce a clear role bifurcation during registration/profile setup so a user can be categorised as either:
+
+Party Post Holder, or
+
+Govt. Post Holder
+
+This will drive different field flows, validations, and downstream permissions (where relevant).
+
+2) UX / UI Changes
+2.1 Role Toggle
+
+Where: In the existing “Role Selection” step (or the earliest point where role is chosen/edited).
+Control: Toggle / segmented control with two options:
+
+Party Post Holder
+
+Govt. Post Holder
+
+Behaviour:
+
+Default state: none selected (forces explicit choice) OR pre-select based on existing role if editing.
+
+Switching the toggle:
+
+If the user has already filled fields for the other role → show a warning: “Switching will clear role-specific fields” and then reset those fields.
+
+3) Party Post Holder Flow (Re-ordered Fields)
+3.1 Fields (in this exact order)
+
+When Party Post Holder is selected, show the existing fields but enforce the order:
+
+Level
+
+Wing
+
+Position
+
+3.2 Field Rules
+
+All three required (unless your current system allows optional—then match existing rules).
+
+Wing options may be filtered by Level (optional enhancement) but not mandatory for this scope.
+
+Position list may be filtered by Wing and/or Level (optional enhancement).
+
+3.3 Data Mapping
+
+Persist into the existing “party_role” structure (or equivalent) without changing downstream interfaces, only reordering UI and validation sequence.
+
+4) Govt. Post Holder Flow (New Sub-Workflow)
+4.1 Step 1: Select Govt Position
+
+When Govt. Post Holder is selected, the workflow asks:
+
+Which position the user is on (Govt Position)
+
+Implementation details:
+
+Use a dropdown/searchable list (positions can be long).
+
+Position can be:
+
+Static list (Phase 1), or
+
+Master data driven (recommended) from a “Govt Positions” table.
+
+4.2 Step 2: Select Units of Jurisdiction (Multi-select)
+
+After position selection, show:
+2. Units of Jurisdiction (the units where this position is applicable)
+
+Key requirement: Multi-select with clear UX.
+
+Provide:
+
+A hierarchical selector (recommended): Zone → District → AC/Halka → Block → Village/Ward (adapt to your existing unit model)
+
+Ability to select multiple units
+
+“Select All” at any level (optional but very useful)
+
+Search by unit name/ID (optional)
+
+Validation Rules:
+
+Govt Position is required.
+
+At least 1 unit must be selected.
+
+Enforce max limits only if needed (e.g., protect performance).
+
+4.3 Jurisdiction Logic
+
+The set of allowed unit types may depend on the selected Govt Position (recommended):
+
+Example: District-level position → allow selecting District(s) or below.
+
+Example: State-level position → allow Zones/Districts etc.
+This mapping can be:
+
+Hardcoded rules (Phase 1), or
+
+Config-driven via a mapping table (preferred).
