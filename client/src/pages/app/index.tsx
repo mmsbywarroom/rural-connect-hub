@@ -267,14 +267,6 @@ export default function VolunteerPortal() {
             >
               <LogIn className="mr-3 h-5 w-5" /> {t('login')}
             </Button>
-            <Button
-              variant="outline"
-              className="w-full h-14 text-base"
-              onClick={() => setAuthState("register_village")}
-              data-testid="button-register"
-            >
-              <UserPlus className="mr-3 h-5 w-5" /> {t('register')}
-            </Button>
             <LanguageSwitcherInline className="mt-3" />
           </CardContent>
         </Card>
