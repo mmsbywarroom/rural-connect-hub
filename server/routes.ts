@@ -9,7 +9,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
-import { authenticator } from "otplib/authenticator";
+import otplib from "otplib";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
@@ -378,6 +378,8 @@ function parseOcrText(text: string, docType: string): Record<string, string> {
 
   return result;
 }
+
+const authenticator = otplib.authenticator;
 
 export async function registerRoutes(
   httpServer: Server,
