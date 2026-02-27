@@ -9,8 +9,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
-import * as otplib from "otplib";
-const authenticator = otplib.authenticator;
+import { authenticator } from "otplib/authenticator";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
