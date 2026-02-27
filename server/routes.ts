@@ -9,6 +9,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
+import { authenticator } from "otplib";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
@@ -784,8 +785,76 @@ export async function registerRoutes(
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password required" });
       }
+
+      // Try main admin users table first
       const user = await storage.getUserByUsername(username);
       if (user && user.password === password) {
+        // If 2FA already enabled, go to verify step
+        if (user.twoFaEnabled) {
+          return res.json({ mode: "verify", userType: "user", userId: user.id });
+        }
+        // First-time login: generate secret and ask to set up 2FA
+        const secret = authenticator.generateSecret();
+        const otpauthUrl = authenticator.keyuri(username, "PatialaRural-Admin", secret);
+        await storage.updateUser(user.id, { twoFaSecret: secret });
+        return res.json({
+          mode: "setup",
+          userType: "user",
+          userId: user.id,
+          secret,
+          otpauthUrl,
+        });
+      }
+
+      // Then check office managers (admin-style login with area restrictions)
+      const manager = await storage.getOfficeManagerByUserId(username);
+      if (manager && manager.password === password) {
+        if (manager.isActive === false) {
+          return res.status(403).json({ error: "Account is inactive. Contact admin." });
+        }
+        if (manager.twoFaEnabled) {
+          return res.json({ mode: "verify", userType: "manager", userId: manager.id });
+        }
+        const secret = authenticator.generateSecret();
+        const otpauthUrl = authenticator.keyuri(username, "PatialaRural-Admin", secret);
+        await storage.updateOfficeManager(manager.id, { twoFaSecret: secret });
+        return res.json({
+          mode: "setup",
+          userType: "manager",
+          userId: manager.id,
+          secret,
+          otpauthUrl,
+        });
+      }
+
+      return res.status(401).json({ error: "Invalid username or password" });
+    } catch (error) {
+      console.error("[Admin login] error", error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // Verify 2FA code (both first-time setup and normal login)
+  app.post("/api/admin/2fa/verify", async (req, res) => {
+    try {
+      const { userId, userType, token } = req.body as { userId?: string; userType?: "user" | "manager"; token?: string };
+      if (!userId || !userType || !token) {
+        return res.status(400).json({ error: "Missing 2FA data" });
+      }
+
+      if (userType === "user") {
+        const user = await storage.getUser(userId);
+        if (!user || !user.twoFaSecret) {
+          return res.status(400).json({ error: "2FA not initialized for this user" });
+        }
+        const isValid = authenticator.check(token, user.twoFaSecret);
+        if (!isValid) {
+          return res.status(401).json({ error: "Invalid 2FA code" });
+        }
+        // Mark 2FA as enabled (idempotent) and return full login payload
+        if (!user.twoFaEnabled) {
+          await storage.updateUser(user.id, { twoFaEnabled: true });
+        }
         let permissions: string[] = [];
         if (user.roleId) {
           const role = await storage.getAdminRole(user.roleId);
@@ -795,10 +864,18 @@ export async function registerRoutes(
         }
         return res.json({ user, permissions, assignedVillages: [] });
       }
-      const manager = await storage.getOfficeManagerByUserId(username);
-      if (manager && manager.password === password) {
-        if (manager.isActive === false) {
-          return res.status(403).json({ error: "Account is inactive. Contact admin." });
+
+      if (userType === "manager") {
+        const manager = await storage.getOfficeManager(userId);
+        if (!manager || !manager.twoFaSecret) {
+          return res.status(400).json({ error: "2FA not initialized for this user" });
+        }
+        const isValid = authenticator.check(token, manager.twoFaSecret);
+        if (!isValid) {
+          return res.status(401).json({ error: "Invalid 2FA code" });
+        }
+        if (!manager.twoFaEnabled) {
+          await storage.updateOfficeManager(manager.id, { twoFaEnabled: true });
         }
         let permissions: string[] = [];
         if (manager.roleId) {
@@ -816,9 +893,11 @@ export async function registerRoutes(
         };
         return res.json({ user: adminUser, permissions, assignedVillages: manager.assignedVillages || [] });
       }
-      return res.status(401).json({ error: "Invalid username or password" });
+
+      return res.status(400).json({ error: "Unsupported user type" });
     } catch (error) {
-      res.status(500).json({ error: "Login failed" });
+      console.error("[Admin 2FA verify] error", error);
+      res.status(500).json({ error: "2FA verification failed" });
     }
   });
 

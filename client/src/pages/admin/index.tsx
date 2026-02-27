@@ -81,14 +81,23 @@ const allMenuItems = [
 
 const GROUPS = ["Management", "Master Data", "Tools", "Analytics"];
 
+type AdminAuthStep = "login" | "setup_2fa" | "verify_2fa";
+
 function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: string[], assignedVillages: string[]) => void }) {
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
+  const [step, setStep] = useState<AdminAuthStep>("login");
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingUserType, setPendingUserType] = useState<"user" | "manager" | null>(null);
+  const [twoFaSecret, setTwoFaSecret] = useState("");
+  const [twoFaOtpauthUrl, setTwoFaOtpauthUrl] = useState("");
+  const [twoFaCode, setTwoFaCode] = useState("");
 
   const handleLogin = async () => {
+    if (step !== "login") return;
     if (!username || !password) {
       toast({ title: "Please enter username and password", variant: "destructive" });
       return;
@@ -102,6 +111,28 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
         setLoading(false);
         return;
       }
+
+      if (data.mode === "setup") {
+        setPendingUserId(data.userId);
+        setPendingUserType(data.userType);
+        setTwoFaSecret(data.secret || "");
+        setTwoFaOtpauthUrl(data.otpauthUrl || "");
+        setStep("setup_2fa");
+        toast({ title: "Set up 2-factor authentication", description: "Scan the QR or enter the key, then enter the 6-digit code." });
+        setLoading(false);
+        return;
+      }
+
+      if (data.mode === "verify") {
+        setPendingUserId(data.userId);
+        setPendingUserType(data.userType);
+        setStep("verify_2fa");
+        toast({ title: "Enter 2-factor code", description: "Open your authenticator app and enter the 6-digit code." });
+        setLoading(false);
+        return;
+      }
+
+      // Fallback (should not normally happen once 2FA is enforced)
       onLogin(data.user, data.permissions || [], data.assignedVillages || []);
     } catch (err: any) {
       const msg = err?.message?.includes("401") ? "Invalid username or password" : "Login failed";
@@ -109,6 +140,123 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
     }
     setLoading(false);
   };
+
+  const handleVerify2fa = async () => {
+    if (!pendingUserId || !pendingUserType) {
+      toast({ title: "Something went wrong", description: "Please try logging in again.", variant: "destructive" });
+      setStep("login");
+      return;
+    }
+    if (twoFaCode.trim().length < 6) {
+      toast({ title: "Enter 6-digit code", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/2fa/verify", {
+        userId: pendingUserId,
+        userType: pendingUserType,
+        token: twoFaCode.trim(),
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast({ title: data.error, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+      onLogin(data.user, data.permissions || [], data.assignedVillages || []);
+    } catch {
+      toast({ title: "2FA verification failed", variant: "destructive" });
+    }
+    setLoading(false);
+  };
+
+  if (step === "setup_2fa") {
+    const qrUrl = twoFaOtpauthUrl
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(twoFaOtpauthUrl)}`
+      : "";
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3">
+              <Settings className="h-8 w-8 text-orange-600" />
+            </div>
+            <CardTitle className="text-xl">Set up 2-Factor Authentication</CardTitle>
+            <CardDescription>Protect your admin account from unauthorized access.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <ol className="list-decimal list-inside space-y-1 text-left">
+              <li>Install an authenticator app (Google Authenticator, Authy, etc.) on your mobile.</li>
+              <li>Open the app and choose “Add account” → “Scan QR code” or “Enter setup key”.</li>
+              <li>Scan the QR code below, or manually enter the secret key.</li>
+              <li>After adding, enter the 6-digit code shown in the app to confirm.</li>
+            </ol>
+
+            {qrUrl && (
+              <div className="flex justify-center mt-2">
+                <img src={qrUrl} alt="2FA QR Code" className="border rounded-md" />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-left">Secret key (keep this safe):</div>
+              <div className="font-mono text-xs break-all bg-slate-100 rounded px-2 py-1 text-left">
+                {twoFaSecret || "—"}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-left block">Enter 6-digit code from app</label>
+              <Input
+                value={twoFaCode}
+                onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="text-center tracking-[0.5em]"
+                placeholder="123456"
+              />
+            </div>
+
+            <Button className="w-full h-11" onClick={handleVerify2fa} disabled={loading}>
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Enable 2FA & Continue"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (step === "verify_2fa") {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3">
+              <Settings className="h-8 w-8 text-orange-600" />
+            </div>
+            <CardTitle className="text-xl">Enter 2-Factor Code</CardTitle>
+            <CardDescription>Open your authenticator app and enter the 6-digit code.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-left block">6-digit code</label>
+              <Input
+                value={twoFaCode}
+                onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="text-center tracking-[0.5em]"
+                placeholder="123456"
+              />
+            </div>
+            <Button className="w-full h-11" onClick={handleVerify2fa} disabled={loading}>
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify & Login"}
+            </Button>
+            <p className="text-xs text-orange-100 text-left">
+              If you lose your authenticator app, contact the super admin to reset 2FA for your account.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">

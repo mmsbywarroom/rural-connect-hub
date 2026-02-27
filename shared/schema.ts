@@ -100,6 +100,8 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").default("admin"),
   roleId: varchar("role_id").references(() => adminRoles.id),
+  twoFaEnabled: boolean("two_fa_enabled").default(false),
+  twoFaSecret: text("two_fa_secret"),
 });
 
 // Office Managers
@@ -111,6 +113,8 @@ export const officeManagers = pgTable("office_managers", {
   isActive: boolean("is_active").default(true),
   roleId: varchar("role_id").references(() => adminRoles.id),
   assignedVillages: text("assigned_villages").array(),
+  twoFaEnabled: boolean("two_fa_enabled").default(false),
+  twoFaSecret: text("two_fa_secret"),
 });
 
 // Volunteers
@@ -760,7 +764,7 @@ export type SurveyResponse = typeof surveyResponses.$inferSelect;
 // Nasha Viruddh Yuddh Reports
 export const nvyReports = pgTable("nvy_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  appUserId: text("app_user_id").notNull().references(() => appUsers.id),
   villageId: varchar("village_id"),
   villageName: text("village_name"),
   photo: text("photo"),
