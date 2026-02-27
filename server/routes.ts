@@ -9,6 +9,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
+import bcrypt from "bcryptjs";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
@@ -83,6 +84,27 @@ async function cleanExpiredOTPs(): Promise<void> {
   try {
     await db.delete(otpCodes).where(lte(otpCodes.expiresAt, new Date()));
   } catch (e) {}
+}
+
+// Password hashing helpers (transition-friendly)
+const BCRYPT_ROUNDS = 10;
+
+async function hashPassword(plain: string): Promise<string> {
+  const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
+  return bcrypt.hash(plain, salt);
+}
+
+async function verifyPassword(plain: string, stored: string): Promise<boolean> {
+  if (!stored) return false;
+  // If stored looks like bcrypt hash, use bcrypt; else fallback to plain compare (for old records)
+  if (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$")) {
+    try {
+      return await bcrypt.compare(plain, stored);
+    } catch {
+      return false;
+    }
+  }
+  return plain === stored;
 }
 
 // Simple TOTP implementation (no external library)
@@ -813,7 +835,8 @@ export async function registerRoutes(
       if (existing) {
         return res.status(409).json({ error: "Username already exists" });
       }
-      const user = await storage.createUser({ username, password, role: "admin", roleId: roleId || null });
+      const hashed = await hashPassword(password);
+      const user = await storage.createUser({ username, password: hashed, role: "admin", roleId: roleId || null });
       res.json(user);
     } catch (error) {
       res.status(400).json({ error: "Failed to create admin user" });
@@ -825,7 +848,7 @@ export async function registerRoutes(
       const { roleId, password } = req.body;
       const updateData: any = {};
       if (roleId !== undefined) updateData.roleId = roleId || null;
-      if (password) updateData.password = password;
+      if (password) updateData.password = await hashPassword(password);
       const user = await storage.updateUser(req.params.id, updateData);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -854,7 +877,7 @@ export async function registerRoutes(
 
       // Try main admin users table first
       const user = await storage.getUserByUsername(username);
-      if (user && user.password === password) {
+      if (user && await verifyPassword(password, user.password)) {
         // If 2FA already enabled, go to verify step
         if (user.twoFaEnabled) {
           return res.json({ mode: "verify", userType: "user", userId: user.id });
@@ -874,7 +897,7 @@ export async function registerRoutes(
 
       // Then check office managers (admin-style login with area restrictions)
       const manager = await storage.getOfficeManagerByUserId(username);
-      if (manager && manager.password === password) {
+      if (manager && await verifyPassword(password, manager.password)) {
         if (manager.isActive === false) {
           return res.status(403).json({ error: "Account is inactive. Contact admin." });
         }
@@ -1007,7 +1030,7 @@ export async function registerRoutes(
       const payload: InsertOfficeManager = {
         name: String(name).trim(),
         userId: String(userId).trim(),
-        password: String(password),
+        password: await hashPassword(String(password)),
         isActive: typeof isActive === "boolean" ? isActive : true,
         roleId: roleId ? String(roleId) : null,
         assignedVillages: Array.isArray(assignedVillages)
