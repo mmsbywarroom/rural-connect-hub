@@ -47,6 +47,8 @@ import {
   sunwaiComplaints, sunwaiLogs,
   type SunwaiComplaint, type InsertSunwaiComplaint,
   type SunwaiLog, type InsertSunwaiLog,
+  nvyReports,
+  type NvyReport, type InsertNvyReport,
   outdoorAdSubmissions,
   type OutdoorAdSubmission, type InsertOutdoorAd,
   govSchoolIssueCategories, govSchoolSubmissions, govSchoolLogs,
@@ -297,6 +299,10 @@ export interface IStorage {
   // Sunwai Logs
   createSunwaiLog(data: InsertSunwaiLog): Promise<SunwaiLog>;
   getSunwaiLogsByComplaint(complaintId: string): Promise<SunwaiLog[]>;
+
+  // Nasha Viruddh Yuddh Reports
+  createNvyReport(data: InsertNvyReport): Promise<NvyReport>;
+  getNvyReports(): Promise<NvyReport[]>;
 
   // Outdoor Ad Submissions
   createOutdoorAd(data: InsertOutdoorAd): Promise<OutdoorAdSubmission>;
@@ -1198,6 +1204,16 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(sunwaiLogs)
       .where(eq(sunwaiLogs.complaintId, complaintId))
       .orderBy(asc(sunwaiLogs.createdAt));
+  }
+
+  // Nasha Viruddh Yuddh Reports
+  async createNvyReport(data: InsertNvyReport): Promise<NvyReport> {
+    const [r] = await db.insert(nvyReports).values(data).returning();
+    return r;
+  }
+
+  async getNvyReports(): Promise<NvyReport[]> {
+    return db.select().from(nvyReports).orderBy(desc(nvyReports.createdAt));
   }
 
   // Outdoor Ad Submissions

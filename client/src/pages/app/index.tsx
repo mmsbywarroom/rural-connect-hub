@@ -22,6 +22,7 @@ import TaskDynamicForm from "./task-dynamic";
 import TaskHstc from "./task-hstc";
 import TaskSdsk from "./task-sdsk";
 import TaskSunwai from "./task-sunwai";
+import TaskNvy from "./task-nvy";
 import TaskOutdoorAd from "./task-outdoor-ad";
 import TaskGovSchool from "./task-gov-school";
 import TaskAppointment from "./task-appointment";
@@ -503,6 +504,9 @@ export default function VolunteerPortal() {
     }
     if (location === "/task/sunwai" || location === "/app/task/sunwai") {
       return <TaskSunwai user={user} />;
+    }
+    if (location === "/task/nasha-viruddh-yuddh" || location === "/app/task/nasha-viruddh-yuddh") {
+      return <TaskNvy user={user} />;
     }
     if (location === "/task/outdoor-ad" || location === "/app/task/outdoor-ad") {
       return <TaskOutdoorAd user={user} />;

@@ -28,6 +28,7 @@ import {
   outdoorAdSubmissions, insertOutdoorAdSchema,
   insertGovSchoolSubmissionSchema, insertGovSchoolIssueCategorySchema,
   insertAppointmentSchema,
+  nvyReports, insertNvyReportSchema,
 } from "@shared/schema";
 
 function normalizeEmail(email: string): string {
@@ -3959,6 +3960,31 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[Sunwai] Complete error:", error.message);
       res.status(500).json({ error: "Failed to complete complaint" });
+    }
+  });
+
+  // ===== Nasha Viruddh Yuddh Routes =====
+
+  // Submit a new report (no OTP, no user-facing list)
+  app.post("/api/nvy/report", async (req, res) => {
+    try {
+      const data = insertNvyReportSchema.parse(req.body);
+      const report = await storage.createNvyReport(data);
+      res.json(report);
+    } catch (error: any) {
+      console.error("[NVY] Submit error:", error.message);
+      res.status(400).json({ error: "Invalid report data" });
+    }
+  });
+
+  // Admin: list all reports
+  app.get("/api/nvy/reports", async (_req, res) => {
+    try {
+      const reports = await storage.getNvyReports();
+      res.json(reports);
+    } catch (error: any) {
+      console.error("[NVY] List error:", error.message);
+      res.status(500).json({ error: "Failed to fetch reports" });
     }
   });
 

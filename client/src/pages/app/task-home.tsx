@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck } from "lucide-react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getProfileCompletion } from "@/lib/profile-completion";
@@ -378,6 +378,33 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           <div className="space-y-2.5">
+            <Link href="/task/nasha-viruddh-yuddh">
+              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
+                <CardContent className="p-4 flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-red-600 to-rose-600 shadow-sm">
+                    <ShieldAlert className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm text-slate-800">
+                      {language === "hi" ? "नशा विरुद्ध युद्ध" : language === "pa" ? "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" : "Nasha Viruddh Yuddh"}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      {language === "hi"
+                        ? "जहां नशा हो रहा है उस स्थान की गुप्त रिपोर्टिंग"
+                        : language === "pa"
+                        ? "ਜਿੱਥੇ ਨਸ਼ਾ ਚੱਲ ਰਿਹਾ ਹੈ ਉਸ ਥਾਂ ਦੀ ਗੁਪਤ ਰਿਪੋਰਟਿੰਗ"
+                        : "Secretly report locations where drug activity is happening"}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                      <ChevronRight className="h-4 w-4 text-red-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
             <Link href="/task/harr-sirr-te-chatt">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
                 <CardContent className="p-4 flex items-center gap-3.5">

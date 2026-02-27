@@ -41,6 +41,7 @@ const ALL_PERMISSIONS = [
   { id: "user-reports", label: "User Reports", group: "Analytics", hasSubPerms: true },
   { id: "role-management", label: "Role Management", group: "Management", hasSubPerms: true },
   { id: "sunwai", label: "Sunwai (Complaints)", group: "Management", hasSubPerms: true },
+  { id: "nvy", label: "Nasha Viruddh Yuddh", group: "Management", hasSubPerms: false },
   { id: "outdoor-ads", label: "Outdoor Ads", group: "Management", hasSubPerms: true },
   { id: "gov-school", label: "Gov School Work", group: "Management", hasSubPerms: true },
 ];

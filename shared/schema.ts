@@ -757,6 +757,29 @@ export const insertSurveyResponseSchema = createInsertSchema(surveyResponses).om
 export type InsertSurveyResponse = z.infer<typeof insertSurveyResponseSchema>;
 export type SurveyResponse = typeof surveyResponses.$inferSelect;
 
+// Nasha Viruddh Yuddh Reports
+export const nvyReports = pgTable("nvy_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id"),
+  villageName: text("village_name"),
+  photo: text("photo"),
+  audioNote: text("audio_note"),
+  description: text("description"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  locationAddress: text("location_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNvyReportSchema = createInsertSchema(nvyReports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertNvyReport = z.infer<typeof insertNvyReportSchema>;
+export type NvyReport = typeof nvyReports.$inferSelect;
+
 export const otpCodes = pgTable("otp_codes", {
   key: text("key").primaryKey(),
   otp: text("otp").notNull(),
