@@ -9,7 +9,6 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
-import otplib from "otplib";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
@@ -84,6 +83,73 @@ async function cleanExpiredOTPs(): Promise<void> {
   try {
     await db.delete(otpCodes).where(lte(otpCodes.expiresAt, new Date()));
   } catch (e) {}
+}
+
+// Simple TOTP implementation (no external library)
+import crypto from "crypto";
+
+const TOTP_DIGITS = 6;
+const TOTP_STEP = 30; // seconds
+const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+function generateBase32Secret(length = 20): string {
+  const buffer = crypto.randomBytes(length);
+  let bits = "";
+  for (const byte of buffer) {
+    bits += byte.toString(2).padStart(8, "0");
+  }
+  let secret = "";
+  for (let i = 0; i + 5 <= bits.length; i += 5) {
+    const chunk = bits.slice(i, i + 5);
+    const index = parseInt(chunk, 2);
+    secret += BASE32_ALPHABET[index];
+  }
+  return secret;
+}
+
+function base32ToBuffer(secret: string): Buffer {
+  let bits = "";
+  for (const char of secret.toUpperCase().replace(/[^A-Z2-7]/g, "")) {
+    const idx = BASE32_ALPHABET.indexOf(char);
+    if (idx === -1) continue;
+    bits += idx.toString(2).padStart(5, "0");
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i + 7 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+function generateTotp(secret: string, timeStep: number): string {
+  const key = base32ToBuffer(secret);
+  const buffer = Buffer.alloc(8);
+  buffer.writeBigUInt64BE(BigInt(timeStep));
+  const hmac = crypto.createHmac("sha1", key).update(buffer).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const code = ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  const otp = (code % 10 ** TOTP_DIGITS).toString().padStart(TOTP_DIGITS, "0");
+  return otp;
+}
+
+function verifyTotpToken(token: string, secret: string): boolean {
+  const t = Math.floor(Date.now() / 1000 / TOTP_STEP);
+  const clean = token.replace(/\D/g, "").trim();
+  if (!clean) return false;
+  for (let drift = -1; drift <= 1; drift++) {
+    const expected = generateTotp(secret, t + drift);
+    if (expected === clean) return true;
+  }
+  return false;
+}
+
+function buildOtpAuthUrl(secret: string, label: string, issuer: string): string {
+  const encLabel = encodeURIComponent(label);
+  const encIssuer = encodeURIComponent(issuer);
+  return `otpauth://totp/${encIssuer}:${encLabel}?secret=${secret}&issuer=${encIssuer}&digits=${TOTP_DIGITS}&period=${TOTP_STEP}`;
 }
 
 // Google Cloud Vision OCR using Service Account
@@ -378,8 +444,6 @@ function parseOcrText(text: string, docType: string): Record<string, string> {
 
   return result;
 }
-
-const authenticator = otplib.authenticator;
 
 export async function registerRoutes(
   httpServer: Server,
@@ -796,8 +860,8 @@ export async function registerRoutes(
           return res.json({ mode: "verify", userType: "user", userId: user.id });
         }
         // First-time login: generate secret and ask to set up 2FA
-        const secret = authenticator.generateSecret();
-        const otpauthUrl = authenticator.keyuri(username, "PatialaRural-Admin", secret);
+        const secret = generateBase32Secret();
+        const otpauthUrl = buildOtpAuthUrl(secret, username, "PatialaRural-Admin");
         await storage.updateUser(user.id, { twoFaSecret: secret });
         return res.json({
           mode: "setup",
@@ -817,8 +881,8 @@ export async function registerRoutes(
         if (manager.twoFaEnabled) {
           return res.json({ mode: "verify", userType: "manager", userId: manager.id });
         }
-        const secret = authenticator.generateSecret();
-        const otpauthUrl = authenticator.keyuri(username, "PatialaRural-Admin", secret);
+        const secret = generateBase32Secret();
+        const otpauthUrl = buildOtpAuthUrl(username, "PatialaRural-Admin", secret);
         await storage.updateOfficeManager(manager.id, { twoFaSecret: secret });
         return res.json({
           mode: "setup",
@@ -849,7 +913,7 @@ export async function registerRoutes(
         if (!user || !user.twoFaSecret) {
           return res.status(400).json({ error: "2FA not initialized for this user" });
         }
-        const isValid = authenticator.check(token, user.twoFaSecret);
+        const isValid = verifyTotpToken(token, user.twoFaSecret);
         if (!isValid) {
           return res.status(401).json({ error: "Invalid 2FA code" });
         }
@@ -872,7 +936,7 @@ export async function registerRoutes(
         if (!manager || !manager.twoFaSecret) {
           return res.status(400).json({ error: "2FA not initialized for this user" });
         }
-        const isValid = authenticator.check(token, manager.twoFaSecret);
+        const isValid = verifyTotpToken(token, manager.twoFaSecret);
         if (!isValid) {
           return res.status(401).json({ error: "Invalid 2FA code" });
         }
