@@ -94,6 +94,7 @@ export default function UserManagementPage() {
     open: false, manager: null,
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [reset2faTarget, setReset2faTarget] = useState<{ open: boolean; id: string; name: string } | null>(null);
 
   const { data: appUsers, isLoading: usersLoading } = useQuery<AppUser[]>({
     queryKey: ["/api/admin/app-users"],
@@ -257,6 +258,34 @@ export default function UserManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/office-managers"] });
       toast({ title: "Admin status updated" });
+    },
+  });
+
+  const reset2faMutation = useMutation({
+    mutationFn: async ({ targetId }: { targetId: string }) => {
+      const stored = localStorage.getItem("adminUser");
+      if (!stored) throw new Error("Not logged in");
+      const admin = JSON.parse(stored) as AdminUser;
+      const superUsername = admin.username;
+      const superPassword = window.prompt("Enter your admin password to reset 2FA for this account:");
+      if (!superPassword) {
+        throw new Error("Password required");
+      }
+      const res = await apiRequest("POST", "/api/admin/2fa/reset", {
+        superUsername,
+        superPassword,
+        targetType: "manager",
+        targetId,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setReset2faTarget(null);
+      toast({ title: "2FA reset successfully. The admin must set it up again on next login." });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "Failed to reset 2FA";
+      toast({ title: "Failed to reset 2FA", description: msg, variant: "destructive" });
     },
   });
 
@@ -641,6 +670,12 @@ export default function UserManagementPage() {
                                   )}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  onClick={() => setReset2faTarget({ open: true, id: mgr.id, name: mgr.name })}
+                                  data-testid={`menu-reset2fa-admin-${mgr.id}`}
+                                >
+                                  <ShieldCheck className="h-4 w-4 mr-2" /> Reset 2FA
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
                                   className="text-destructive"
                                   onClick={() => setDeleteConfirm({ open: true, id: mgr.id, name: mgr.name, type: "admin" })}
                                   data-testid={`menu-delete-admin-${mgr.id}`}
@@ -995,6 +1030,31 @@ export default function UserManagementPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {reset2faTarget && (
+        <Dialog open={reset2faTarget.open} onOpenChange={(open) => !open && setReset2faTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reset 2-Factor Authentication</DialogTitle>
+              <DialogDescription>
+                This will clear 2FA for <span className="font-semibold">{reset2faTarget.name}</span>. On next login they
+                will have to set up 2FA again with a new QR code. Confirm only if this admin has genuinely lost access
+                to their authenticator app.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setReset2faTarget(null)}>Cancel</Button>
+              <Button
+                type="button"
+                onClick={() => reset2faMutation.mutate({ targetId: reset2faTarget.id })}
+                disabled={reset2faMutation.isPending}
+              >
+                {reset2faMutation.isPending ? "Resetting..." : "Confirm Reset"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={editAdmin.open} onOpenChange={(open) => !open && setEditAdmin({ open: false, manager: null })}>
         <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">

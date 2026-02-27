@@ -30,6 +30,7 @@ import {
   insertGovSchoolSubmissionSchema, insertGovSchoolIssueCategorySchema,
   insertAppointmentSchema,
   nvyReports, insertNvyReportSchema,
+  type InsertOfficeManager,
 } from "@shared/schema";
 
 function normalizeEmail(email: string): string {
@@ -105,6 +106,33 @@ async function verifyPassword(plain: string, stored: string): Promise<boolean> {
     }
   }
   return plain === stored;
+}
+
+// Simple in-memory rate limiter for admin auth endpoints
+type RateKey = string;
+interface RateEntry {
+  count: number;
+  first: number;
+}
+
+const loginRateStore: Record<RateKey, RateEntry> = {};
+const LOGIN_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const LOGIN_MAX_ATTEMPTS = 10;
+
+function isRateLimited(key: RateKey): boolean {
+  const now = Date.now();
+  const entry = loginRateStore[key];
+  if (!entry) {
+    loginRateStore[key] = { count: 1, first: now };
+    return false;
+  }
+  if (now - entry.first > LOGIN_WINDOW_MS) {
+    // window reset
+    loginRateStore[key] = { count: 1, first: now };
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > LOGIN_MAX_ATTEMPTS;
 }
 
 // Simple TOTP implementation (no external library)
@@ -875,6 +903,11 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Username and password required" });
       }
 
+      const rateKey = `admin-login:${username}`;
+      if (isRateLimited(rateKey)) {
+        return res.status(429).json({ error: "Too many login attempts. Please wait and try again." });
+      }
+
       // Try main admin users table first
       const user = await storage.getUserByUsername(username);
       if (user && await verifyPassword(password, user.password)) {
@@ -929,6 +962,11 @@ export async function registerRoutes(
       const { userId, userType, token } = req.body as { userId?: string; userType?: "user" | "manager"; token?: string };
       if (!userId || !userType || !token) {
         return res.status(400).json({ error: "Missing 2FA data" });
+      }
+
+      const rateKey = `admin-2fa:${userId}`;
+      if (isRateLimited(rateKey)) {
+        return res.status(429).json({ error: "Too many 2FA attempts. Please wait and try again." });
       }
 
       if (userType === "user") {
@@ -987,6 +1025,51 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[Admin 2FA verify] error", error);
       res.status(500).json({ error: "2FA verification failed" });
+    }
+  });
+
+  // Super admin: reset 2FA for a target admin account
+  app.post("/api/admin/2fa/reset", async (req, res) => {
+    try {
+      const { superUsername, superPassword, targetType, targetId } = req.body as {
+        superUsername?: string;
+        superPassword?: string;
+        targetType?: "user" | "manager";
+        targetId?: string;
+      };
+
+      if (!superUsername || !superPassword || !targetType || !targetId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Only allow specific hard-coded super admin username for now
+      if (superUsername !== "9625692122") {
+        return res.status(403).json({ error: "Not authorized to reset 2FA" });
+      }
+
+      const superUser = await storage.getUserByUsername(superUsername);
+      if (!superUser || !(await verifyPassword(superPassword, superUser.password))) {
+        return res.status(401).json({ error: "Invalid super admin credentials" });
+      }
+
+      if (targetType === "user") {
+        const updated = await storage.updateUser(targetId, { twoFaEnabled: false, twoFaSecret: null });
+        if (!updated) {
+          return res.status(404).json({ error: "Target user not found" });
+        }
+      } else if (targetType === "manager") {
+        const updated = await storage.updateOfficeManager(targetId, { twoFaEnabled: false, twoFaSecret: null });
+        if (!updated) {
+          return res.status(404).json({ error: "Target office manager not found" });
+        }
+      } else {
+        return res.status(400).json({ error: "Unsupported target type" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Admin 2FA reset] error", error);
+      res.status(500).json({ error: "Failed to reset 2FA" });
     }
   });
 
