@@ -999,10 +999,28 @@ export async function registerRoutes(
 
   app.post("/api/office-managers", async (req, res) => {
     try {
-      const data = insertOfficeManagerSchema.parse(req.body);
-      const manager = await storage.createOfficeManager(data);
+      const { name, userId, password, isActive, roleId, assignedVillages } = req.body || {};
+      if (!name || !userId || !password) {
+        return res.status(400).json({ error: "Name, userId and password are required" });
+      }
+
+      const payload: InsertOfficeManager = {
+        name: String(name).trim(),
+        userId: String(userId).trim(),
+        password: String(password),
+        isActive: typeof isActive === "boolean" ? isActive : true,
+        roleId: roleId ? String(roleId) : null,
+        assignedVillages: Array.isArray(assignedVillages)
+          ? assignedVillages.map((v: any) => String(v))
+          : [],
+        twoFaEnabled: false,
+        twoFaSecret: null,
+      };
+
+      const manager = await storage.createOfficeManager(payload);
       res.json(manager);
     } catch (error) {
+      console.error("[office-managers] create error", error);
       res.status(400).json({ error: "Invalid office manager data" });
     }
   });
