@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
@@ -39,6 +39,7 @@ import OutdoorAdSubmissionsPage from "./outdoor-ad-submissions";
 import NvyReportsPage from "./nvy-reports";
 import GovSchoolSubmissionsPage from "./gov-school-submissions";
 import AppointmentSubmissionsPage from "./appointment-submissions";
+import RoadReportsPage from "./road-reports";
 
 interface AdminUser {
   id: string;
@@ -60,6 +61,7 @@ const allMenuItems = [
   { id: "birthdays", label: "Birthday Manager", icon: Cake, path: "/admin/birthdays", group: "Management" },
   { id: "sunwai", label: "Sunwai (Complaints)", icon: Megaphone, path: "/admin/sunwai", group: "Management" },
   { id: "nvy", label: "Nasha Viruddh Yuddh", icon: ShieldAlert, path: "/admin/nvy", group: "Management" },
+  { id: "road", label: "Road Reports", icon: Route, path: "/admin/road", group: "Management" },
   { id: "outdoor-ads", label: "Outdoor Ads", icon: Megaphone, path: "/admin/outdoor-ads", group: "Management" },
   { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Management" },
   { id: "appointments", label: "Appointments", icon: CalendarCheck, path: "/admin/appointments", group: "Management" },
@@ -380,6 +382,7 @@ export default function AdminPage() {
     if (currentPath.includes("gov-school")) return "gov-school";
     if (currentPath.includes("sunwai")) return "sunwai";
     if (currentPath.includes("nvy")) return "nvy";
+    if (currentPath.includes("road")) return "road";
     if (currentPath.includes("birthdays")) return "birthdays";
     if (currentPath.includes("surveys")) return "surveys";
     if (currentPath.includes("sdsk")) return "sdsk";
@@ -482,6 +485,7 @@ export default function AdminPage() {
             {activeSection === "birthdays" && <BirthdayManagerPage />}
             {activeSection === "sunwai" && <SunwaiSubmissionsPage />}
             {activeSection === "nvy" && <NvyReportsPage />}
+            {activeSection === "road" && <RoadReportsPage />}
             {activeSection === "outdoor-ads" && <OutdoorAdSubmissionsPage />}
             {activeSection === "gov-school" && <GovSchoolSubmissionsPage />}
             {activeSection === "appointments" && <AppointmentSubmissionsPage />}

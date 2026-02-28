@@ -996,3 +996,55 @@ export const insertAppointmentLogSchema = createInsertSchema(appointmentLogs).om
 
 export type InsertAppointmentLog = z.infer<typeof insertAppointmentLogSchema>;
 export type AppointmentLog = typeof appointmentLogs.$inferSelect;
+
+// Road Repair Reports
+export const roadReports = pgTable("road_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id"),
+  villageName: text("village_name"),
+  reporterName: text("reporter_name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  mobileVerified: boolean("mobile_verified").default(false),
+  description: text("description").notNull(),
+  photos: text("photos").array(),
+  video: text("video"),
+  audioNote: text("audio_note"),
+  startLatitude: text("start_latitude"),
+  startLongitude: text("start_longitude"),
+  endLatitude: text("end_latitude"),
+  endLongitude: text("end_longitude"),
+  distanceKm: text("distance_km"),
+  status: text("status").default("pending").notNull(), // pending, in_progress, completed
+  adminNote: text("admin_note"),
+  completionNote: text("completion_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertRoadReportSchema = createInsertSchema(roadReports).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export type InsertRoadReport = z.infer<typeof insertRoadReportSchema>;
+export type RoadReport = typeof roadReports.$inferSelect;
+
+export const roadLogs = pgTable("road_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull().references(() => roadReports.id),
+  action: text("action").notNull(),
+  note: text("note"),
+  performedBy: text("performed_by"),
+  performedByName: text("performed_by_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRoadLogSchema = createInsertSchema(roadLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRoadLog = z.infer<typeof insertRoadLogSchema>;
+export type RoadLog = typeof roadLogs.$inferSelect;

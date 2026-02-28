@@ -26,6 +26,7 @@ import TaskNvy from "./task-nvy";
 import TaskOutdoorAd from "./task-outdoor-ad";
 import TaskGovSchool from "./task-gov-school";
 import TaskAppointment from "./task-appointment";
+import TaskRoad from "./task-road";
 import SurveyForm from "./survey-form";
 import SurveyLeaderboard from "./survey-leaderboard";
 import Leaderboard from "./leaderboard";
@@ -507,6 +508,9 @@ export default function VolunteerPortal() {
     }
     if (location === "/task/nasha-viruddh-yuddh" || location === "/app/task/nasha-viruddh-yuddh") {
       return <TaskNvy user={user} />;
+    }
+    if (location === "/task/road-report" || location === "/app/task/road-report") {
+      return <TaskRoad user={user} />;
     }
     if (location === "/task/outdoor-ad" || location === "/app/task/outdoor-ad") {
       return <TaskOutdoorAd user={user} />;

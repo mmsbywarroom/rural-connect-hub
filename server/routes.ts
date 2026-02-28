@@ -30,6 +30,7 @@ import {
   insertGovSchoolSubmissionSchema, insertGovSchoolIssueCategorySchema,
   insertAppointmentSchema,
   nvyReports, insertNvyReportSchema,
+  roadReports, insertRoadReportSchema,
   type InsertOfficeManager,
 } from "@shared/schema";
 
@@ -4815,6 +4816,182 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[Appointment] Resolve error:", error.message);
       res.status(500).json({ error: "Failed to resolve appointment" });
+    }
+  });
+
+  // ===== Road Repair Reports =====
+
+  // OTP for reporter mobile verification
+  app.post("/api/road/send-otp", async (req, res) => {
+    try {
+      const { mobileNumber } = req.body;
+      if (!mobileNumber) {
+        return res.status(400).json({ error: "Mobile number is required" });
+      }
+      if (!isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const otp = await storeOTP(normalized);
+      if (isSmsConfigured()) {
+        try {
+          await sendOtpSms(normalized, otp);
+          console.log(`[Road OTP] SMS sent to ${maskMobile(normalized)}`);
+        } catch (smsErr: any) {
+          console.error("[Road OTP] SMS failed:", smsErr.message);
+        }
+      }
+      res.json({ success: true, masked: maskMobile(normalized) });
+    } catch (error: any) {
+      console.error("[Road OTP] Error:", error.message);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/road/verify-otp", async (req, res) => {
+    try {
+      const { mobileNumber, otp } = req.body;
+      if (!mobileNumber || !otp) {
+        return res.status(400).json({ error: "Mobile number and OTP are required" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const valid = await verifyOTP(normalized, otp);
+      if (!valid) {
+        return res.status(400).json({ error: "Invalid or expired OTP" });
+      }
+      res.json({ success: true, verified: true });
+    } catch (error: any) {
+      console.error("[Road OTP] Verify error:", error.message);
+      res.status(500).json({ error: "Failed to verify OTP" });
+    }
+  });
+
+  // Submit road report
+  app.post("/api/road/report", async (req, res) => {
+    try {
+      const data = insertRoadReportSchema.parse(req.body);
+      const report = await storage.createRoadReport(data);
+      await storage.createRoadLog({
+        reportId: report.id,
+        action: "submitted",
+        note: "Road issue reported",
+        performedBy: data.appUserId,
+        performedByName: data.reporterName,
+      });
+      res.json(report);
+    } catch (error: any) {
+      console.error("[Road] Submit error:", error.message);
+      res.status(400).json({ error: "Invalid road report data" });
+    }
+  });
+
+  // User's own road reports with logs
+  app.get("/api/road/my-reports/:appUserId", async (req, res) => {
+    try {
+      const reports = await storage.getRoadReportsByUser(req.params.appUserId);
+      const withLogs = await Promise.all(
+        reports.map(async (r) => {
+          const logs = await storage.getRoadLogsByReport(r.id);
+          return { ...r, logs };
+        })
+      );
+      res.json(withLogs);
+    } catch (error: any) {
+      console.error("[Road] My reports error:", error.message);
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: list all road reports
+  app.get("/api/road/reports", async (req, res) => {
+    try {
+      const reports = await storage.getRoadReports();
+      res.json(reports);
+    } catch (error: any) {
+      console.error("[Road] Get reports error:", error.message);
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  // Admin: single road report with logs
+  app.get("/api/road/reports/:id", async (req, res) => {
+    try {
+      const reports = await storage.getRoadReports();
+      const report = reports.find((r) => r.id === req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      const logs = await storage.getRoadLogsByReport(report.id);
+      res.json({ ...report, logs });
+    } catch (error: any) {
+      console.error("[Road] Get report error:", error.message);
+      res.status(500).json({ error: "Failed to fetch report" });
+    }
+  });
+
+  // Admin: add processing note (does not close)
+  app.patch("/api/road/reports/:id/note", async (req, res) => {
+    try {
+      const { note, performedBy, performedByName } = req.body;
+      if (!note) {
+        return res.status(400).json({ error: "Note is required" });
+      }
+      const reports = await storage.getRoadReports();
+      const report = reports.find((r) => r.id === req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      await db.update(roadReports)
+        .set({ adminNote: note })
+        .where(eq(roadReports.id, req.params.id));
+      await storage.createRoadLog({
+        reportId: req.params.id,
+        action: "note",
+        note,
+        performedBy: performedBy || "admin",
+        performedByName: performedByName || "Admin",
+      });
+      const logs = await storage.getRoadLogsByReport(req.params.id);
+      const [updated] = await db.select().from(roadReports).where(eq(roadReports.id, req.params.id));
+      res.json({ ...updated, logs });
+    } catch (error: any) {
+      console.error("[Road] Add note error:", error.message);
+      res.status(500).json({ error: "Failed to add note" });
+    }
+  });
+
+  // Admin: mark report completed with final note
+  app.patch("/api/road/reports/:id/complete", async (req, res) => {
+    try {
+      const { completionNote, performedBy, performedByName } = req.body;
+      if (!completionNote) {
+        return res.status(400).json({ error: "Completion note is required" });
+      }
+      const reports = await storage.getRoadReports();
+      const report = reports.find((r) => r.id === req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      await db.update(roadReports)
+        .set({
+          status: "completed",
+          completionNote,
+          completedAt: new Date(),
+        } as any)
+        .where(eq(roadReports.id, req.params.id));
+      await storage.createRoadLog({
+        reportId: req.params.id,
+        action: "completed",
+        note: completionNote,
+        performedBy: performedBy || "admin",
+        performedByName: performedByName || "Admin",
+      });
+      const logs = await storage.getRoadLogsByReport(req.params.id);
+      const [updated] = await db.select().from(roadReports).where(eq(roadReports.id, req.params.id));
+      res.json({ ...updated, logs });
+    } catch (error: any) {
+      console.error("[Road] Complete error:", error.message);
+      res.status(500).json({ error: "Failed to complete report" });
     }
   });
 

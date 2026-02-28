@@ -58,6 +58,9 @@ import {
   appointments, appointmentLogs,
   type Appointment, type InsertAppointment,
   type AppointmentLog, type InsertAppointmentLog,
+  roadReports, roadLogs,
+  type RoadReport, type InsertRoadReport,
+  type RoadLog, type InsertRoadLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -335,6 +338,13 @@ export interface IStorage {
   getAppointmentsByUser(appUserId: string): Promise<Appointment[]>;
   createAppointmentLog(data: InsertAppointmentLog): Promise<AppointmentLog>;
   getAppointmentLogsByAppointment(appointmentId: string): Promise<AppointmentLog[]>;
+
+  // Road Reports
+  createRoadReport(data: InsertRoadReport): Promise<RoadReport>;
+  getRoadReports(): Promise<RoadReport[]>;
+  getRoadReportsByUser(appUserId: string): Promise<RoadReport[]>;
+  createRoadLog(data: InsertRoadLog): Promise<RoadLog>;
+  getRoadLogsByReport(reportId: string): Promise<RoadLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1334,6 +1344,33 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(appointmentLogs)
       .where(eq(appointmentLogs.appointmentId, appointmentId))
       .orderBy(asc(appointmentLogs.createdAt));
+  }
+
+  // Road Reports
+  async createRoadReport(data: InsertRoadReport): Promise<RoadReport> {
+    const [r] = await db.insert(roadReports).values(data).returning();
+    return r;
+  }
+
+  async getRoadReports(): Promise<RoadReport[]> {
+    return db.select().from(roadReports).orderBy(desc(roadReports.createdAt));
+  }
+
+  async getRoadReportsByUser(appUserId: string): Promise<RoadReport[]> {
+    return db.select().from(roadReports)
+      .where(eq(roadReports.appUserId, appUserId))
+      .orderBy(desc(roadReports.createdAt));
+  }
+
+  async createRoadLog(data: InsertRoadLog): Promise<RoadLog> {
+    const [log] = await db.insert(roadLogs).values(data).returning();
+    return log;
+  }
+
+  async getRoadLogsByReport(reportId: string): Promise<RoadLog[]> {
+    return db.select().from(roadLogs)
+      .where(eq(roadLogs.reportId, reportId))
+      .orderBy(asc(roadLogs.createdAt));
   }
 }
 

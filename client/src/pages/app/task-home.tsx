@@ -405,6 +405,33 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               </Card>
             </Link>
 
+            <Link href="/task/road-report">
+              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
+                <CardContent className="p-4 flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-600 to-sky-500 shadow-sm">
+                    <Route className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm text-slate-800">
+                      {language === "hi" ? "सड़क खराबी सूचना" : language === "pa" ? "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" : "Road Condition Report"}
+                    </h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      {language === "hi"
+                        ? "जहां सड़क टूटी या खराब है, वहां की शुरू से अंत तक की जानकारी भेजें"
+                        : language === "pa"
+                        ? "ਜਿੱਥੇ ਸੜਕ ਟੁੱਟੀ ਜਾਂ ਖਰਾਬ ਹੈ, ਉੱਥੇ ਦੀ ਸ਼ੁਰੂ ਤੋਂ ਅੰਤ ਤੱਕ ਜਾਣਕਾਰੀ ਭੇਜੋ"
+                        : "Report damaged road stretch with photos, audio and map distance"}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <ChevronRight className="h-4 w-4 text-blue-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
             <Link href="/task/harr-sirr-te-chatt">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
                 <CardContent className="p-4 flex items-center gap-3.5">
