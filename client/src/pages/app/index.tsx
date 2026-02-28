@@ -253,26 +253,38 @@ export default function VolunteerPortal() {
   }
 
   if (authState === "welcome") {
+    const ministerImageUrl = "https://drive.google.com/uc?export=view&id=1T6EoEClNxR4IJW1YuM0bb50OBycafpud";
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-xl">
-          <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-              <Mail className="h-8 w-8 text-blue-600" />
+      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-4">
+          <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white">
+            <img
+              src={ministerImageUrl}
+              alt="Dr. Balbir Singh - Health Minister, Punjab Government"
+              className="w-full h-auto object-cover"
+            />
+            <div className="p-3 text-center bg-white">
+              <p className="font-semibold text-slate-800 text-lg">Dr. Balbir Singh</p>
+              <p className="text-sm text-slate-600">Health Minister, Punjab Government</p>
+              <p className="text-xs text-slate-500 mt-2 font-medium">Sewa, Sunwai, Samman, Sangathan, Suraksha, Sangharsh</p>
             </div>
-            <CardTitle className="text-xl" data-testid="text-app-title">{t('patialaRural')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button
-              className="w-full h-14 text-base"
-              onClick={() => setAuthState("login")}
-              data-testid="button-login"
-            >
-              <LogIn className="mr-3 h-5 w-5" /> {t('login')}
-            </Button>
-            <LanguageSwitcherInline className="mt-3" />
-          </CardContent>
-        </Card>
+          </div>
+          <Card className="shadow-xl">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-xl" data-testid="text-app-title">{t('patialaRural')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                className="w-full h-14 text-base"
+                onClick={() => setAuthState("login")}
+                data-testid="button-login"
+              >
+                <LogIn className="mr-3 h-5 w-5" /> {t('login')}
+              </Button>
+              <LanguageSwitcherInline className="mt-3" />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }

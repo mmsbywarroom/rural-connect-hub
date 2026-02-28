@@ -3011,6 +3011,71 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/user-tree", async (req, res) => {
+    try {
+      const allUsers = await storage.getAppUsers();
+      const allVolunteers = await storage.getMappedVolunteers();
+      const allSupporters = await storage.getSupporters();
+
+      const volCountByUser = new Map<string, number>();
+      const supCountByUser = new Map<string, number>();
+      for (const v of allVolunteers) {
+        volCountByUser.set(v.addedByUserId, (volCountByUser.get(v.addedByUserId) || 0) + 1);
+      }
+      for (const s of allSupporters) {
+        supCountByUser.set(s.addedByUserId, (supCountByUser.get(s.addedByUserId) || 0) + 1);
+      }
+
+      const docFields: { key: string; label: string }[] = [
+        { key: "name", label: "Full Name" },
+        { key: "selfPhoto", label: "Self Photo" },
+        { key: "voterId", label: "Voter ID" },
+        { key: "aadhaarNumber", label: "Aadhaar Number" },
+        { key: "aadhaarPhoto", label: "Aadhaar Front" },
+        { key: "aadhaarPhotoBack", label: "Aadhaar Back" },
+        { key: "voterCardPhoto", label: "Voter Card Front" },
+        { key: "voterCardPhotoBack", label: "Voter Card Back" },
+        { key: "wing", label: "Wing" },
+      ];
+
+      const usersWithStats = allUsers.map((u) => {
+        const uploaded: string[] = [];
+        const missing: string[] = [];
+        for (const f of docFields) {
+          const val = (u as Record<string, unknown>)[f.key];
+          const filled = !!(val && String(val).trim());
+          if (filled) uploaded.push(f.label);
+          else missing.push(f.label);
+        }
+        if (u.role === "party_post_holder") {
+          const posFilled = !!(u.currentPosition && String(u.currentPosition).trim());
+          const lvlFilled = !!(u.level && String(u.level).trim());
+          if (posFilled) uploaded.push("Position"); else missing.push("Position");
+          if (lvlFilled) uploaded.push("Level"); else missing.push("Level");
+        }
+        return {
+          id: u.id,
+          name: u.name,
+          mobileNumber: u.mobileNumber,
+          email: u.email,
+          role: u.role,
+          mappedAreaName: u.mappedAreaName,
+          volunteerMappingCount: volCountByUser.get(u.id) || 0,
+          supporterMappingCount: supCountByUser.get(u.id) || 0,
+          documentsUploaded: uploaded,
+          documentsMissing: missing,
+        };
+      });
+
+      res.json({
+        users: usersWithStats.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" })),
+      });
+    } catch (error) {
+      console.error("User tree error:", error);
+      res.status(500).json({ error: "Failed to fetch user tree" });
+    }
+  });
+
   app.get("/api/analytics/user-report/:userId", async (req, res) => {
     try {
       const user = await storage.getAppUser(req.params.userId);

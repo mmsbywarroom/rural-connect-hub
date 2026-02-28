@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
@@ -40,6 +40,7 @@ import NvyReportsPage from "./nvy-reports";
 import GovSchoolSubmissionsPage from "./gov-school-submissions";
 import AppointmentSubmissionsPage from "./appointment-submissions";
 import RoadReportsPage from "./road-reports";
+import UserTreePage from "./user-tree";
 
 interface AdminUser {
   id: string;
@@ -79,6 +80,7 @@ const allMenuItems = [
   { id: "analytics", label: "Dashboard", icon: BarChart3, path: "/admin/analytics", group: "Analytics" },
   { id: "task-reports", label: "Task Reports", icon: FileBarChart, path: "/admin/task-reports", group: "Analytics" },
   { id: "user-reports", label: "User Reports", icon: UserCheck, path: "/admin/user-reports", group: "Analytics" },
+  { id: "user-tree", label: "User Tree", icon: FolderTree, path: "/admin/user-tree", group: "Analytics" },
 ];
 
 const GROUPS = ["Management", "Master Data", "Tools", "Analytics"];
@@ -389,6 +391,7 @@ export default function AdminPage() {
     if (currentPath.includes("hstc")) return "hstc";
     if (currentPath.includes("task-reports")) return "task-reports";
     if (currentPath.includes("user-reports")) return "user-reports";
+    if (currentPath.includes("user-tree")) return "user-tree";
     if (currentPath.includes("role-management")) return "role-management";
     if (currentPath.includes("user-management")) return "user-management";
     if (currentPath.includes("analytics")) return "analytics";
@@ -504,6 +507,7 @@ export default function AdminPage() {
             {activeSection === "analytics" && <AnalyticsDashboard />}
             {activeSection === "task-reports" && <TaskReportsPage />}
             {activeSection === "user-reports" && <UserReportsPage />}
+            {activeSection === "user-tree" && <UserTreePage />}
           </main>
         </div>
       </div>
