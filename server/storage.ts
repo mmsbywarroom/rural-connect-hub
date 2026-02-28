@@ -213,6 +213,7 @@ export interface IStorage {
   getTaskCategory(id: string): Promise<TaskCategory | undefined>;
   createTaskCategory(category: InsertTaskCategory): Promise<TaskCategory>;
   updateTaskCategory(id: string, category: Partial<InsertTaskCategory>): Promise<TaskCategory | undefined>;
+  setTaskCategoryTasks(categoryId: string, taskIds: string[]): Promise<void>;
   deleteTaskCategory(id: string): Promise<void>;
 
   // Task Configs (SDUI)
@@ -890,6 +891,13 @@ export class DatabaseStorage implements IStorage {
   async updateTaskCategory(id: string, category: Partial<InsertTaskCategory>): Promise<TaskCategory | undefined> {
     const [updated] = await db.update(taskCategories).set(category).where(eq(taskCategories.id, id)).returning();
     return updated;
+  }
+
+  async setTaskCategoryTasks(categoryId: string, taskIds: string[]): Promise<void> {
+    await db.update(taskConfigs).set({ categoryId: null }).where(eq(taskConfigs.categoryId, categoryId));
+    if (taskIds.length > 0) {
+      await db.update(taskConfigs).set({ categoryId }).where(inArray(taskConfigs.id, taskIds));
+    }
   }
 
   async deleteTaskCategory(id: string): Promise<void> {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,12 @@ interface TaskCategory {
   isActive: boolean | null;
 }
 
+interface TaskConfigItem {
+  id: string;
+  name: string;
+  categoryId: string | null;
+}
+
 export default function TaskCategoriesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,9 +47,15 @@ export default function TaskCategoriesPage() {
   const [namePa, setNamePa] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
   const { data: categories, isLoading } = useQuery<TaskCategory[]>({
     queryKey: ["/api/task-categories"],
+  });
+
+  const { data: taskConfigs } = useQuery<TaskConfigItem[]>({
+    queryKey: ["/api/task-configs"],
+    enabled: isOpen && !!editingCategory,
   });
 
   const createCategory = useMutation({
@@ -60,12 +72,13 @@ export default function TaskCategoriesPage() {
   });
 
   const updateCategory = useMutation({
-    mutationFn: async (data: { name: string; nameHi?: string; namePa?: string; sortOrder: number; isActive: boolean }) =>
+    mutationFn: async (data: { name: string; nameHi?: string; namePa?: string; sortOrder: number; isActive: boolean; taskIds?: string[] }) =>
       apiRequest("PATCH", `/api/task-categories/${editingCategory?.id}`, data),
     onSuccess: () => {
       toast({ title: "Category updated!" });
       queryClient.invalidateQueries({ queryKey: ["/api/task-categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/app/task-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-configs"] });
       setIsOpen(false);
       setEditingCategory(null);
       resetForm();
@@ -91,6 +104,7 @@ export default function TaskCategoriesPage() {
     setNamePa("");
     setSortOrder(0);
     setIsActive(true);
+    setSelectedTaskIds([]);
   };
 
   const handleAdd = () => {
@@ -106,8 +120,21 @@ export default function TaskCategoriesPage() {
     setNamePa(cat.namePa ?? "");
     setSortOrder(cat.sortOrder ?? 0);
     setIsActive(cat.isActive ?? true);
+    setSelectedTaskIds([]);
     setIsOpen(true);
   };
+
+  const toggleTask = (taskId: string) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  useEffect(() => {
+    if (editingCategory && taskConfigs) {
+      setSelectedTaskIds(taskConfigs.filter((t) => t.categoryId === editingCategory.id).map((t) => t.id));
+    }
+  }, [editingCategory?.id, taskConfigs]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +143,7 @@ export default function TaskCategoriesPage() {
       return;
     }
     const data = { name: name.trim(), nameHi: nameHi.trim() || undefined, namePa: namePa.trim() || undefined, sortOrder, isActive };
-    if (editingCategory) updateCategory.mutate(data);
+    if (editingCategory) updateCategory.mutate({ ...data, taskIds: selectedTaskIds });
     else createCategory.mutate(data);
   };
 
@@ -205,6 +232,29 @@ export default function TaskCategoriesPage() {
               <Switch id="cat-active" checked={isActive} onCheckedChange={setIsActive} />
               <Label htmlFor="cat-active">Active (show on user dashboard)</Label>
             </div>
+            {editingCategory && (
+              <div className="space-y-2">
+                <Label>Assign tasks to this category</Label>
+                <p className="text-xs text-muted-foreground">Select which tasks appear under this category on the user dashboard.</p>
+                <div className="max-h-48 overflow-y-auto rounded-md border p-2 space-y-1.5">
+                  {!taskConfigs?.length ? (
+                    <p className="text-sm text-muted-foreground">No tasks yet. Add tasks in Task Manager first.</p>
+                  ) : (
+                    taskConfigs.map((task) => (
+                      <label key={task.id} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.includes(task.id)}
+                          onChange={() => toggleTask(task.id)}
+                          className="rounded border-input"
+                        />
+                        <span className="text-sm">{task.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createCategory.isPending || updateCategory.isPending}>

@@ -32,11 +32,15 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
     else setLoadState("fallback-text");
   };
 
+  const containerClass = compact
+    ? "w-full min-h-[120px] flex items-center justify-center overflow-hidden bg-slate-100"
+    : "w-full min-h-[180px] overflow-hidden bg-slate-100";
+
   if (loadState === "fallback-text") {
     return (
-      <div className={`w-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center ${compact ? "aspect-video max-h-32" : "aspect-[4/3]"}`}>
+      <div className={`${containerClass} bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center`}>
         <div className="text-center p-4">
-          <p className={`font-bold text-blue-800 ${compact ? "text-xl" : "text-4xl"}`}>{c.ministerName}</p>
+          <p className={`font-bold text-blue-800 ${compact ? "text-lg" : "text-4xl"}`}>{c.ministerName}</p>
           <p className={`text-blue-600 mt-1 ${compact ? "text-xs" : "text-sm"}`}>{c.ministerTitle}</p>
         </div>
       </div>
@@ -45,13 +49,16 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
 
   const imgSrc = loadState === "fallback-img" ? "/minister.jpg" : imageUrl;
   return (
-    <img
-      key={loadState + imgSrc}
-      src={imgSrc}
-      alt={`${c.ministerName} - ${c.ministerTitle}`}
-      className={`w-full h-auto object-cover ${compact ? "max-h-32 object-top" : ""}`}
-      onError={handleError}
-    />
+    <div className={containerClass}>
+      <img
+        key={loadState + imgSrc}
+        src={imgSrc}
+        alt={`${c.ministerName} - ${c.ministerTitle}`}
+        className={`w-full h-full object-cover object-top ${compact ? "min-h-[120px] max-h-[140px]" : "min-h-[180px]"}`}
+        onError={handleError}
+        referrerPolicy="no-referrer"
+      />
+    </div>
   );
 }
 

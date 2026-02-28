@@ -1939,8 +1939,10 @@ export async function registerRoutes(
 
   app.patch("/api/task-categories/:id", async (req, res) => {
     try {
-      const category = await storage.updateTaskCategory(req.params.id, req.body);
+      const { taskIds, ...rest } = req.body || {};
+      const category = await storage.updateTaskCategory(req.params.id, rest);
       if (!category) return res.status(404).json({ error: "Category not found" });
+      if (Array.isArray(taskIds)) await storage.setTaskCategoryTasks(req.params.id, taskIds);
       res.json(category);
     } catch (error) {
       res.status(400).json({ error: "Failed to update category" });

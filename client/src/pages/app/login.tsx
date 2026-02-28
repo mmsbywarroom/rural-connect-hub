@@ -122,12 +122,14 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-4">
-        <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white">
-          <MinisterImageWithFallback compact />
+      <div className="w-full max-w-sm space-y-4 flex flex-col">
+        <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white flex-shrink-0">
+          <div className="min-h-[120px] w-full">
+            <MinisterImageWithFallback compact />
+          </div>
           <MinisterTextBlock compact />
         </div>
-      <Card className="shadow-xl">
+      <Card className="shadow-xl flex-shrink-0">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-3">
             {inputIcon}
