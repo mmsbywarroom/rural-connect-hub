@@ -137,13 +137,13 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment"];
-  const selectedCat = categories?.find((c) => c.id === selectedCategoryId);
-  const visibleFixedSlugs = !selectedCategoryId ? ALL_FIXED_SLUGS : (selectedCat?.fixedTaskSlugs ?? []);
-
   const { data: categories } = useQuery<TaskCategory[]>({
     queryKey: ["/api/app/task-categories"],
   });
+
+  const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment"];
+  const selectedCat = categories?.find((c) => c.id === selectedCategoryId);
+  const visibleFixedSlugs = !selectedCategoryId ? ALL_FIXED_SLUGS : (selectedCat?.fixedTaskSlugs ?? []);
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
