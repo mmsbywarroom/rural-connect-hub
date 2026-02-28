@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
 import { Loader2, Mail, KeyRound, ArrowRight, ArrowLeft, Phone, Smartphone } from "lucide-react";
 import type { AppUser } from "@shared/schema";
+import { MinisterImageWithFallback, MinisterTextBlock } from "@/components/minister-image";
 
 interface AppLoginProps {
   onLogin: (user: AppUser) => void;
@@ -119,22 +120,12 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
   const inputIcon = inputType === "mobile" ? <Smartphone className="h-8 w-8 text-blue-600" /> : <Mail className="h-8 w-8 text-blue-600" />;
   const channelIcon = channel === "sms" ? <Phone className="h-4 w-4 text-blue-600" /> : <Mail className="h-4 w-4 text-blue-600" />;
 
-  const ministerImageUrl = "https://drive.google.com/uc?export=view&id=1T6EoEClNxR4IJW1YuM0bb50OBycafpud";
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-4">
         <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white">
-          <img
-            src={ministerImageUrl}
-            alt="Dr. Balbir Singh - Health Minister, Punjab Government"
-            className="w-full h-auto object-cover max-h-32 object-top"
-          />
-          <div className="p-2 text-center bg-white">
-            <p className="font-semibold text-slate-800 text-sm">Dr. Balbir Singh</p>
-            <p className="text-xs text-slate-600">Health Minister, Punjab Government</p>
-            <p className="text-xs text-slate-500 mt-1">Sewa, Sunwai, Samman, Sangathan, Suraksha, Sangharsh</p>
-          </div>
+          <MinisterImageWithFallback compact />
+          <MinisterTextBlock compact />
         </div>
       <Card className="shadow-xl">
         <CardHeader className="text-center pb-2">

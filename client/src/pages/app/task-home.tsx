@@ -4,12 +4,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon } from "lucide-react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getProfileCompletion } from "@/lib/profile-completion";
 import { useTranslation, getLocalizedText, type Language } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import type { AppUser, TaskConfig, Survey, SurveyQuestion } from "@shared/schema";
+
+interface TaskCategory {
+  id: string;
+  name: string;
+  nameHi: string | null;
+  namePa: string | null;
+  sortOrder: number | null;
+}
 
 interface LeaderboardEntry {
   userId: string;
@@ -124,6 +133,12 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   const completion = getProfileCompletion(user);
   const isComplete = completion.percentage === 100;
   const isAbove90 = completion.percentage >= 90;
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  const { data: categories } = useQuery<TaskCategory[]>({
+    queryKey: ["/api/app/task-categories"],
+  });
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
@@ -377,7 +392,35 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('availableTasks')}</h2>
           </div>
 
+          {categories && categories.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setSelectedCategoryId(null)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedCategoryId === null ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+              >
+                {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
+              </button>
+              {categories.map((cat) => {
+                const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
+                const isSelected = selectedCategoryId === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="space-y-2.5">
+            {!selectedCategoryId && (
+            <>
             <Link href="/task/nasha-viruddh-yuddh">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -569,6 +612,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
+            </>
+            )}
 
             {isLoading && (
               <>
@@ -577,7 +622,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               </>
             )}
 
-            {tasks?.map((task) => {
+            {(selectedCategoryId
+              ? tasks?.filter((t) => (t as any).categoryId === selectedCategoryId)
+              : tasks
+            )?.map((task) => {
               const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
               const count = submissionCounts?.[task.id] || 0;
               const actionLabel = count > 0 ? t('continueTask') : t('startTask');
@@ -606,12 +654,15 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               );
             })}
 
-            {!isLoading && tasks?.length === 0 && (
-              <div className="text-center py-10 text-slate-400">
-                <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">{t('noTasks')}</p>
-              </div>
-            )}
+            {!isLoading && (() => {
+              const filtered = selectedCategoryId ? (tasks?.filter((t) => (t as any).categoryId === selectedCategoryId) ?? []) : (tasks ?? []);
+              return filtered.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+                  <p className="text-sm">{selectedCategoryId ? (language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category") : t('noTasks')}</p>
+                </div>
+              ) : null;
+            })()}
           </div>
         </section>
       </div>

@@ -84,6 +84,16 @@ export const leadershipFlags = pgTable("leadership_flags", {
   isActive: boolean("is_active").default(true),
 });
 
+// Login Page Config (admin-editable image, name, slogan on login/welcome screen)
+export const loginPageConfig = pgTable("login_page_config", {
+  id: varchar("id").primaryKey().default("default"),
+  imageUrl: text("image_url"),
+  ministerName: text("minister_name").default("Dr. Balbir Singh"),
+  ministerTitle: text("minister_title").default("Health Minister, Punjab Government"),
+  slogan: text("slogan").default("Sewa, Sunwai, Samman, Sangathan, Suraksha, Sangharsh"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Admin Roles
 export const adminRoles = pgTable("admin_roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -292,9 +302,21 @@ export const supporters = pgTable("supporters", {
 
 // ===== SDUI (Server-Driven UI) Configuration =====
 
+// Task Categories - Group tasks on user dashboard
+export const taskCategories = pgTable("task_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  nameHi: text("name_hi"),
+  namePa: text("name_pa"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Task Configurations - Admin defines tasks
 export const taskConfigs = pgTable("task_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  categoryId: varchar("category_id").references(() => taskCategories.id),
   name: text("name").notNull(),
   nameHi: text("name_hi"),
   namePa: text("name_pa"),
@@ -468,6 +490,10 @@ export const csvUploads = pgTable("csv_uploads", {
 });
 
 // Insert Schemas
+export const insertLoginPageConfigSchema = createInsertSchema(loginPageConfig).omit({ updatedAt: true });
+export type InsertLoginPageConfig = z.infer<typeof insertLoginPageConfigSchema>;
+export type LoginPageConfig = typeof loginPageConfig.$inferSelect;
+
 export const insertAdminRoleSchema = createInsertSchema(adminRoles).omit({ id: true, createdAt: true });
 export const insertVillageSchema = createInsertSchema(villages).omit({ id: true });
 export const insertIssueSchema = createInsertSchema(issues).omit({ id: true });
@@ -488,6 +514,10 @@ export const insertCscSchema = createInsertSchema(cscs).omit({ id: true });
 export const insertCscReportSchema = createInsertSchema(cscReports).omit({ id: true, createdAt: true });
 export const insertMappedVolunteerSchema = createInsertSchema(mappedVolunteers).omit({ id: true, createdAt: true });
 export const insertSupporterSchema = createInsertSchema(supporters).omit({ id: true, createdAt: true });
+export const insertTaskCategorySchema = createInsertSchema(taskCategories).omit({ id: true, createdAt: true });
+export type InsertTaskCategory = z.infer<typeof insertTaskCategorySchema>;
+export type TaskCategory = typeof taskCategories.$inferSelect;
+
 export const insertTaskConfigSchema = createInsertSchema(taskConfigs).omit({ id: true, createdAt: true });
 export const insertFormFieldSchema = createInsertSchema(formFields).omit({ id: true });
 export const insertFieldOptionSchema = createInsertSchema(fieldOptions).omit({ id: true });

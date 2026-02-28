@@ -14,6 +14,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -40,6 +47,7 @@ const taskFormSchema = z.object({
   sortOrder: z.coerce.number().int().default(0),
   villageRestricted: z.boolean().default(false),
   isEnabled: z.boolean().default(true),
+  categoryId: z.string().nullable().optional(),
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -64,11 +72,16 @@ export default function TaskManagerPage() {
       sortOrder: 0,
       villageRestricted: false,
       isEnabled: true,
+      categoryId: null as string | null,
     },
   });
 
   const { data: taskConfigs, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/task-configs"],
+  });
+
+  const { data: categories } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/task-categories"],
   });
 
   const { data: taskStats } = useQuery<{ totalUsers: number; stats: Record<string, { submittedUsers: number; totalSubmissions: number }> }>({
@@ -132,6 +145,7 @@ export default function TaskManagerPage() {
       sortOrder: 0,
       villageRestricted: false,
       isEnabled: true,
+      categoryId: null,
     });
     setIsOpen(true);
   };
@@ -150,15 +164,17 @@ export default function TaskManagerPage() {
       sortOrder: task.sortOrder ?? 0,
       villageRestricted: task.villageRestricted ?? false,
       isEnabled: task.isEnabled ?? true,
+      categoryId: (task as any).categoryId ?? null,
     });
     setIsOpen(true);
   };
 
   const onSubmit = (data: TaskFormData) => {
+    const payload = { ...data, categoryId: data.categoryId || null };
     if (editingTask) {
-      updateTask.mutate(data);
+      updateTask.mutate(payload);
     } else {
-      createTask.mutate(data);
+      createTask.mutate(payload);
     }
   };
 
@@ -388,6 +404,29 @@ export default function TaskManagerPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category (for user dashboard)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="No category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No category</SelectItem>
+                        {categories?.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-3 gap-3">
                 <FormField
                   control={form.control}

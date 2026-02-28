@@ -4,9 +4,10 @@ import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
   appUsers, cscs, cscReports, mappedVolunteers, supporters,
-  taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions, csvUploads, userAdditionalRoles, voterList, pushSubscriptions,
-  adminRoles,
+  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions, csvUploads, userAdditionalRoles, voterList, pushSubscriptions,
+  adminRoles, loginPageConfig,
   type AdminRole, type InsertAdminRole,
+  type LoginPageConfig, type InsertLoginPageConfig,
   type User, type InsertUser,
   type Village, type InsertVillage,
   type Issue, type InsertIssue,
@@ -26,6 +27,7 @@ import {
   type CscReport, type InsertCscReport,
   type MappedVolunteer, type InsertMappedVolunteer,
   type Supporter, type InsertSupporter,
+  type TaskCategory, type InsertTaskCategory,
   type TaskConfig, type InsertTaskConfig,
   type FormField, type InsertFormField,
   type FieldOption, type InsertFieldOption,
@@ -65,6 +67,9 @@ import {
 
 export interface IStorage {
   // Admin Roles
+  getLoginPageConfig(): Promise<LoginPageConfig | null>;
+  updateLoginPageConfig(data: Partial<InsertLoginPageConfig>): Promise<LoginPageConfig>;
+
   getAdminRoles(): Promise<AdminRole[]>;
   getAdminRole(id: string): Promise<AdminRole | undefined>;
   createAdminRole(role: InsertAdminRole): Promise<AdminRole>;
@@ -201,6 +206,14 @@ export interface IStorage {
   createSupporter(supporter: InsertSupporter): Promise<Supporter>;
   deleteSupporter(id: string): Promise<void>;
   deleteSupportersBatch(ids: string[]): Promise<void>;
+
+  // Task Categories
+  getTaskCategories(activeOnly?: boolean): Promise<TaskCategory[]>;
+  getTaskCategoriesAll(): Promise<TaskCategory[]>;
+  getTaskCategory(id: string): Promise<TaskCategory | undefined>;
+  createTaskCategory(category: InsertTaskCategory): Promise<TaskCategory>;
+  updateTaskCategory(id: string, category: Partial<InsertTaskCategory>): Promise<TaskCategory | undefined>;
+  deleteTaskCategory(id: string): Promise<void>;
 
   // Task Configs (SDUI)
   getTaskConfigs(): Promise<TaskConfig[]>;
@@ -349,6 +362,26 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Admin Roles
+  async getLoginPageConfig(): Promise<LoginPageConfig | null> {
+    const [row] = await db.select().from(loginPageConfig).where(eq(loginPageConfig.id, "default"));
+    return row ?? null;
+  }
+
+  async updateLoginPageConfig(data: Partial<InsertLoginPageConfig>): Promise<LoginPageConfig> {
+    const [existing] = await db.select().from(loginPageConfig).where(eq(loginPageConfig.id, "default"));
+    if (existing) {
+      const [updated] = await db.update(loginPageConfig)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(loginPageConfig.id, "default"))
+        .returning();
+      return updated!;
+    }
+    const [created] = await db.insert(loginPageConfig)
+      .values({ id: "default", ...data })
+      .returning();
+    return created!;
+  }
+
   async getAdminRoles(): Promise<AdminRole[]> {
     return db.select().from(adminRoles).orderBy(asc(adminRoles.name));
   }
@@ -834,6 +867,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Task Configs (SDUI)
+  async getTaskCategories(activeOnly = true): Promise<TaskCategory[]> {
+    const order = asc(taskCategories.sortOrder);
+    if (activeOnly) return db.select().from(taskCategories).where(eq(taskCategories.isActive, true)).orderBy(order, asc(taskCategories.name));
+    return db.select().from(taskCategories).orderBy(order, asc(taskCategories.name));
+  }
+
+  async getTaskCategoriesAll(): Promise<TaskCategory[]> {
+    return db.select().from(taskCategories).orderBy(asc(taskCategories.sortOrder), asc(taskCategories.name));
+  }
+
+  async getTaskCategory(id: string): Promise<TaskCategory | undefined> {
+    const [c] = await db.select().from(taskCategories).where(eq(taskCategories.id, id));
+    return c;
+  }
+
+  async createTaskCategory(category: InsertTaskCategory): Promise<TaskCategory> {
+    const [created] = await db.insert(taskCategories).values(category).returning();
+    return created!;
+  }
+
+  async updateTaskCategory(id: string, category: Partial<InsertTaskCategory>): Promise<TaskCategory | undefined> {
+    const [updated] = await db.update(taskCategories).set(category).where(eq(taskCategories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTaskCategory(id: string): Promise<void> {
+    await db.update(taskConfigs).set({ categoryId: null }).where(eq(taskConfigs.categoryId, id));
+    await db.delete(taskCategories).where(eq(taskCategories.id, id));
+  }
+
   async getTaskConfigs(): Promise<TaskConfig[]> {
     return db.select().from(taskConfigs).orderBy(asc(taskConfigs.sortOrder));
   }

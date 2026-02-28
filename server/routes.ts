@@ -16,7 +16,7 @@ import {
   insertDepartmentSchema, insertLeadershipFlagSchema, insertVolunteerSchema,
   insertFamilyMemberSchema, insertVisitorSchema, insertVolunteerVisitSchema,
   insertOfficeManagerSchema, insertAppUserSchema, insertCscSchema, insertCscReportSchema,
-  insertMappedVolunteerSchema, insertSupporterSchema, insertTaskConfigSchema,
+  insertMappedVolunteerSchema, insertSupporterSchema, insertTaskCategorySchema, insertTaskConfigSchema,
   insertFormFieldSchema, insertFieldOptionSchema, insertFieldConditionSchema,
   insertTaskSubmissionSchema, insertHstcSubmissionSchema, insertAdminRoleSchema,
   LEVELS, WINGS, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
@@ -516,6 +516,22 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[OCR] Error:", error.message);
       res.status(500).json({ error: error.message || "OCR processing failed" });
+    }
+  });
+
+  // Login Page Config (public - for login/welcome screen)
+  app.get("/api/login-page-config", async (req, res) => {
+    try {
+      const config = await storage.getLoginPageConfig();
+      res.json(config || {
+        imageUrl: null,
+        ministerName: "Dr. Balbir Singh",
+        ministerTitle: "Health Minister, Punjab Government",
+        slogan: "Sewa, Sunwai, Samman, Sangathan, Suraksha, Sangharsh",
+      });
+    } catch (error) {
+      console.error("Login page config error:", error);
+      res.status(500).json({ error: "Failed to fetch config" });
     }
   });
 
@@ -1902,6 +1918,44 @@ export async function registerRoutes(
   // ===== SDUI / ADMIN CONFIGURATION APIs =====
 
   // Task Configs CRUD
+  app.get("/api/task-categories", async (req, res) => {
+    try {
+      const categories = await storage.getTaskCategoriesAll();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch task categories" });
+    }
+  });
+
+  app.post("/api/task-categories", async (req, res) => {
+    try {
+      const data = insertTaskCategorySchema.parse(req.body);
+      const category = await storage.createTaskCategory(data);
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: "Invalid category data" });
+    }
+  });
+
+  app.patch("/api/task-categories/:id", async (req, res) => {
+    try {
+      const category = await storage.updateTaskCategory(req.params.id, req.body);
+      if (!category) return res.status(404).json({ error: "Category not found" });
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/task-categories/:id", async (req, res) => {
+    try {
+      await storage.deleteTaskCategory(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: "Failed to delete category" });
+    }
+  });
+
   app.get("/api/task-configs", async (req, res) => {
     try {
       const configs = await storage.getTaskConfigs();
@@ -2010,6 +2064,15 @@ export async function registerRoutes(
   });
 
   // Enabled tasks for mobile app
+  app.get("/api/app/task-categories", async (req, res) => {
+    try {
+      const categories = await storage.getTaskCategories(true);
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch task categories" });
+    }
+  });
+
   app.get("/api/app/tasks", async (req, res) => {
     try {
       const configs = await storage.getTaskConfigs();
@@ -3073,6 +3136,51 @@ export async function registerRoutes(
     } catch (error) {
       console.error("User tree error:", error);
       res.status(500).json({ error: "Failed to fetch user tree" });
+    }
+  });
+
+  app.get("/api/admin/user-tree/:userId/mappings", async (req, res) => {
+    try {
+      const volunteers = await storage.getMappedVolunteersByUser(req.params.userId);
+      const supporters = await storage.getSupportersByUser(req.params.userId);
+      res.json({
+        volunteers: volunteers.map((v) => ({ id: v.id, name: v.name, mobileNumber: v.mobileNumber })),
+        supporters: supporters.map((s) => ({ id: s.id, name: s.name, mobileNumber: s.mobileNumber })),
+      });
+    } catch (error) {
+      console.error("User mappings error:", error);
+      res.status(500).json({ error: "Failed to fetch mappings" });
+    }
+  });
+
+  app.get("/api/admin/login-page-config", async (req, res) => {
+    try {
+      const config = await storage.getLoginPageConfig();
+      res.json(config || {
+        imageUrl: null,
+        ministerName: "Dr. Balbir Singh",
+        ministerTitle: "Health Minister, Punjab Government",
+        slogan: "Sewa, Sunwai, Samman, Sangathan, Suraksha, Sangharsh",
+      });
+    } catch (error) {
+      console.error("Login page config error:", error);
+      res.status(500).json({ error: "Failed to fetch config" });
+    }
+  });
+
+  app.patch("/api/admin/login-page-config", async (req, res) => {
+    try {
+      const { imageUrl, ministerName, ministerTitle, slogan } = req.body;
+      const config = await storage.updateLoginPageConfig({
+        imageUrl: imageUrl ?? undefined,
+        ministerName: ministerName ?? undefined,
+        ministerTitle: ministerTitle ?? undefined,
+        slogan: slogan ?? undefined,
+      });
+      res.json(config);
+    } catch (error) {
+      console.error("Login page config update error:", error);
+      res.status(500).json({ error: "Failed to update config" });
     }
   });
 

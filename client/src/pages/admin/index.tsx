@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
@@ -41,6 +41,8 @@ import GovSchoolSubmissionsPage from "./gov-school-submissions";
 import AppointmentSubmissionsPage from "./appointment-submissions";
 import RoadReportsPage from "./road-reports";
 import UserTreePage from "./user-tree";
+import LoginPageSettingsPage from "./login-page-settings";
+import TaskCategoriesPage from "./task-categories";
 
 interface AdminUser {
   id: string;
@@ -56,6 +58,7 @@ const allMenuItems = [
   { id: "visitors", label: "Office Visitors", icon: Building, path: "/admin/visitors", group: "Management" },
   { id: "office-managers", label: "Office Managers", icon: Users, path: "/admin/office-managers", group: "Management" },
   { id: "task-manager", label: "Task Manager", icon: ClipboardList, path: "/admin/task-manager", group: "Management" },
+  { id: "task-categories", label: "Task Categories", icon: FolderTree, path: "/admin/task-categories", group: "Management" },
   { id: "hstc", label: "Harr Sirr te Chatt", icon: Home, path: "/admin/hstc", group: "Management" },
   { id: "sdsk", label: "Sukh-Dukh Saanjha Karo", icon: Heart, path: "/admin/sdsk", group: "Management" },
   { id: "surveys", label: "Survey Manager", icon: ClipboardCheck, path: "/admin/surveys", group: "Management" },
@@ -77,6 +80,7 @@ const allMenuItems = [
   { id: "voter-database", label: "Voter Database", icon: Vote, path: "/admin/voter-database", group: "Tools" },
   { id: "csv-upload", label: "CSV Upload", icon: Upload, path: "/admin/csv-upload", group: "Tools" },
   { id: "data-export", label: "Data Export", icon: Database, path: "/admin/data-export", group: "Tools" },
+  { id: "login-page-settings", label: "Login Page Settings", icon: ImageIcon, path: "/admin/login-page-settings", group: "Tools" },
   { id: "analytics", label: "Dashboard", icon: BarChart3, path: "/admin/analytics", group: "Analytics" },
   { id: "task-reports", label: "Task Reports", icon: FileBarChart, path: "/admin/task-reports", group: "Analytics" },
   { id: "user-reports", label: "User Reports", icon: UserCheck, path: "/admin/user-reports", group: "Analytics" },
@@ -379,6 +383,7 @@ export default function AdminPage() {
   const getActiveSection = () => {
     if (currentPath.includes("form-builder")) return "form-builder";
     if (currentPath.includes("task-manager")) return "task-manager";
+    if (currentPath.includes("task-categories")) return "task-categories";
     if (currentPath.includes("outdoor-ads")) return "outdoor-ads";
     if (currentPath.includes("appointments")) return "appointments";
     if (currentPath.includes("gov-school")) return "gov-school";
@@ -409,6 +414,7 @@ export default function AdminPage() {
     if (currentPath.includes("voter-database")) return "voter-database";
     if (currentPath.includes("csv-upload")) return "csv-upload";
     if (currentPath.includes("data-export")) return "data-export";
+    if (currentPath.includes("login-page-settings")) return "login-page-settings";
     return filteredMenuItems[0]?.id || "user-management";
   };
 
@@ -482,6 +488,7 @@ export default function AdminPage() {
             {activeSection === "visitors" && <VisitorsPage />}
             {activeSection === "office-managers" && <OfficeManagersPage />}
             {activeSection === "task-manager" && <TaskManagerPage />}
+            {activeSection === "task-categories" && <TaskCategoriesPage />}
             {activeSection === "hstc" && <HstcSubmissionsPage />}
             {activeSection === "sdsk" && <SdskSubmissionsPage />}
             {activeSection === "surveys" && <SurveyManagerPage />}
@@ -504,6 +511,7 @@ export default function AdminPage() {
             {activeSection === "voter-database" && <VoterDatabasePage />}
             {activeSection === "csv-upload" && <CsvUploadPage />}
             {activeSection === "data-export" && <DataExportPage />}
+            {activeSection === "login-page-settings" && <LoginPageSettingsPage />}
             {activeSection === "analytics" && <AnalyticsDashboard />}
             {activeSection === "task-reports" && <TaskReportsPage />}
             {activeSection === "user-reports" && <UserReportsPage />}
