@@ -1939,8 +1939,11 @@ export async function registerRoutes(
 
   app.patch("/api/task-categories/:id", async (req, res) => {
     try {
-      const { taskIds, ...rest } = req.body || {};
-      const category = await storage.updateTaskCategory(req.params.id, rest);
+      const { taskIds, fixedTaskSlugs, ...rest } = req.body || {};
+      const category = await storage.updateTaskCategory(req.params.id, {
+        ...rest,
+        ...(Array.isArray(fixedTaskSlugs) && { fixedTaskSlugs: fixedTaskSlugs.filter((s: unknown) => typeof s === "string") }),
+      });
       if (!category) return res.status(404).json({ error: "Category not found" });
       if (Array.isArray(taskIds)) await storage.setTaskCategoryTasks(req.params.id, taskIds);
       res.json(category);

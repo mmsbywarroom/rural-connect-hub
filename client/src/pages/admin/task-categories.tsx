@@ -28,6 +28,7 @@ interface TaskCategory {
   namePa: string | null;
   sortOrder: number | null;
   isActive: boolean | null;
+  fixedTaskSlugs?: string[] | null;
 }
 
 interface TaskConfigItem {
@@ -35,6 +36,17 @@ interface TaskConfigItem {
   name: string;
   categoryId: string | null;
 }
+
+const FIXED_TASKS: { slug: string; name: string }[] = [
+  { slug: "nasha-viruddh-yuddh", name: "Nasha Viruddh Yuddh" },
+  { slug: "road-report", name: "Road Reports" },
+  { slug: "harr-sirr-te-chatt", name: "Harr Sirr te Chatt" },
+  { slug: "sukh-dukh-saanjha-karo", name: "Sukh-Dukh Saanjha Karo" },
+  { slug: "sunwai", name: "Sunwai (Complaints)" },
+  { slug: "outdoor-ad", name: "Outdoor Ads" },
+  { slug: "gov-school", name: "Gov School Work" },
+  { slug: "appointment", name: "Appointments" },
+];
 
 export default function TaskCategoriesPage() {
   const { toast } = useToast();
@@ -48,6 +60,7 @@ export default function TaskCategoriesPage() {
   const [sortOrder, setSortOrder] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [selectedFixedSlugs, setSelectedFixedSlugs] = useState<string[]>([]);
 
   const { data: categories, isLoading } = useQuery<TaskCategory[]>({
     queryKey: ["/api/task-categories"],
@@ -72,7 +85,7 @@ export default function TaskCategoriesPage() {
   });
 
   const updateCategory = useMutation({
-    mutationFn: async (data: { name: string; nameHi?: string; namePa?: string; sortOrder: number; isActive: boolean; taskIds?: string[] }) =>
+    mutationFn: async (data: { name: string; nameHi?: string; namePa?: string; sortOrder: number; isActive: boolean; taskIds?: string[]; fixedTaskSlugs?: string[] }) =>
       apiRequest("PATCH", `/api/task-categories/${editingCategory?.id}`, data),
     onSuccess: () => {
       toast({ title: "Category updated!" });
@@ -105,6 +118,7 @@ export default function TaskCategoriesPage() {
     setSortOrder(0);
     setIsActive(true);
     setSelectedTaskIds([]);
+    setSelectedFixedSlugs([]);
   };
 
   const handleAdd = () => {
@@ -136,6 +150,18 @@ export default function TaskCategoriesPage() {
     }
   }, [editingCategory?.id, taskConfigs]);
 
+  useEffect(() => {
+    if (editingCategory) {
+      setSelectedFixedSlugs(editingCategory.fixedTaskSlugs ?? []);
+    }
+  }, [editingCategory?.id, editingCategory?.fixedTaskSlugs]);
+
+  const toggleFixedSlug = (slug: string) => {
+    setSelectedFixedSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -143,7 +169,7 @@ export default function TaskCategoriesPage() {
       return;
     }
     const data = { name: name.trim(), nameHi: nameHi.trim() || undefined, namePa: namePa.trim() || undefined, sortOrder, isActive };
-    if (editingCategory) updateCategory.mutate({ ...data, taskIds: selectedTaskIds });
+    if (editingCategory) updateCategory.mutate({ ...data, taskIds: selectedTaskIds, fixedTaskSlugs: selectedFixedSlugs });
     else createCategory.mutate(data);
   };
 
@@ -236,22 +262,35 @@ export default function TaskCategoriesPage() {
               <div className="space-y-2">
                 <Label>Assign tasks to this category</Label>
                 <p className="text-xs text-muted-foreground">Select which tasks appear under this category on the user dashboard.</p>
-                <div className="max-h-48 overflow-y-auto rounded-md border p-2 space-y-1.5">
-                  {!taskConfigs?.length ? (
-                    <p className="text-sm text-muted-foreground">No tasks yet. Add tasks in Task Manager first.</p>
-                  ) : (
-                    taskConfigs.map((task) => (
-                      <label key={task.id} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
-                        <input
-                          type="checkbox"
-                          checked={selectedTaskIds.includes(task.id)}
-                          onChange={() => toggleTask(task.id)}
-                          className="rounded border-input"
-                        />
-                        <span className="text-sm">{task.name}</span>
-                      </label>
-                    ))
+                <div className="max-h-64 overflow-y-auto rounded-md border p-2 space-y-1.5">
+                  {taskConfigs && taskConfigs.length > 0 && (
+                    <>
+                      <p className="text-xs font-medium text-muted-foreground px-1 pt-1">From Task Manager</p>
+                      {taskConfigs.map((task) => (
+                        <label key={task.id} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
+                          <input
+                            type="checkbox"
+                            checked={selectedTaskIds.includes(task.id)}
+                            onChange={() => toggleTask(task.id)}
+                            className="rounded border-input"
+                          />
+                          <span className="text-sm">{task.name}</span>
+                        </label>
+                      ))}
+                    </>
                   )}
+                  <p className="text-xs font-medium text-muted-foreground px-1 pt-2">Fixed tasks (Harr Sirr te Chatt, Sunwai, etc.)</p>
+                  {FIXED_TASKS.map((ft) => (
+                    <label key={ft.slug} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
+                      <input
+                        type="checkbox"
+                        checked={selectedFixedSlugs.includes(ft.slug)}
+                        onChange={() => toggleFixedSlug(ft.slug)}
+                        className="rounded border-input"
+                      />
+                      <span className="text-sm">{ft.name}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
             )}

@@ -22,6 +22,8 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
 
   const { data: config } = useQuery<LoginPageConfig>({
     queryKey: ["/api/login-page-config"],
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const c = config || DEFAULT_CONFIG;
@@ -33,8 +35,8 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
   };
 
   const containerClass = compact
-    ? "w-full min-h-[120px] flex items-center justify-center overflow-hidden bg-slate-100"
-    : "w-full min-h-[180px] overflow-hidden bg-slate-100";
+    ? "w-full h-[140px] relative overflow-hidden bg-slate-100"
+    : "w-full min-h-[180px] relative overflow-hidden bg-slate-100";
 
   if (loadState === "fallback-text") {
     return (
@@ -54,9 +56,10 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
         key={loadState + imgSrc}
         src={imgSrc}
         alt={`${c.ministerName} - ${c.ministerTitle}`}
-        className={`w-full h-full object-cover object-top ${compact ? "min-h-[120px] max-h-[140px]" : "min-h-[180px]"}`}
+        className="absolute inset-0 w-full h-full object-cover object-top"
         onError={handleError}
         referrerPolicy="no-referrer"
+        loading="eager"
       />
     </div>
   );
@@ -65,6 +68,8 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
 export function MinisterTextBlock({ compact = false }: { compact?: boolean }) {
   const { data: config } = useQuery<LoginPageConfig>({
     queryKey: ["/api/login-page-config"],
+    staleTime: 0,
+    refetchOnMount: true,
   });
   const c = config || DEFAULT_CONFIG;
   return (

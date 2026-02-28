@@ -310,6 +310,7 @@ export const taskCategories = pgTable("task_categories", {
   namePa: text("name_pa"),
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").default(true),
+  fixedTaskSlugs: text("fixed_task_slugs").array().default(sql`'{}'`),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

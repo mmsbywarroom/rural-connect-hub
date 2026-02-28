@@ -18,6 +18,7 @@ interface TaskCategory {
   nameHi: string | null;
   namePa: string | null;
   sortOrder: number | null;
+  fixedTaskSlugs?: string[] | null;
 }
 
 interface LeaderboardEntry {
@@ -135,6 +136,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   const isAbove90 = completion.percentage >= 90;
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment"];
+  const selectedCat = categories?.find((c) => c.id === selectedCategoryId);
+  const visibleFixedSlugs = !selectedCategoryId ? ALL_FIXED_SLUGS : (selectedCat?.fixedTaskSlugs ?? []);
 
   const { data: categories } = useQuery<TaskCategory[]>({
     queryKey: ["/api/app/task-categories"],
@@ -419,8 +424,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           )}
 
           <div className="space-y-2.5">
-            {!selectedCategoryId && (
-            <>
+            {visibleFixedSlugs.includes("nasha-viruddh-yuddh") && (
             <Link href="/task/nasha-viruddh-yuddh">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -447,7 +451,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("road-report") && (
             <Link href="/task/road-report">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -474,7 +479,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("harr-sirr-te-chatt") && (
             <Link href="/task/harr-sirr-te-chatt">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -497,7 +503,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("sukh-dukh-saanjha-karo") && (
             <Link href="/task/sukh-dukh-saanjha-karo">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sdsk">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -520,7 +527,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("sunwai") && (
             <Link href="/task/sunwai">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-teal-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sunwai">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -543,7 +551,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("outdoor-ad") && (
             <Link href="/task/outdoor-ad">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-outdoor-ad">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -566,7 +575,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("gov-school") && (
             <Link href="/task/gov-school">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-green-200 hover:shadow-md transition-all duration-200" data-testid="task-card-gov-school">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -589,7 +599,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-
+            )}
+            {visibleFixedSlugs.includes("appointment") && (
             <Link href="/task/appointment">
               <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-appointment">
                 <CardContent className="p-4 flex items-center gap-3.5">
@@ -612,7 +623,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </CardContent>
               </Card>
             </Link>
-            </>
             )}
 
             {isLoading && (
