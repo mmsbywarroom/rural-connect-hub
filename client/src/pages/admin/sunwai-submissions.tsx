@@ -256,7 +256,7 @@ function ComplaintDetail({ complaint, onBack }: { complaint: ComplaintWithLogs; 
               <Field label="Issue Category" value={
                 (complaint as any).otherCategoryText
                   ? `Other: ${(complaint as any).otherCategoryText}`
-                  : (complaint as any).issueCategoryName || complaint.issueCategoryId || "\u2014"
+                  : (complaint as any).issueCategoryName || "\u2014"
               } />
               <div>
                 <span className="text-xs text-muted-foreground">Complaint Note</span>

@@ -4322,18 +4322,24 @@ export async function registerRoutes(
     }
   });
 
-  // Admin: all complaints
+  // Admin: all complaints (with issue category names resolved)
   app.get("/api/sunwai/complaints", async (req, res) => {
     try {
       const complaints = await storage.getSunwaiComplaints();
-      res.json(complaints);
+      const issues = await storage.getIssues();
+      const issueNameById: Record<string, string> = Object.fromEntries(issues.map((i) => [i.id, i.name]));
+      const withNames = complaints.map((c) => ({
+        ...c,
+        issueCategoryName: c.issueCategoryId ? issueNameById[c.issueCategoryId] ?? null : null,
+      }));
+      res.json(withNames);
     } catch (error: any) {
       console.error("[Sunwai] Get complaints error:", error.message);
       res.status(500).json({ error: "Failed to fetch complaints" });
     }
   });
 
-  // Single complaint with logs
+  // Single complaint with logs (with issue category name resolved)
   app.get("/api/sunwai/complaints/:id", async (req, res) => {
     try {
       const complaint = await storage.getSunwaiComplaintById(req.params.id);
@@ -4341,7 +4347,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Complaint not found" });
       }
       const logs = await storage.getSunwaiLogsByComplaint(complaint.id);
-      res.json({ ...complaint, logs });
+      let issueCategoryName: string | null = null;
+      if (complaint.issueCategoryId) {
+        const issue = await storage.getIssue(complaint.issueCategoryId);
+        issueCategoryName = issue?.name ?? null;
+      }
+      res.json({ ...complaint, issueCategoryName, logs });
     } catch (error: any) {
       console.error("[Sunwai] Get complaint error:", error.message);
       res.status(500).json({ error: "Failed to fetch complaint" });
@@ -4373,7 +4384,12 @@ export async function registerRoutes(
         performedByName: performedByName || "Admin",
       });
       const logs = await storage.getSunwaiLogsByComplaint(req.params.id);
-      res.json({ ...updated, logs });
+      let issueCategoryName: string | null = null;
+      if (updated?.issueCategoryId) {
+        const issue = await storage.getIssue(updated.issueCategoryId);
+        issueCategoryName = issue?.name ?? null;
+      }
+      res.json({ ...updated, issueCategoryName, logs });
     } catch (error: any) {
       console.error("[Sunwai] Accept error:", error.message);
       res.status(500).json({ error: "Failed to accept complaint" });
@@ -4404,7 +4420,12 @@ export async function registerRoutes(
         performedByName: performedByName || "Admin",
       });
       const logs = await storage.getSunwaiLogsByComplaint(req.params.id);
-      res.json({ ...updated, logs });
+      let issueCategoryName: string | null = null;
+      if (updated?.issueCategoryId) {
+        const issue = await storage.getIssue(updated.issueCategoryId);
+        issueCategoryName = issue?.name ?? null;
+      }
+      res.json({ ...updated, issueCategoryName, logs });
     } catch (error: any) {
       console.error("[Sunwai] Complete error:", error.message);
       res.status(500).json({ error: "Failed to complete complaint" });
