@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -320,9 +320,12 @@ export default function TaskManagerPage() {
       )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby="task-form-description">
           <DialogHeader>
             <DialogTitle>{editingTask ? "Edit Task" : "Add New Task"}</DialogTitle>
+            <DialogDescription id="task-form-description">
+              {editingTask ? "Update task name, category, and settings." : "Create a new task for the volunteer app."}
+            </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
@@ -410,14 +413,17 @@ export default function TaskManagerPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category (for user dashboard)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
+                      value={field.value ?? "__none__"}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="No category" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No category</SelectItem>
+                        <SelectItem value="__none__">No category</SelectItem>
                         {categories?.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))}
