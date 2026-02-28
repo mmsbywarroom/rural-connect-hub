@@ -124,8 +124,8 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
     <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-4 flex flex-col">
         <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white flex-shrink-0">
-          <div className="w-full h-[140px] flex shrink-0">
-            <MinisterImageWithFallback compact />
+          <div className="w-full h-[160px] flex shrink-0">
+            <MinisterImageWithFallback compact fullImage />
           </div>
           <MinisterTextBlock compact />
         </div>
@@ -149,6 +149,7 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="h-12 text-base"
                   data-testid="input-email-or-mobile"
+                  autoFocus
                 />
                 {identifier.trim() && (
                   <p className="text-xs text-slate-500 mt-1">

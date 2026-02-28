@@ -17,7 +17,7 @@ const DEFAULT_CONFIG: LoginPageConfig = {
 
 const FALLBACK_IMAGE_URL = "https://drive.google.com/thumbnail?id=1T6EoEClNxR4IJW1YuM0bb50OBycafpud&sz=w800";
 
-export function MinisterImageWithFallback({ compact = false }: { compact?: boolean }) {
+export function MinisterImageWithFallback({ compact = false, fullImage = true }: { compact?: boolean; fullImage?: boolean }) {
   const [loadState, setLoadState] = useState<"primary" | "fallback-img" | "fallback-text">("primary");
 
   const { data: config } = useQuery<LoginPageConfig>({
@@ -35,8 +35,8 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
   };
 
   const containerClass = compact
-    ? "w-full h-[140px] relative overflow-hidden bg-slate-100"
-    : "w-full min-h-[180px] relative overflow-hidden bg-slate-100";
+    ? "w-full h-[160px] relative overflow-hidden bg-slate-100 flex items-center justify-center"
+    : "w-full min-h-[220px] relative overflow-hidden bg-slate-100 flex items-center justify-center";
 
   if (loadState === "fallback-text") {
     return (
@@ -50,13 +50,14 @@ export function MinisterImageWithFallback({ compact = false }: { compact?: boole
   }
 
   const imgSrc = loadState === "fallback-img" ? "/minister.jpg" : imageUrl;
+  const objectFit = fullImage ? "object-contain" : "object-cover";
   return (
     <div className={containerClass}>
       <img
         key={loadState + imgSrc}
         src={imgSrc}
         alt={`${c.ministerName} - ${c.ministerTitle}`}
-        className="absolute inset-0 w-full h-full object-cover object-top"
+        className={`absolute inset-0 w-full h-full ${objectFit} object-top`}
         onError={handleError}
         referrerPolicy="no-referrer"
         loading="eager"

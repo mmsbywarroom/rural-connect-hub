@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon } from "lucide-react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -142,8 +142,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   });
 
   const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment"];
+  const slugsInAnyCategory = new Set(categories?.flatMap((c) => c.fixedTaskSlugs ?? []) ?? []);
+  const uncategorizedFixedSlugs = ALL_FIXED_SLUGS.filter((slug) => !slugsInAnyCategory.has(slug));
   const selectedCat = categories?.find((c) => c.id === selectedCategoryId);
-  const visibleFixedSlugs = !selectedCategoryId ? ALL_FIXED_SLUGS : (selectedCat?.fixedTaskSlugs ?? []);
+  const visibleFixedSlugs = !selectedCategoryId ? uncategorizedFixedSlugs : (selectedCat?.fixedTaskSlugs ?? []);
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
@@ -398,13 +400,32 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           {categories && categories.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="space-y-2.5 mb-4">
               <button
                 type="button"
                 onClick={() => setSelectedCategoryId(null)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedCategoryId === null ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+                className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${selectedCategoryId === null ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
               >
-                {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
+                <Card className="border-0 shadow-none">
+                  <CardContent className="p-4 flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-slate-500 to-slate-600 shadow-sm">
+                      <LayoutGrid className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm text-slate-800">
+                        {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                        {language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedCategoryId === null ? "bg-blue-100" : "bg-slate-100"}`}>
+                        <ChevronRight className={`h-4 w-4 ${selectedCategoryId === null ? "text-blue-500" : "text-slate-500"}`} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </button>
               {categories.map((cat) => {
                 const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
@@ -414,9 +435,26 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategoryId(cat.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+                    className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${isSelected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
                   >
-                    {label}
+                    <Card className="border-0 shadow-none">
+                      <CardContent className="p-4 flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
+                          <FolderTree className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm text-slate-800">{label}</h3>
+                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                            {language === "hi" ? "इस श्रेणी के कार्य" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਦੇ ਕੰਮ" : "Tasks in this category"}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                            <ChevronRight className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-slate-500"}`} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </button>
                 );
               })}
@@ -634,7 +672,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
             {(selectedCategoryId
               ? tasks?.filter((t) => (t as any).categoryId === selectedCategoryId)
-              : tasks
+              : tasks?.filter((t) => !(t as any).categoryId)
             )?.map((task) => {
               const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
               const count = submissionCounts?.[task.id] || 0;
@@ -665,11 +703,16 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             })}
 
             {!isLoading && (() => {
-              const filtered = selectedCategoryId ? (tasks?.filter((t) => (t as any).categoryId === selectedCategoryId) ?? []) : (tasks ?? []);
-              return filtered.length === 0 ? (
+              const filtered = selectedCategoryId ? (tasks?.filter((t) => (t as any).categoryId === selectedCategoryId) ?? []) : (tasks?.filter((t) => !(t as any).categoryId) ?? []);
+              const hasFixed = visibleFixedSlugs.length > 0;
+              return filtered.length === 0 && !hasFixed ? (
                 <div className="text-center py-10 text-slate-400">
                   <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm">{selectedCategoryId ? (language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category") : t('noTasks')}</p>
+                  <p className="text-sm">
+                    {selectedCategoryId
+                      ? (language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category")
+                      : (language === "hi" ? "कोई अश्रेणीबद्ध कार्य नहीं" : language === "pa" ? "ਕੋਈ ਬਿਨਾਂ ਸ਼੍ਰੇਣੀ ਕੰਮ ਨਹੀਂ" : "No uncategorized tasks")}
+                  </p>
                 </div>
               ) : null;
             })()}

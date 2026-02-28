@@ -258,7 +258,9 @@ export default function VolunteerPortal() {
       <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-4">
           <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white">
-            <MinisterImageWithFallback />
+            <div className="w-full min-h-[220px]">
+              <MinisterImageWithFallback fullImage />
+            </div>
             <MinisterTextBlock />
           </div>
           <Card className="shadow-xl">
