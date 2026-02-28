@@ -112,6 +112,7 @@ const translations = {
   continueTask: { en: "Continue", hi: "जारी रखें", pa: "ਜਾਰੀ ਰੱਖੋ" },
   startTask: { en: "Start", hi: "शुरू करें", pa: "ਸ਼ੁਰੂ ਕਰੋ" },
   completeProfile: { en: "Complete your profile to unlock all features", hi: "सभी सुविधाओं को अनलॉक करने के लिए अपनी प्रोफ़ाइल पूरी करें", pa: "ਸਾਰੀਆਂ ਸੁਵਿਧਾਵਾਂ ਅਨਲੌਕ ਕਰਨ ਲਈ ਆਪਣੀ ਪ੍ਰੋਫ਼ਾਈਲ ਪੂਰੀ ਕਰੋ" },
+  profileCompleteFirst: { en: "Please complete your profile first. Then you can access all tasks.", hi: "पहले अपनी प्रोफ़ाइल पूरी करें। उसके बाद आप सभी कार्यों तक पहुँच सकते हैं।", pa: "ਪਹਿਲਾਂ ਆਪਣੀ ਪ੍ਰੋਫ਼ਾਈਲ ਪੂਰੀ ਕਰੋ। ਫਿਰ ਤੁਸੀਂ ਸਾਰੇ ਕੰਮਾਂ ਤੱਕ ਪਹੁੰਚ ਸਕੋਗੇ।" },
   fieldsDone: { en: "fields done", hi: "फ़ील्ड पूरे", pa: "ਫੀਲਡ ਪੂਰੇ" },
   remaining: { en: "remaining", hi: "शेष", pa: "ਬਾਕੀ" },
   of: { en: "of", hi: "का", pa: "ਵਿੱਚੋਂ" },

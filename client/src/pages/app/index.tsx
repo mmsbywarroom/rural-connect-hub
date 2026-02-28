@@ -32,6 +32,7 @@ import SurveyLeaderboard from "./survey-leaderboard";
 import Leaderboard from "./leaderboard";
 import { Loader2, LogIn, UserPlus, Mail, KeyRound, ArrowRight, ArrowLeft, MapPin, Phone, Smartphone } from "lucide-react";
 import type { AppUser } from "@shared/schema";
+import { getProfileCompletion } from "@/lib/profile-completion";
 
 function isIndianMobile(input: string): boolean {
   const cleaned = input.replace(/\D/g, "").replace(/^91/, "");
@@ -485,40 +486,72 @@ export default function VolunteerPortal() {
   }
 
   if (authState === "authenticated" && user) {
+    const completion = getProfileCompletion(user);
+    const profileComplete = completion.percentage === 100;
+
+    const ProfileGate = () => (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center space-y-4">
+            <p className="text-lg font-medium text-slate-800">
+              {t('profileCompleteFirst')}
+            </p>
+            <Button onClick={() => setLocation("/profile")} className="w-full">
+              Complete Profile
+            </Button>
+            <Button variant="outline" onClick={() => setLocation("/")} className="w-full">
+              Back to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+
     if (location === "/profile" || location === "/app/profile") {
       return <ProfilePage user={user} onBack={() => setLocation("/")} onUpdate={handleProfileUpdate} />;
     }
     if (location === "/task/csc-report" || location === "/app/task/csc-report") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskCscReport user={user} />;
     }
     if (location === "/task/volunteer-mapping" || location === "/app/task/volunteer-mapping") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskVolunteerMapping user={user} />;
     }
     if (location === "/task/supporter-mapping" || location === "/app/task/supporter-mapping") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskSupporterMapping user={user} />;
     }
     if (location === "/task/harr-sirr-te-chatt" || location === "/app/task/harr-sirr-te-chatt") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskHstc user={user} />;
     }
     if (location === "/task/sukh-dukh-saanjha-karo" || location === "/app/task/sukh-dukh-saanjha-karo") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskSdsk user={user} />;
     }
     if (location === "/task/sunwai" || location === "/app/task/sunwai") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskSunwai user={user} />;
     }
     if (location === "/task/nasha-viruddh-yuddh" || location === "/app/task/nasha-viruddh-yuddh") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskNvy user={user} />;
     }
     if (location === "/task/road-report" || location === "/app/task/road-report") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskRoad user={user} />;
     }
     if (location === "/task/outdoor-ad" || location === "/app/task/outdoor-ad") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskOutdoorAd user={user} />;
     }
     if (location === "/task/gov-school" || location === "/app/task/gov-school") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskGovSchool user={user} />;
     }
     if (location === "/task/appointment" || location === "/app/task/appointment") {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskAppointment user={user} />;
     }
     if (location === "/leaderboard" || location === "/app/leaderboard") {
@@ -529,10 +562,12 @@ export default function VolunteerPortal() {
     }
     const surveyMatch = location.match(/^\/(?:app\/)?survey\/(.+)$/);
     if (surveyMatch) {
+      if (!profileComplete) return <ProfileGate />;
       return <SurveyForm user={user} surveyId={surveyMatch[1]} onBack={() => setLocation("/")} />;
     }
     const taskMatch = location.match(/^\/(?:app\/)?task\/(.+)$/);
     if (taskMatch) {
+      if (!profileComplete) return <ProfileGate />;
       return <TaskDynamicForm user={user} taskId={taskMatch[1]} />;
     }
     return <TaskHome user={user} onLogout={handleLogout} onProfile={() => setLocation("/profile")} />;
