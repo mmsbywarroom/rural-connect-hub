@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -233,73 +234,86 @@ export default function TaskCategoriesPage() {
       </Card>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
             <DialogTitle>{editingCategory ? "Edit Category" : "Add Category"}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? "Update name and assign tasks to this category." : "Create a new category for the user dashboard."}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="cat-name">Name (English) *</Label>
-              <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Field Work" required />
-            </div>
-            <div>
-              <Label htmlFor="cat-nameHi">Name (Hindi)</Label>
-              <Input id="cat-nameHi" value={nameHi} onChange={(e) => setNameHi(e.target.value)} placeholder="Optional" />
-            </div>
-            <div>
-              <Label htmlFor="cat-namePa">Name (Punjabi)</Label>
-              <Input id="cat-namePa" value={namePa} onChange={(e) => setNamePa(e.target.value)} placeholder="Optional" />
-            </div>
-            <div>
-              <Label htmlFor="cat-sortOrder">Sort Order</Label>
-              <Input id="cat-sortOrder" type="number" value={sortOrder} onChange={(e) => setSortOrder(parseInt(e.target.value, 10) || 0)} />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="cat-active" checked={isActive} onCheckedChange={setIsActive} />
-              <Label htmlFor="cat-active">Active (show on user dashboard)</Label>
-            </div>
-            {editingCategory && (
-              <div className="space-y-2">
-                <Label>Assign tasks to this category</Label>
-                <p className="text-xs text-muted-foreground">Select which tasks appear under this category on the user dashboard.</p>
-                <div className="max-h-64 overflow-y-auto rounded-md border p-2 space-y-1.5">
-                  {taskConfigs && taskConfigs.length > 0 && (
-                    <>
-                      <p className="text-xs font-medium text-muted-foreground px-1 pt-1">From Task Manager</p>
-                      {taskConfigs.map((task) => (
-                        <label key={task.id} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
-                          <input
-                            type="checkbox"
-                            checked={selectedTaskIds.includes(task.id)}
-                            onChange={() => toggleTask(task.id)}
-                            className="rounded border-input"
-                          />
-                          <span className="text-sm">{task.name}</span>
-                        </label>
-                      ))}
-                    </>
-                  )}
-                  <p className="text-xs font-medium text-muted-foreground px-1 pt-2">Fixed tasks (Harr Sirr te Chatt, Sunwai, etc.)</p>
-                  {FIXED_TASKS.map((ft) => (
-                    <label key={ft.slug} className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-muted/50">
-                      <input
-                        type="checkbox"
-                        checked={selectedFixedSlugs.includes(ft.slug)}
-                        onChange={() => toggleFixedSlug(ft.slug)}
-                        className="rounded border-input"
-                      />
-                      <span className="text-sm">{ft.name}</span>
-                    </label>
-                  ))}
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="px-6 overflow-y-auto flex-1 space-y-4 pb-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="cat-name">Name (English) *</Label>
+                  <Input id="cat-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Field Work" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cat-nameHi">Name (Hindi)</Label>
+                  <Input id="cat-nameHi" value={nameHi} onChange={(e) => setNameHi(e.target.value)} placeholder="Optional" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cat-namePa">Name (Punjabi)</Label>
+                  <Input id="cat-namePa" value={namePa} onChange={(e) => setNamePa(e.target.value)} placeholder="Optional" />
                 </div>
               </div>
-            )}
-            <div className="flex justify-end gap-2">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Input id="cat-sortOrder" type="number" className="w-20" value={sortOrder} onChange={(e) => setSortOrder(parseInt(e.target.value, 10) || 0)} />
+                  <Label htmlFor="cat-sortOrder">Sort order</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="cat-active" checked={isActive} onCheckedChange={setIsActive} />
+                  <Label htmlFor="cat-active" className="cursor-pointer">Active on dashboard</Label>
+                </div>
+              </div>
+              {editingCategory && (
+                <div className="space-y-3 pt-2 border-t">
+                  <div>
+                    <Label className="text-base">Assign tasks to this category</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">Tasks selected here will appear under this category on the app.</p>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto rounded-lg border bg-muted/30 p-3 space-y-3">
+                    {taskConfigs && taskConfigs.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From Task Manager</p>
+                        <div className="space-y-1">
+                          {taskConfigs.map((task) => (
+                            <label key={task.id} className="flex items-center gap-3 cursor-pointer rounded-md px-2 py-2 hover:bg-background transition-colors">
+                              <Checkbox
+                                checked={selectedTaskIds.includes(task.id)}
+                                onCheckedChange={() => toggleTask(task.id)}
+                              />
+                              <span className="text-sm select-none">{task.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fixed tasks</p>
+                      <div className="space-y-1">
+                        {FIXED_TASKS.map((ft) => (
+                          <label key={ft.slug} className="flex items-center gap-3 cursor-pointer rounded-md px-2 py-2 hover:bg-background transition-colors">
+                            <Checkbox
+                              checked={selectedFixedSlugs.includes(ft.slug)}
+                              onCheckedChange={() => toggleFixedSlug(ft.slug)}
+                            />
+                            <span className="text-sm select-none">{ft.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="px-6 py-4 border-t bg-muted/20 flex-shrink-0 rounded-b-lg">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={createCategory.isPending || updateCategory.isPending}>
                 {editingCategory ? "Update" : "Create"}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
