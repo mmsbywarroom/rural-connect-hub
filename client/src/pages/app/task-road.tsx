@@ -905,36 +905,15 @@ export default function TaskRoad({ user }: Props) {
         )}
 
         {step === "select_unit" && (
-          <div className="space-y-4">
-            <div className="px-1">
-              <h2 className="text-lg font-semibold text-slate-800">
-                {l("unitHeading", language)}
-              </h2>
-              <p className="text-sm text-slate-500">
-                {l("unitSubtitle", language)}
-              </p>
-            </div>
-            <UnitSelector
-              title={l("unitHeading", language)}
-              subtitle={l("unitSubtitle", language)}
-              onSelect={(unit) => {
-                setSelectedVillageId(unit.villageId);
-                setSelectedVillageName(unit.villageName);
-              }}
-            />
-            <Button
-              className="w-full"
-              onClick={() => {
-                if (!selectedVillageId) {
-                  toast({ title: l("unitRequired", language), variant: "destructive" });
-                  return;
-                }
-                setStep("verify_mobile");
-              }}
-            >
-              Continue
-            </Button>
-          </div>
+          <UnitSelector
+            title={l("unitHeading", language)}
+            subtitle={l("unitSubtitle", language)}
+            onSelect={(unit) => {
+              setSelectedVillageId(unit.villageId);
+              setSelectedVillageName(unit.villageName);
+              setStep("verify_mobile");
+            }}
+          />
         )}
 
         {step === "verify_mobile" && (
