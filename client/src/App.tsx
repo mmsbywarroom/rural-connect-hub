@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
+import { InstallBanner } from "@/components/install-banner";
 import NotFound from "@/pages/not-found";
 import OfficePage from "@/pages/office";
 import OfficeLogin from "@/pages/office/login";
@@ -50,9 +51,11 @@ function Router() {
       <Route path="/volunteer-login" component={VolunteerLoginPage} />
       <Route path="/volunteer/dashboard" component={VolunteerDashboardPage} />
       <Route path="/app" component={VolunteerPortal} />
+      <Route path="/app/chat" component={VolunteerPortal} />
       <Route path="/app/profile" component={VolunteerPortal} />
       <Route path="/app/leaderboard" component={VolunteerPortal} />
       <Route path="/app/task/:taskId" component={VolunteerPortal} />
+      <Route path="/chat" component={VolunteerPortal} />
       <Route path="/survey/:surveyId" component={VolunteerPortal} />
       <Route path="/app/survey/:surveyId" component={VolunteerPortal} />
       <Route path="/survey-leaderboard" component={VolunteerPortal} />
@@ -67,6 +70,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <TooltipProvider>
+          <InstallBanner />
           <Toaster />
           <Router />
         </TooltipProvider>
