@@ -144,8 +144,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment"];
   const slugsInAnyCategory = new Set(categories?.flatMap((c) => c.fixedTaskSlugs ?? []) ?? []);
   const uncategorizedFixedSlugs = ALL_FIXED_SLUGS.filter((slug) => !slugsInAnyCategory.has(slug));
-  const selectedCat = categories?.find((c) => c.id === selectedCategoryId);
-  const visibleFixedSlugs = !selectedCategoryId ? uncategorizedFixedSlugs : (selectedCat?.fixedTaskSlugs ?? []);
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
@@ -174,6 +172,257 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   });
 
   const surveyTop3 = (surveyLeaderboard || []).filter(e => e.count > 0).slice(0, 3);
+
+  /** Fixed slugs + dynamic tasks list – jis category ke niche dikhana hai wahi pass karo */
+  function renderTaskList(fixedSlugs: string[], taskList: TaskConfig[]) {
+    const hasFixed = fixedSlugs.length > 0;
+    const hasDynamic = taskList.length > 0;
+    return (
+      <>
+        {fixedSlugs.includes("nasha-viruddh-yuddh") && (
+        <Link href="/task/nasha-viruddh-yuddh">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-red-600 to-rose-600 shadow-sm">
+                <ShieldAlert className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "नशा विरुद्ध युद्ध" : language === "pa" ? "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" : "Nasha Viruddh Yuddh"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi"
+                    ? "जहां नशा हो रहा है उस स्थान की गुप्त रिपोर्टिंग"
+                    : language === "pa"
+                    ? "ਜਿੱਥੇ ਨਸ਼ਾ ਚੱਲ ਰਿਹਾ ਹੈ ਉਸ ਥਾਂ ਦੀ ਗੁਪਤ ਰਿਪੋਰਟਿੰਗ"
+                    : "Secretly report locations where drug activity is happening"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-red-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("road-report") && (
+        <Link href="/task/road-report">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-600 to-sky-500 shadow-sm">
+                <RouteIcon className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "सड़क खराबी सूचना" : language === "pa" ? "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" : "Road Condition Report"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi"
+                    ? "जहां सड़क टूटी या खराब है, वहां की शुरू से अंत तक की जानकारी भेजें"
+                    : language === "pa"
+                    ? "ਜਿੱਥੇ ਸੜਕ ਟੁੱਟੀ ਜਾਂ ਖਰਾਬ ਹੈ, ਉੱਥੇ ਦੀ ਸ਼ੁਰੂ ਤੋਂ ਅੰਤ ਤੱਕ ਜਾਣਕਾਰੀ ਭੇਜੋ"
+                    : "Report damaged road stretch with photos, audio and map distance"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("harr-sirr-te-chatt") && (
+        <Link href="/task/harr-sirr-te-chatt">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-500 to-red-500 shadow-sm">
+                <Home className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "हर सिर ते छत" : language === "pa" ? "ਹਰ ਸਿਰ ਤੇ ਛੱਤ" : "Harr Sirr te Chatt"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "जरूरतमंद परिवारों के लिए छत की पहल" : language === "pa" ? "ਲੋੜਵੰਦ ਪਰਿਵਾਰਾਂ ਲਈ ਛੱਤ ਪਹਿਲਕਦਮੀ" : "Roof initiative for needy families"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-orange-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("sukh-dukh-saanjha-karo") && (
+        <Link href="/task/sukh-dukh-saanjha-karo">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sdsk">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
+                <Heart className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "सुख-दुख सांझा करो" : language === "pa" ? "ਸੁਖ-ਦੁੱਖ ਸਾਂਝਾ ਕਰੋ" : "Sukh-Dukh Saanjha Karo"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "समुदाय कल्याण - सुख और दुख साझा करें" : language === "pa" ? "ਭਾਈਚਾਰਕ ਭਲਾਈ - ਸੁਖ ਅਤੇ ਦੁੱਖ ਸਾਂਝੇ ਕਰੋ" : "Community welfare - share joy and sorrow"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-purple-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("sunwai") && (
+        <Link href="/task/sunwai">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-teal-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sunwai">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-500 to-cyan-600 shadow-sm">
+                <MessageSquare className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "सुनवाई" : language === "pa" ? "ਸੁਣਵਾਈ" : "Sunwai (Hearing)"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "शिकायत दर्ज करें और समाधान ट्रैक करें" : language === "pa" ? "ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰੋ ਅਤੇ ਹੱਲ ਟ੍ਰੈਕ ਕਰੋ" : "File complaints and track resolution"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-teal-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("outdoor-ad") && (
+        <Link href="/task/outdoor-ad">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-outdoor-ad">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm">
+                <ImageIcon className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "आउटडोर विज्ञापन" : language === "pa" ? "ਆਊਟਡੋਰ ਇਸ਼ਤਿਹਾਰ" : "Outdoor Advertisement"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "विज्ञापन स्थान विवरण जमा करें" : language === "pa" ? "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ" : "Submit ad location details"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-blue-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("gov-school") && (
+        <Link href="/task/gov-school">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-green-200 hover:shadow-md transition-all duration-200" data-testid="task-card-gov-school">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm">
+                <GraduationCap className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "सरकारी स्कूल कार्य" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਕੰਮ" : "Gov School Work"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "सरकारी स्कूल की समस्याएं रिपोर्ट करें" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਦੀਆਂ ਸਮੱਸਿਆਵਾਂ ਰਿਪੋਰਟ ਕਰੋ" : "Report government school issues"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-green-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("appointment") && (
+        <Link href="/task/appointment">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-appointment">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-indigo-600 shadow-sm">
+                <CalendarCheck className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "मुलाकात" : language === "pa" ? "ਮੁਲਾਕਾਤ" : "Appointment"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi" ? "मुलाकात का अनुरोध करें और अपनी निर्धारित बैठकों को ट्रैक करें" : language === "pa" ? "ਮੁਲਾਕਾਤ ਦੀ ਬੇਨਤੀ ਕਰੋ ਅਤੇ ਆਪਣੀਆਂ ਤਹਿ ਮੀਟਿੰਗਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ" : "Request an appointment and track your scheduled meetings"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-purple-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {isLoading && (
+          <>
+            <Skeleton className="h-[72px] w-full rounded-xl" />
+            <Skeleton className="h-[72px] w-full rounded-xl" />
+          </>
+        )}
+        {taskList.map((task) => {
+          const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
+          const count = submissionCounts?.[task.id] || 0;
+          return (
+            <Link key={task.id} href={getTaskRoute(task)}>
+              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid={`task-card-${task.id}`}>
+                <CardContent className="p-4 flex items-center gap-3.5">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${task.color || "#3b82f6"}, ${task.color || "#3b82f6"}dd)` }}
+                  >
+                    <IconComponent className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, task)}</h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, task)}</p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <ChevronRight className="h-4 w-4 text-blue-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          );
+        })}
+        {!isLoading && !hasFixed && !hasDynamic && (
+          <div className="text-center py-10 text-slate-400">
+            <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+            <p className="text-sm">
+              {language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category"}
+            </p>
+          </div>
+        )}
+      </>
+    );
+  }
 
   const overallTop3 = (() => {
     if (!leaderboardData) return [];
@@ -399,323 +648,88 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('availableTasks')}</h2>
           </div>
 
-          {categories && categories.length > 0 && (
-            <div className="space-y-2.5 mb-4">
-              <button
-                type="button"
-                onClick={() => setSelectedCategoryId(null)}
-                className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${selectedCategoryId === null ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
-              >
-                <Card className="border-0 shadow-none">
-                  <CardContent className="p-4 flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-slate-500 to-slate-600 shadow-sm">
-                      <LayoutGrid className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm text-slate-800">
-                        {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
-                      </h3>
-                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                        {language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedCategoryId === null ? "bg-blue-100" : "bg-slate-100"}`}>
-                        <ChevronRight className={`h-4 w-4 ${selectedCategoryId === null ? "text-blue-500" : "text-slate-500"}`} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </button>
-              {categories.map((cat) => {
-                const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
-                const isSelected = selectedCategoryId === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategoryId(cat.id)}
-                    className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${isSelected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
-                  >
-                    <Card className="border-0 shadow-none">
-                      <CardContent className="p-4 flex items-center gap-3.5">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
-                          <FolderTree className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm text-slate-800">{label}</h3>
-                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                            {language === "hi" ? "इस श्रेणी के कार्य" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਦੇ ਕੰਮ" : "Tasks in this category"}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
-                            <ChevronRight className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-slate-500"}`} />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           <div className="space-y-2.5">
-            {visibleFixedSlugs.includes("nasha-viruddh-yuddh") && (
-            <Link href="/task/nasha-viruddh-yuddh">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-red-600 to-rose-600 shadow-sm">
-                    <ShieldAlert className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "नशा विरुद्ध युद्ध" : language === "pa" ? "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" : "Nasha Viruddh Yuddh"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi"
-                        ? "जहां नशा हो रहा है उस स्थान की गुप्त रिपोर्टिंग"
-                        : language === "pa"
-                        ? "ਜਿੱਥੇ ਨਸ਼ਾ ਚੱਲ ਰਿਹਾ ਹੈ ਉਸ ਥਾਂ ਦੀ ਗੁਪਤ ਰਿਪੋਰਟਿੰਗ"
-                        : "Secretly report locations where drug activity is happening"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-red-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("road-report") && (
-            <Link href="/task/road-report">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-600 to-sky-500 shadow-sm">
-                    <RouteIcon className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "सड़क खराबी सूचना" : language === "pa" ? "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" : "Road Condition Report"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi"
-                        ? "जहां सड़क टूटी या खराब है, वहां की शुरू से अंत तक की जानकारी भेजें"
-                        : language === "pa"
-                        ? "ਜਿੱਥੇ ਸੜਕ ਟੁੱਟੀ ਜਾਂ ਖਰਾਬ ਹੈ, ਉੱਥੇ ਦੀ ਸ਼ੁਰੂ ਤੋਂ ਅੰਤ ਤੱਕ ਜਾਣਕਾਰੀ ਭੇਜੋ"
-                        : "Report damaged road stretch with photos, audio and map distance"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-blue-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("harr-sirr-te-chatt") && (
-            <Link href="/task/harr-sirr-te-chatt">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-500 to-red-500 shadow-sm">
-                    <Home className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "हर सिर ते छत" : language === "pa" ? "ਹਰ ਸਿਰ ਤੇ ਛੱਤ" : "Harr Sirr te Chatt"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "जरूरतमंद परिवारों के लिए छत की पहल" : language === "pa" ? "ਲੋੜਵੰਦ ਪਰਿਵਾਰਾਂ ਲਈ ਛੱਤ ਪਹਿਲਕਦਮੀ" : "Roof initiative for needy families"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-orange-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("sukh-dukh-saanjha-karo") && (
-            <Link href="/task/sukh-dukh-saanjha-karo">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sdsk">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
-                    <Heart className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "सुख-दुख सांझा करो" : language === "pa" ? "ਸੁਖ-ਦੁੱਖ ਸਾਂਝਾ ਕਰੋ" : "Sukh-Dukh Saanjha Karo"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "समुदाय कल्याण - सुख और दुख साझा करें" : language === "pa" ? "ਭਾਈਚਾਰਕ ਭਲਾਈ - ਸੁਖ ਅਤੇ ਦੁੱਖ ਸਾਂਝੇ ਕਰੋ" : "Community welfare - share joy and sorrow"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-purple-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("sunwai") && (
-            <Link href="/task/sunwai">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-teal-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sunwai">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-500 to-cyan-600 shadow-sm">
-                    <MessageSquare className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "सुनवाई" : language === "pa" ? "ਸੁਣਵਾਈ" : "Sunwai (Hearing)"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "शिकायत दर्ज करें और समाधान ट्रैक करें" : language === "pa" ? "ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰੋ ਅਤੇ ਹੱਲ ਟ੍ਰੈਕ ਕਰੋ" : "File complaints and track resolution"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-teal-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("outdoor-ad") && (
-            <Link href="/task/outdoor-ad">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-outdoor-ad">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm">
-                    <ImageIcon className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "आउटडोर विज्ञापन" : language === "pa" ? "ਆਊਟਡੋਰ ਇਸ਼ਤਿਹਾਰ" : "Outdoor Advertisement"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "विज्ञापन स्थान विवरण जमा करें" : language === "pa" ? "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ" : "Submit ad location details"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-blue-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("gov-school") && (
-            <Link href="/task/gov-school">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-green-200 hover:shadow-md transition-all duration-200" data-testid="task-card-gov-school">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm">
-                    <GraduationCap className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "सरकारी स्कूल कार्य" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਕੰਮ" : "Gov School Work"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "सरकारी स्कूल की समस्याएं रिपोर्ट करें" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਦੀਆਂ ਸਮੱਸਿਆਵਾਂ ਰਿਪੋਰਟ ਕਰੋ" : "Report government school issues"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-green-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-            {visibleFixedSlugs.includes("appointment") && (
-            <Link href="/task/appointment">
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-appointment">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-indigo-600 shadow-sm">
-                    <CalendarCheck className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">
-                      {language === "hi" ? "मुलाकात" : language === "pa" ? "ਮੁਲਾਕਾਤ" : "Appointment"}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                      {language === "hi" ? "मुलाकात का अनुरोध करें और अपनी निर्धारित बैठकों को ट्रैक करें" : language === "pa" ? "ਮੁਲਾਕਾਤ ਦੀ ਬੇਨਤੀ ਕਰੋ ਅਤੇ ਆਪਣੀਆਂ ਤਹਿ ਮੀਟਿੰਗਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ" : "Request an appointment and track your scheduled meetings"}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-purple-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-            )}
-
-            {isLoading && (
-              <>
-                <Skeleton className="h-[72px] w-full rounded-xl" />
-                <Skeleton className="h-[72px] w-full rounded-xl" />
-              </>
-            )}
-
-            {(selectedCategoryId
-              ? tasks?.filter((t) => (t as any).categoryId === selectedCategoryId)
-              : tasks?.filter((t) => !(t as any).categoryId)
-            )?.map((task) => {
-              const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
-              const count = submissionCounts?.[task.id] || 0;
-              const actionLabel = count > 0 ? t('continueTask') : t('startTask');
-              return (
-                <Link key={task.id} href={getTaskRoute(task)}>
-                  <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid={`task-card-${task.id}`}>
+          {categories && categories.length > 0 && (
+            <>
+              {/* All – task list sirf iske niche jab All selected ho */}
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryId(null)}
+                  className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${selectedCategoryId === null ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
+                >
+                  <Card className="border-0 shadow-none">
                     <CardContent className="p-4 flex items-center gap-3.5">
-                      <div
-                        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                        style={{ background: `linear-gradient(135deg, ${task.color || "#3b82f6"}, ${task.color || "#3b82f6"}dd)` }}
-                      >
-                        <IconComponent className="h-5 w-5 text-white" />
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-slate-500 to-slate-600 shadow-sm">
+                        <LayoutGrid className="h-5 w-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, task)}</h3>
-                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, task)}</p>
+                        <h3 className="font-semibold text-sm text-slate-800">
+                          {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
+                        </h3>
+                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                          {language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
+                        </p>
                       </div>
                       <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                          <ChevronRight className="h-4 w-4 text-blue-500" />
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedCategoryId === null ? "bg-blue-100" : "bg-slate-100"}`}>
+                          <ChevronRight className={`h-4 w-4 ${selectedCategoryId === null ? "text-blue-500" : "text-slate-500"}`} />
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                </Link>
-              );
-            })}
+                </button>
+                {selectedCategoryId === null && (
+                  <div className="pl-0 space-y-2.5">
+                    {renderTaskList(uncategorizedFixedSlugs, tasks?.filter((t) => !(t as any).categoryId) ?? [])}
+                  </div>
+                )}
+              </div>
 
-            {!isLoading && (() => {
-              const filtered = selectedCategoryId ? (tasks?.filter((t) => (t as any).categoryId === selectedCategoryId) ?? []) : (tasks?.filter((t) => !(t as any).categoryId) ?? []);
-              const hasFixed = visibleFixedSlugs.length > 0;
-              return filtered.length === 0 && !hasFixed ? (
-                <div className="text-center py-10 text-slate-400">
-                  <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm">
-                    {selectedCategoryId
-                      ? (language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category")
-                      : (language === "hi" ? "कोई अश्रेणीबद्ध कार्य नहीं" : language === "pa" ? "ਕੋਈ ਬਿਨਾਂ ਸ਼੍ਰੇਣੀ ਕੰਮ ਨਹੀਂ" : "No uncategorized tasks")}
-                  </p>
-                </div>
-              ) : null;
-            })()}
+              {/* Har category – task list sirf us category ke niche jab woh selected ho */}
+              {categories.map((cat) => {
+                const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
+                const isSelected = selectedCategoryId === cat.id;
+                const catSlugs = cat.fixedTaskSlugs ?? [];
+                const catTasks = tasks?.filter((t) => (t as any).categoryId === cat.id) ?? [];
+                return (
+                  <div key={cat.id} className="space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                      className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${isSelected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
+                    >
+                      <Card className="border-0 shadow-none">
+                        <CardContent className="p-4 flex items-center gap-3.5">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
+                            <FolderTree className="h-5 w-5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-sm text-slate-800">{label}</h3>
+                            <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                              {language === "hi" ? "इस श्रेणी के कार्य" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਦੇ ਕੰਮ" : "Tasks in this category"}
+                            </p>
+                          </div>
+                          <div className="flex-shrink-0">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                              <ChevronRight className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-slate-500"}`} />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </button>
+                    {isSelected && (
+                      <div className="pl-0 space-y-2.5">
+                        {renderTaskList(catSlugs, catTasks)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {(!categories || categories.length === 0) && renderTaskList(uncategorizedFixedSlugs, tasks?.filter((t) => !(t as any).categoryId) ?? [])}
           </div>
         </section>
       </div>
