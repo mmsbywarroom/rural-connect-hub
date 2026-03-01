@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -480,6 +480,57 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Chat: single "all users" group (WhatsApp-style), admin-controlled, new users auto-added
+export const chatGroups = pgTable("chat_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().default("Rural Connect Hub"),
+  isAllUsersGroup: boolean("is_all_users_group").default(false),
+  createdById: varchar("created_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const groupMembers = pgTable("group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => chatGroups.id, { onDelete: "cascade" }),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const groupMessages = pgTable("group_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => chatGroups.id, { onDelete: "cascade" }),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  text: text("text"),
+  imageUrl: text("image_url"),
+  audioUrl: text("audio_url"),
+  replyToMessageId: varchar("reply_to_message_id"),
+  deletedAt: timestamp("deleted_at"),
+  deletedForEveryone: boolean("deleted_for_everyone").default(false),
+  deletedForUserIds: jsonb("deleted_for_user_ids").$type<string[]>().default([]),
+  reactions: jsonb("reactions").$type<Record<string, string[]>>().default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Group calls (audio/video) – WhatsApp-style: ring, accept/decline, all group members
+export const groupCalls = pgTable("group_calls", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => chatGroups.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // "audio" | "video"
+  createdBy: varchar("created_by").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("ringing"), // "ringing" | "active" | "ended"
+  createdAt: timestamp("created_at").defaultNow(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const groupCallParticipants = pgTable("group_call_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  callId: varchar("call_id").notNull().references(() => groupCalls.id, { onDelete: "cascade" }),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("invited"), // "invited" | "joined" | "declined"
+  joinedAt: timestamp("joined_at"),
+});
+
 // CSV Upload History
 export const csvUploads = pgTable("csv_uploads", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -527,6 +578,11 @@ export const insertTaskSubmissionSchema = createInsertSchema(taskSubmissions).om
 export const insertUserAdditionalRoleSchema = createInsertSchema(userAdditionalRoles).omit({ id: true, createdAt: true });
 export const insertVoterListSchema = createInsertSchema(voterList).omit({ id: true });
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
+export const insertChatGroupSchema = createInsertSchema(chatGroups).omit({ id: true, createdAt: true });
+export const insertGroupMemberSchema = createInsertSchema(groupMembers).omit({ id: true, joinedAt: true });
+export const insertGroupMessageSchema = createInsertSchema(groupMessages).omit({ id: true, createdAt: true });
+export const insertGroupCallSchema = createInsertSchema(groupCalls).omit({ id: true, createdAt: true });
+export const insertGroupCallParticipantSchema = createInsertSchema(groupCallParticipants).omit({ id: true });
 export const insertCsvUploadSchema = createInsertSchema(csvUploads).omit({ id: true, createdAt: true });
 
 // Types
@@ -613,6 +669,18 @@ export type VoterListRecord = typeof voterList.$inferSelect;
 
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+export type InsertChatGroup = z.infer<typeof insertChatGroupSchema>;
+export type ChatGroup = typeof chatGroups.$inferSelect;
+export type InsertGroupMember = z.infer<typeof insertGroupMemberSchema>;
+export type GroupMember = typeof groupMembers.$inferSelect;
+export type InsertGroupMessage = z.infer<typeof insertGroupMessageSchema>;
+export type GroupMessage = typeof groupMessages.$inferSelect;
+
+export type InsertGroupCall = z.infer<typeof insertGroupCallSchema>;
+export type GroupCall = typeof groupCalls.$inferSelect;
+export type InsertGroupCallParticipant = z.infer<typeof insertGroupCallParticipantSchema>;
+export type GroupCallParticipant = typeof groupCallParticipants.$inferSelect;
 
 export type InsertCsvUpload = z.infer<typeof insertCsvUploadSchema>;
 export type CsvUpload = typeof csvUploads.$inferSelect;

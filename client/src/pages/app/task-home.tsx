@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid } from "lucide-react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -484,6 +484,11 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </span>
               )}
             </button>
+            <Link href="/chat">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="button-chat">
+                <MessageCircle className="h-5 w-5" />
+              </Button>
+            </Link>
             <LanguageSwitcher variant="ghost" className="text-white" iconClassName="text-white" />
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onLogout} data-testid="button-logout">
               <LogOut className="h-5 w-5" />

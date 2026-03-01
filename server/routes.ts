@@ -3,7 +3,9 @@ import { createServer, type Server } from "http";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
-import { sendPushToAll, sendPushToUser, VAPID_PUBLIC_KEY } from "./push";
+import { sendPushToAll, sendPushToUser, sendPushToGroupMembers, VAPID_PUBLIC_KEY } from "./push";
+import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded } from "./ws-calls";
+import { createLivekitToken, isLivekitConfigured, getLivekitUrl } from "./livekit";
 import { translateBatch } from "./translate";
 import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
@@ -500,6 +502,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  attachCallWebSocket(httpServer);
 
   // OCR endpoint using Google Cloud Vision API
   app.post("/api/ocr", async (req, res) => {
@@ -1543,6 +1546,9 @@ export async function registerRoutes(
         }
       }
       const user = await storage.createAppUser(data);
+
+      const defaultGroup = await storage.getOrCreateDefaultChatGroup();
+      await storage.addGroupMember(defaultGroup.id, user.id, "member");
 
       if (Array.isArray(additionalRoles) && additionalRoles.length > 0) {
         for (const role of additionalRoles) {
@@ -3292,6 +3298,272 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Push send error:", error);
       res.status(500).json({ error: "Failed to send notifications" });
+    }
+  });
+
+  // ===== App Group Chat (WhatsApp-style, all users, push on new message) =====
+  app.get("/api/app/group/default", async (_req, res) => {
+    try {
+      const group = await storage.getOrCreateDefaultChatGroup();
+      const memberIds = await storage.getGroupMemberIds(group.id);
+      res.json({ ...group, memberCount: memberIds.length });
+    } catch (error) {
+      console.error("Group default error:", error);
+      res.status(500).json({ error: "Failed to get group" });
+    }
+  });
+
+  app.get("/api/app/group/:id/messages", async (req, res) => {
+    try {
+      const { id: groupId } = req.params;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+      const before = req.query.before as string | undefined;
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      let messages = await storage.getGroupMessages(groupId, limit, before);
+      const forUserId = req.query.forUserId as string | undefined;
+      if (forUserId) {
+        messages = messages.filter((m) => {
+          const arr = m.deletedForUserIds as string[] | undefined;
+          return !Array.isArray(arr) || !arr.includes(forUserId);
+        });
+      }
+      const userIds = [...new Set(messages.map((m) => m.appUserId))];
+      const replyToIds = [...new Set(messages.map((m) => m.replyToMessageId).filter(Boolean))] as string[];
+      const usersList = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name, selfPhoto: appUsers.selfPhoto }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
+      const userMap = new Map(usersList.map((u) => [u.id, u]));
+      const replyMessages = replyToIds.length ? await Promise.all(replyToIds.map((id) => storage.getGroupMessage(id))) : [];
+      const replyMap = new Map(replyMessages.filter(Boolean).map((m) => [m!.id, m]));
+      const list = messages.map((m) => {
+        const replyTo = m.replyToMessageId ? replyMap.get(m.replyToMessageId!) : null;
+        return {
+          id: m.id,
+          groupId: m.groupId,
+          appUserId: m.appUserId,
+          text: m.deletedForEveryone ? null : m.text,
+          imageUrl: m.deletedForEveryone ? null : m.imageUrl,
+          audioUrl: m.deletedForEveryone ? null : m.audioUrl,
+          replyToMessageId: m.replyToMessageId,
+          replyTo: replyTo ? { id: replyTo.id, text: replyTo.deletedForEveryone ? null : (replyTo.text?.slice(0, 80) ?? null), senderName: userMap.get(replyTo.appUserId)?.name ?? "Unknown" } : null,
+          deletedAt: m.deletedAt,
+          deletedForEveryone: m.deletedForEveryone ?? false,
+          deletedForUserIds: m.deletedForUserIds ?? [],
+          reactions: m.reactions ?? {},
+          createdAt: m.createdAt,
+          senderName: userMap.get(m.appUserId)?.name ?? "Unknown",
+          senderPhoto: userMap.get(m.appUserId)?.selfPhoto ?? null,
+        };
+      });
+      res.json(list.reverse());
+    } catch (error) {
+      console.error("Group messages error:", error);
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  app.post("/api/app/group/:id/messages", async (req, res) => {
+    try {
+      const { id: groupId } = req.params;
+      const { appUserId, text, imageUrl, audioUrl, replyToMessageId } = req.body;
+      if (!appUserId) return res.status(400).json({ error: "appUserId required" });
+      if (!text && !imageUrl && !audioUrl) return res.status(400).json({ error: "text, imageUrl or audioUrl required" });
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const isMember = await storage.isGroupMember(groupId, appUserId);
+      if (!isMember) return res.status(403).json({ error: "Not a group member" });
+      const msg = await storage.createGroupMessage({
+        groupId,
+        appUserId,
+        text: text || null,
+        imageUrl: imageUrl || null,
+        audioUrl: audioUrl || null,
+        replyToMessageId: replyToMessageId || null,
+      });
+      const sender = await storage.getAppUser(appUserId);
+      const senderName = sender?.name ?? "Someone";
+      const notifBody = text ? (text.length > 60 ? text.slice(0, 60) + "…" : text) : audioUrl ? "🎤 Audio" : "📷 Photo";
+      await sendPushToGroupMembers(groupId, appUserId, senderName, notifBody, "/app/chat");
+      res.json(msg);
+    } catch (error) {
+      console.error("Group send message error:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+  app.delete("/api/app/group/:id/messages/:messageId", async (req, res) => {
+    try {
+      const { id: groupId, messageId } = req.params;
+      const { appUserId, deleteForEveryone } = req.body;
+      if (!appUserId) return res.status(400).json({ error: "appUserId required" });
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const isMember = await storage.isGroupMember(groupId, appUserId);
+      if (!isMember) return res.status(403).json({ error: "Not a group member" });
+      const msg = await storage.getGroupMessage(messageId);
+      if (!msg || msg.groupId !== groupId) return res.status(404).json({ error: "Message not found" });
+      if (msg.appUserId !== appUserId) return res.status(403).json({ error: "Can only delete your own message" });
+      if (deleteForEveryone) {
+        const age = Date.now() - new Date(msg.createdAt!).getTime();
+        if (age > TWENTY_FOUR_HOURS_MS) return res.status(400).json({ error: "Delete for everyone only within 24 hours" });
+        await storage.updateGroupMessage(messageId, {
+          deletedAt: new Date(),
+          deletedForEveryone: true,
+          text: null,
+          imageUrl: null,
+          audioUrl: null,
+        });
+      } else {
+        const deletedIds: string[] = Array.isArray(msg.deletedForUserIds) ? [...msg.deletedForUserIds] : [];
+        if (!deletedIds.includes(appUserId)) deletedIds.push(appUserId);
+        await storage.updateGroupMessage(messageId, { deletedForUserIds: deletedIds });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Group delete message error:", error);
+      res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+
+  app.patch("/api/app/group/:id/messages/:messageId/react", async (req, res) => {
+    try {
+      const { id: groupId, messageId } = req.params;
+      const { appUserId, emoji } = req.body;
+      if (!appUserId || !emoji) return res.status(400).json({ error: "appUserId and emoji required" });
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const isMember = await storage.isGroupMember(groupId, appUserId);
+      if (!isMember) return res.status(403).json({ error: "Not a group member" });
+      const msg = await storage.getGroupMessage(messageId);
+      if (!msg || msg.groupId !== groupId) return res.status(404).json({ error: "Message not found" });
+      const reactions: Record<string, string[]> = (msg.reactions && typeof msg.reactions === "object") ? { ...msg.reactions } : {};
+      const list = reactions[emoji] ?? [];
+      const idx = list.indexOf(appUserId);
+      if (idx >= 0) list.splice(idx, 1);
+      else list.push(appUserId);
+      if (list.length === 0) delete reactions[emoji];
+      else reactions[emoji] = list;
+      const updated = await storage.updateGroupMessage(messageId, { reactions });
+      res.json(updated);
+    } catch (error) {
+      console.error("Group react error:", error);
+      res.status(500).json({ error: "Failed to react" });
+    }
+  });
+
+  // ===== Group audio/video calls (WhatsApp-style: ring, accept/decline) =====
+  app.get("/api/app/livekit-config", (_req, res) => {
+    res.json({ configured: isLivekitConfigured(), url: isLivekitConfigured() ? getLivekitUrl() : null });
+  });
+
+  app.get("/api/app/group/:id/active-call", async (req, res) => {
+    try {
+      const { id: groupId } = req.params;
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const call = await storage.getActiveGroupCallByGroupId(groupId);
+      if (!call) return res.json(null);
+      const caller = await storage.getAppUser(call.createdBy);
+      const participants = await storage.getGroupCallParticipants(call.id);
+      res.json({
+        id: call.id,
+        groupId: call.groupId,
+        type: call.type,
+        status: call.status,
+        createdBy: call.createdBy,
+        callerName: caller?.name ?? "Unknown",
+        createdAt: call.createdAt,
+        participants: participants.map((p) => ({ appUserId: p.appUserId, status: p.status, joinedAt: p.joinedAt })),
+      });
+    } catch (error) {
+      console.error("Active call error:", error);
+      res.status(500).json({ error: "Failed to get active call" });
+    }
+  });
+
+  app.post("/api/app/group/:id/calls", async (req, res) => {
+    try {
+      const { id: groupId } = req.params;
+      const { appUserId, type } = req.body;
+      if (!appUserId || !type) return res.status(400).json({ error: "appUserId and type (audio|video) required" });
+      if (!["audio", "video"].includes(type)) return res.status(400).json({ error: "type must be audio or video" });
+      if (!isLivekitConfigured()) return res.status(503).json({ error: "Calls not configured" });
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const isMember = await storage.isGroupMember(groupId, appUserId);
+      if (!isMember) return res.status(403).json({ error: "Not a group member" });
+      const existing = await storage.getActiveGroupCallByGroupId(groupId);
+      if (existing) return res.status(409).json({ error: "A call is already in progress" });
+      const call = await storage.createGroupCall({ groupId, type, createdBy: appUserId, status: "ringing" });
+      const memberIds = await storage.getGroupMemberIds(groupId);
+      for (const uid of memberIds) {
+        await storage.addGroupCallParticipant({ callId: call.id, appUserId: uid, status: uid === appUserId ? "joined" : "invited" });
+      }
+      const caller = await storage.getAppUser(appUserId);
+      const callerName = caller?.name ?? "Someone";
+      const toNotify = memberIds.filter((id) => id !== appUserId);
+      await sendPushToGroupMembers(groupId, appUserId, callerName, type === "video" ? "Incoming group video call" : "Incoming group audio call", "/app/chat");
+      notifyIncomingCall(toNotify, { type: "incoming-call", callId: call.id, groupId, callType: type, callerId: appUserId, callerName });
+      res.json({ id: call.id, groupId: call.groupId, type: call.type, status: call.status, createdBy: call.createdBy, createdAt: call.createdAt });
+    } catch (error) {
+      console.error("Start call error:", error);
+      res.status(500).json({ error: "Failed to start call" });
+    }
+  });
+
+  app.post("/api/app/group/:id/calls/:callId/join", async (req, res) => {
+    try {
+      const { id: groupId, callId } = req.params;
+      const { appUserId } = req.body;
+      if (!appUserId) return res.status(400).json({ error: "appUserId required" });
+      if (!isLivekitConfigured()) return res.status(503).json({ error: "Calls not configured" });
+      const call = await storage.getGroupCall(callId);
+      if (!call || call.groupId !== groupId) return res.status(404).json({ error: "Call not found" });
+      if (call.status === "ended") return res.status(400).json({ error: "Call has ended" });
+      const isMember = await storage.isGroupMember(groupId, appUserId);
+      if (!isMember) return res.status(403).json({ error: "Not a group member" });
+      await storage.updateGroupCall(callId, { status: "active" });
+      await storage.updateGroupCallParticipant(callId, appUserId, { status: "joined", joinedAt: new Date() });
+      const user = await storage.getAppUser(appUserId);
+      const roomName = `call-${callId}`;
+      const token = createLivekitToken(roomName, appUserId, user?.name ?? "User", call.type === "video");
+      res.json({ token, roomName, livekitUrl: getLivekitUrl(), callType: call.type });
+    } catch (error) {
+      console.error("Join call error:", error);
+      res.status(500).json({ error: "Failed to join call" });
+    }
+  });
+
+  app.post("/api/app/group/:id/calls/:callId/decline", async (req, res) => {
+    try {
+      const { id: groupId, callId } = req.params;
+      const { appUserId } = req.body;
+      if (!appUserId) return res.status(400).json({ error: "appUserId required" });
+      const call = await storage.getGroupCall(callId);
+      if (!call || call.groupId !== groupId) return res.status(404).json({ error: "Call not found" });
+      await storage.updateGroupCallParticipant(callId, appUserId, { status: "declined" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Decline call error:", error);
+      res.status(500).json({ error: "Failed to decline" });
+    }
+  });
+
+  app.post("/api/app/group/:id/calls/:callId/end", async (req, res) => {
+    try {
+      const { id: groupId, callId } = req.params;
+      const { appUserId } = req.body;
+      if (!appUserId) return res.status(400).json({ error: "appUserId required" });
+      const call = await storage.getGroupCall(callId);
+      if (!call || call.groupId !== groupId) return res.status(404).json({ error: "Call not found" });
+      await storage.updateGroupCall(callId, { status: "ended", endedAt: new Date() });
+      const participants = await storage.getGroupCallParticipants(callId);
+      const userIds = participants.map((p) => p.appUserId);
+      notifyCallEnded(userIds, { type: "call-ended", callId });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("End call error:", error);
+      res.status(500).json({ error: "Failed to end call" });
     }
   });
 

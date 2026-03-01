@@ -89,4 +89,27 @@ export async function sendPushToUser(appUserId: string, title: string, body: str
   return { sent, failed };
 }
 
+/** Send push to all members of a group except excludeAppUserId (e.g. sender). */
+export async function sendPushToGroupMembers(
+  groupId: string,
+  excludeAppUserId: string,
+  title: string,
+  body: string,
+  url?: string
+) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    return { sent: 0, failed: 0 };
+  }
+  const memberIds = await storage.getGroupMemberIds(groupId);
+  const idsToNotify = memberIds.filter((id) => id !== excludeAppUserId);
+  let sent = 0;
+  let failed = 0;
+  for (const appUserId of idsToNotify) {
+    const result = await sendPushToUser(appUserId, title, body, url);
+    sent += result.sent;
+    failed += result.failed;
+  }
+  return { sent, failed };
+}
+
 export { VAPID_PUBLIC_KEY };

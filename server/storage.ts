@@ -4,7 +4,8 @@ import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
   appUsers, cscs, cscReports, mappedVolunteers, supporters,
-  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions, csvUploads, userAdditionalRoles, voterList, pushSubscriptions,
+  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions,   csvUploads, userAdditionalRoles, voterList, pushSubscriptions,
+  chatGroups, groupMembers, groupMessages, groupCalls, groupCallParticipants,
   adminRoles, loginPageConfig,
   type AdminRole, type InsertAdminRole,
   type LoginPageConfig, type InsertLoginPageConfig,
@@ -37,6 +38,11 @@ import {
   type CsvUpload, type InsertCsvUpload,
   type VoterListRecord, type InsertVoterList,
   type PushSubscription, type InsertPushSubscription,
+  type ChatGroup, type InsertChatGroup,
+  type GroupMember, type InsertGroupMember,
+  type GroupMessage, type InsertGroupMessage,
+  type GroupCall, type InsertGroupCall,
+  type GroupCallParticipant, type InsertGroupCallParticipant,
   hstcSubmissions,
   type HstcSubmission, type InsertHstcSubmission,
   sdskCategories, sdskSubmissions,
@@ -266,6 +272,28 @@ export interface IStorage {
   createPushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
   deletePushSubscription(endpoint: string): Promise<void>;
   deletePushSubscriptionsByUser(appUserId: string): Promise<void>;
+
+  // Chat Groups
+  getDefaultChatGroup(): Promise<ChatGroup | null>;
+  getOrCreateDefaultChatGroup(): Promise<ChatGroup>;
+  getChatGroup(id: string): Promise<ChatGroup | undefined>;
+  addGroupMember(groupId: string, appUserId: string, role?: string): Promise<GroupMember>;
+  getGroupMemberIds(groupId: string): Promise<string[]>;
+  isGroupMember(groupId: string, appUserId: string): Promise<boolean>;
+  getGroupMessages(groupId: string, limit: number, beforeId?: string): Promise<GroupMessage[]>;
+  getGroupMessage(id: string): Promise<GroupMessage | undefined>;
+  createGroupMessage(data: InsertGroupMessage): Promise<GroupMessage>;
+  updateGroupMessage(id: string, data: Partial<GroupMessage>): Promise<GroupMessage | undefined>;
+  deleteGroupMessage(id: string): Promise<boolean>;
+
+  // Group Calls (audio/video)
+  createGroupCall(data: InsertGroupCall): Promise<GroupCall>;
+  getGroupCall(id: string): Promise<GroupCall | undefined>;
+  getActiveGroupCallByGroupId(groupId: string): Promise<GroupCall | undefined>;
+  updateGroupCall(id: string, data: Partial<GroupCall>): Promise<GroupCall | undefined>;
+  addGroupCallParticipant(data: InsertGroupCallParticipant): Promise<GroupCallParticipant>;
+  getGroupCallParticipants(callId: string): Promise<GroupCallParticipant[]>;
+  updateGroupCallParticipant(callId: string, appUserId: string, data: Partial<GroupCallParticipant>): Promise<GroupCallParticipant | undefined>;
 
   // CSV Uploads
   getCsvUploads(): Promise<CsvUpload[]>;
@@ -1105,6 +1133,116 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushSubscriptionsByUser(appUserId: string): Promise<void> {
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.appUserId, appUserId));
+  }
+
+  // Chat Groups
+  async getDefaultChatGroup(): Promise<ChatGroup | null> {
+    const [g] = await db.select().from(chatGroups).where(eq(chatGroups.isAllUsersGroup, true)).limit(1);
+    return g ?? null;
+  }
+
+  async getOrCreateDefaultChatGroup(): Promise<ChatGroup> {
+    let g = await this.getDefaultChatGroup();
+    if (g) return g;
+    const [created] = await db.insert(chatGroups).values({
+      name: "Rural Connect Hub",
+      isAllUsersGroup: true,
+    }).returning();
+    g = created;
+    const allAppUsers = await db.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.isActive, true));
+    for (const u of allAppUsers) {
+      const isMember = await this.isGroupMember(g.id, u.id);
+      if (!isMember) await this.addGroupMember(g.id, u.id, "member");
+    }
+    return g;
+  }
+
+  async getChatGroup(id: string): Promise<ChatGroup | undefined> {
+    const [g] = await db.select().from(chatGroups).where(eq(chatGroups.id, id));
+    return g;
+  }
+
+  async addGroupMember(groupId: string, appUserId: string, role = "member"): Promise<GroupMember> {
+    const existing = await db.select().from(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.appUserId, appUserId)));
+    if (existing[0]) return existing[0];
+    const [m] = await db.insert(groupMembers).values({ groupId, appUserId, role }).returning();
+    return m;
+  }
+
+  async getGroupMemberIds(groupId: string): Promise<string[]> {
+    const rows = await db.select({ appUserId: groupMembers.appUserId }).from(groupMembers).where(eq(groupMembers.groupId, groupId));
+    return rows.map((r) => r.appUserId);
+  }
+
+  async isGroupMember(groupId: string, appUserId: string): Promise<boolean> {
+    const [m] = await db.select().from(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.appUserId, appUserId)));
+    return !!m;
+  }
+
+  async getGroupMessages(groupId: string, limit: number, beforeId?: string): Promise<GroupMessage[]> {
+    if (beforeId) {
+      const [before] = await db.select().from(groupMessages).where(eq(groupMessages.id, beforeId));
+      if (before) {
+        return db.select().from(groupMessages)
+          .where(and(eq(groupMessages.groupId, groupId), sql`${groupMessages.createdAt} < ${before.createdAt}`))
+          .orderBy(desc(groupMessages.createdAt)).limit(limit);
+      }
+    }
+    return db.select().from(groupMessages).where(eq(groupMessages.groupId, groupId)).orderBy(desc(groupMessages.createdAt)).limit(limit);
+  }
+
+  async getGroupMessage(id: string): Promise<GroupMessage | undefined> {
+    const [m] = await db.select().from(groupMessages).where(eq(groupMessages.id, id));
+    return m;
+  }
+
+  async createGroupMessage(data: InsertGroupMessage): Promise<GroupMessage> {
+    const [msg] = await db.insert(groupMessages).values(data).returning();
+    return msg;
+  }
+
+  async updateGroupMessage(id: string, data: Partial<GroupMessage>): Promise<GroupMessage | undefined> {
+    const [updated] = await db.update(groupMessages).set(data).where(eq(groupMessages.id, id)).returning();
+    return updated;
+  }
+
+  async deleteGroupMessage(id: string): Promise<boolean> {
+    const [deleted] = await db.delete(groupMessages).where(eq(groupMessages.id, id)).returning({ id: groupMessages.id });
+    return !!deleted;
+  }
+
+  async createGroupCall(data: InsertGroupCall): Promise<GroupCall> {
+    const [c] = await db.insert(groupCalls).values(data).returning();
+    return c;
+  }
+
+  async getGroupCall(id: string): Promise<GroupCall | undefined> {
+    const [c] = await db.select().from(groupCalls).where(eq(groupCalls.id, id));
+    return c;
+  }
+
+  async getActiveGroupCallByGroupId(groupId: string): Promise<GroupCall | undefined> {
+    const [c] = await db.select().from(groupCalls).where(and(eq(groupCalls.groupId, groupId), inArray(groupCalls.status, ["ringing", "active"]))).orderBy(desc(groupCalls.createdAt)).limit(1);
+    return c;
+  }
+
+  async updateGroupCall(id: string, data: Partial<GroupCall>): Promise<GroupCall | undefined> {
+    const [c] = await db.update(groupCalls).set(data).where(eq(groupCalls.id, id)).returning();
+    return c;
+  }
+
+  async addGroupCallParticipant(data: InsertGroupCallParticipant): Promise<GroupCallParticipant> {
+    const [p] = await db.insert(groupCallParticipants).values(data).returning();
+    return p;
+  }
+
+  async getGroupCallParticipants(callId: string): Promise<GroupCallParticipant[]> {
+    return db.select().from(groupCallParticipants).where(eq(groupCallParticipants.callId, callId));
+  }
+
+  async updateGroupCallParticipant(callId: string, appUserId: string, data: Partial<GroupCallParticipant>): Promise<GroupCallParticipant | undefined> {
+    const [p] = await db.update(groupCallParticipants).set(data).where(and(eq(groupCallParticipants.callId, callId), eq(groupCallParticipants.appUserId, appUserId))).returning();
+    return p;
   }
 
   // HSTC Submissions

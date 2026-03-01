@@ -30,6 +30,7 @@ import TaskRoad from "./task-road";
 import SurveyForm from "./survey-form";
 import SurveyLeaderboard from "./survey-leaderboard";
 import Leaderboard from "./leaderboard";
+import GroupChat from "./group-chat";
 import { Loader2, LogIn, UserPlus, Mail, KeyRound, ArrowRight, ArrowLeft, MapPin, Phone, Smartphone } from "lucide-react";
 import type { AppUser } from "@shared/schema";
 import { getProfileCompletion } from "@/lib/profile-completion";
@@ -559,6 +560,9 @@ export default function VolunteerPortal() {
     if (location === "/task/appointment" || location === "/app/task/appointment") {
       if (!profileComplete) return <ProfileGate />;
       return <TaskAppointment user={user} />;
+    }
+    if (location === "/chat" || location === "/app/chat") {
+      return <GroupChat user={user} onBack={() => setLocation("/")} />;
     }
     if (location === "/leaderboard" || location === "/app/leaderboard") {
       return <Leaderboard user={user} onBack={() => setLocation("/")} />;
