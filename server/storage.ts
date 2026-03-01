@@ -278,6 +278,7 @@ export interface IStorage {
   getOrCreateDefaultChatGroup(): Promise<ChatGroup>;
   getChatGroup(id: string): Promise<ChatGroup | undefined>;
   addGroupMember(groupId: string, appUserId: string, role?: string): Promise<GroupMember>;
+  removeGroupMember(groupId: string, appUserId: string): Promise<boolean>;
   getGroupMemberIds(groupId: string): Promise<string[]>;
   isGroupMember(groupId: string, appUserId: string): Promise<boolean>;
   getGroupMessages(groupId: string, limit: number, beforeId?: string): Promise<GroupMessage[]>;
@@ -1167,6 +1168,11 @@ export class DatabaseStorage implements IStorage {
     if (existing[0]) return existing[0];
     const [m] = await db.insert(groupMembers).values({ groupId, appUserId, role }).returning();
     return m;
+  }
+
+  async removeGroupMember(groupId: string, appUserId: string): Promise<boolean> {
+    const [deleted] = await db.delete(groupMembers).where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.appUserId, appUserId))).returning({ id: groupMembers.id });
+    return !!deleted;
   }
 
   async getGroupMemberIds(groupId: string): Promise<string[]> {

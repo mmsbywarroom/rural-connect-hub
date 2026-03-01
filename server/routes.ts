@@ -2613,6 +2613,84 @@ export async function registerRoutes(
     }
   });
 
+  // Admin - Group Chat: get default group and members (for management)
+  app.get("/api/admin/chat-group", async (_req, res) => {
+    try {
+      const group = await storage.getOrCreateDefaultChatGroup();
+      const memberIds = await storage.getGroupMemberIds(group.id);
+      const members = memberIds.length
+        ? await db.select({ id: appUsers.id, name: appUsers.name, mobileNumber: appUsers.mobileNumber, isActive: appUsers.isActive }).from(appUsers).where(inArray(appUsers.id, memberIds))
+        : [];
+      res.json({
+        id: group.id,
+        name: group.name,
+        isAllUsersGroup: group.isAllUsersGroup ?? false,
+        createdAt: group.createdAt,
+        memberCount: memberIds.length,
+        members: members.map((m) => ({ id: m.id, name: m.name, mobileNumber: m.mobileNumber ?? null, isActive: m.isActive })),
+      });
+    } catch (error) {
+      console.error("Admin chat-group error:", error);
+      res.status(500).json({ error: "Failed to fetch group" });
+    }
+  });
+
+  app.delete("/api/admin/chat-group/members/:appUserId", async (req, res) => {
+    try {
+      const group = await storage.getOrCreateDefaultChatGroup();
+      const removed = await storage.removeGroupMember(group.id, req.params.appUserId);
+      if (!removed) return res.status(404).json({ error: "Member not in group" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin remove member error:", error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
+  app.get("/api/admin/chat-group/messages", async (req, res) => {
+    try {
+      const group = await storage.getOrCreateDefaultChatGroup();
+      const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+      const messages = await storage.getGroupMessages(group.id, limit);
+      const userIds = [...new Set(messages.map((m) => m.appUserId))];
+      const usersList = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
+      const userMap = new Map(usersList.map((u) => [u.id, u.name]));
+      const list = messages.map((m) => ({
+        id: m.id,
+        appUserId: m.appUserId,
+        senderName: userMap.get(m.appUserId) ?? "Unknown",
+        text: m.deletedForEveryone ? null : m.text,
+        imageUrl: m.deletedForEveryone ? null : m.imageUrl,
+        audioUrl: m.deletedForEveryone ? null : m.audioUrl,
+        deletedForEveryone: m.deletedForEveryone ?? false,
+        createdAt: m.createdAt,
+      }));
+      res.json(list.reverse());
+    } catch (error) {
+      console.error("Admin chat-group messages error:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.delete("/api/admin/chat-group/messages/:messageId", async (req, res) => {
+    try {
+      const group = await storage.getOrCreateDefaultChatGroup();
+      const msg = await storage.getGroupMessage(req.params.messageId);
+      if (!msg || msg.groupId !== group.id) return res.status(404).json({ error: "Message not found" });
+      await storage.updateGroupMessage(req.params.messageId, {
+        deletedAt: new Date(),
+        deletedForEveryone: true,
+        text: null,
+        imageUrl: null,
+        audioUrl: null,
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin delete message error:", error);
+      res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+
   // Birthday Management - Get all users with DOB info
   app.get("/api/admin/birthdays", async (req, res) => {
     try {

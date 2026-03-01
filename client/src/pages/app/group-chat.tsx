@@ -128,6 +128,9 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const [inCallRoom, setInCallRoom] = useState<InCallRoom | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const prevMessageCountRef = useRef(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -296,12 +299,35 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/app/group", group?.id, "messages"] });
+    onSuccess: (data: { id: string; groupId: string; appUserId: string; text: string | null; imageUrl: string | null; audioUrl: string | null; replyToMessageId: string | null; createdAt: string }, _variables) => {
+      const queryKey = ["/api/app/group", group?.id, "messages", user.id] as const;
+      queryClient.setQueryData<Message[]>(queryKey, (old) => {
+        const replyToMsg = replyTo ? { id: replyTo.id, text: replyTo.text?.slice(0, 80) ?? null, senderName: replyTo.senderName } : null;
+        const newMsg: Message = {
+          id: data.id,
+          groupId: data.groupId,
+          appUserId: data.appUserId,
+          text: data.text,
+          imageUrl: data.imageUrl,
+          audioUrl: data.audioUrl,
+          replyToMessageId: data.replyToMessageId,
+          replyTo: replyToMsg,
+          deletedAt: null,
+          deletedForEveryone: false,
+          deletedForUserIds: [],
+          reactions: {},
+          createdAt: data.createdAt,
+          senderName: user.name,
+          senderPhoto: user.selfPhoto ?? null,
+        };
+        return [...(old || []), newMsg];
+      });
       setInputText("");
       setImagePreview(null);
       setAudioPreview(null);
       setReplyTo(null);
+      isNearBottomRef.current = true;
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
     },
   });
 
@@ -333,8 +359,34 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     },
   });
 
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+    isNearBottomRef.current = true;
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const threshold = 120;
+      isNearBottomRef.current = scrollTop + clientHeight >= scrollHeight - threshold;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const prevCount = prevMessageCountRef.current;
+    prevMessageCountRef.current = messages.length;
+    if (prevCount === 0) {
+      scrollToBottom("auto");
+      return;
+    }
+    if (isNearBottomRef.current) {
+      scrollToBottom("smooth");
+    }
   }, [messages]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -512,7 +564,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 pb-28">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3 pb-28">
         {messagesLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon, MessageCircle } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
@@ -43,6 +43,7 @@ import RoadReportsPage from "./road-reports";
 import UserTreePage from "./user-tree";
 import LoginPageSettingsPage from "./login-page-settings";
 import TaskCategoriesPage from "./task-categories";
+import GroupChatManagementPage from "./group-chat-management";
 
 interface AdminUser {
   id: string;
@@ -59,6 +60,7 @@ const allMenuItems = [
   { id: "office-managers", label: "Office Managers", icon: Users, path: "/admin/office-managers", group: "Management" },
   { id: "task-manager", label: "Task Manager", icon: ClipboardList, path: "/admin/task-manager", group: "Management" },
   { id: "task-categories", label: "Task Categories", icon: FolderTree, path: "/admin/task-categories", group: "Management" },
+  { id: "group-chat", label: "Group Chat", icon: MessageCircle, path: "/admin/group-chat", group: "Management" },
   { id: "hstc", label: "Harr Sirr te Chatt", icon: Home, path: "/admin/hstc", group: "Management" },
   { id: "sdsk", label: "Sukh-Dukh Saanjha Karo", icon: Heart, path: "/admin/sdsk", group: "Management" },
   { id: "surveys", label: "Survey Manager", icon: ClipboardCheck, path: "/admin/surveys", group: "Management" },
@@ -384,6 +386,7 @@ export default function AdminPage() {
     if (currentPath.includes("form-builder")) return "form-builder";
     if (currentPath.includes("task-manager")) return "task-manager";
     if (currentPath.includes("task-categories")) return "task-categories";
+    if (currentPath.includes("group-chat")) return "group-chat";
     if (currentPath.includes("outdoor-ads")) return "outdoor-ads";
     if (currentPath.includes("appointments")) return "appointments";
     if (currentPath.includes("gov-school")) return "gov-school";
@@ -489,6 +492,7 @@ export default function AdminPage() {
             {activeSection === "office-managers" && <OfficeManagersPage />}
             {activeSection === "task-manager" && <TaskManagerPage />}
             {activeSection === "task-categories" && <TaskCategoriesPage />}
+            {activeSection === "group-chat" && <GroupChatManagementPage />}
             {activeSection === "hstc" && <HstcSubmissionsPage />}
             {activeSection === "sdsk" && <SdskSubmissionsPage />}
             {activeSection === "surveys" && <SurveyManagerPage />}
