@@ -131,6 +131,8 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const [recording, setRecording] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [inCallRoom, setInCallRoom] = useState<InCallRoom | null>(null);
+  const [pendingCallType, setPendingCallType] = useState<"audio" | "video" | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
   const [mediaViewer, setMediaViewer] = useState<MediaViewer>(null);
   const [callSeconds, setCallSeconds] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -244,6 +246,14 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
+    onMutate: (type) => {
+      setPendingCallType(type);
+      setCancelRequested(false);
+    },
+    onError: () => {
+      setPendingCallType(null);
+      setCancelRequested(false);
+    },
     onSuccess: async (_data, type) => {
       refetchActiveCall();
       const joinRes = await fetch(`/api/app/group/${group!.id}/calls/${_data.id}/join`, {
@@ -251,9 +261,28 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appUserId: user.id }),
       });
-      if (!joinRes.ok) return;
+      if (!joinRes.ok) {
+        setPendingCallType(null);
+        return;
+      }
       const { token, roomName, livekitUrl, callType } = await joinRes.json();
+      if (cancelRequested) {
+        // Call was cancelled while we were connecting – end it and do not join.
+        await endCallMutation.mutateAsync({ callId: _data.id, groupId: group!.id });
+        setPendingCallType(null);
+        setCancelRequested(false);
+        return;
+      }
       setInCallRoom({ token, roomName, serverUrl: livekitUrl, callType, callId: _data.id, groupId: group!.id });
+      setPendingCallType(null);
+      setCancelRequested(false);
+    },
+    onSettled: () => {
+      // Safety: clear pending indicator if something went wrong and we didn't join a room
+      if (!inCallRoom) {
+        setPendingCallType(null);
+        setCancelRequested(false);
+      }
     },
   });
 
@@ -554,7 +583,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   }
 
   return (
-    <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden relative">
       {incomingCall && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
           <p className="text-white text-lg font-medium mb-1">{incomingCall.callerName}</p>
@@ -624,6 +653,37 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           </div>
         )}
       </header>
+
+      {pendingCallType && !inCallRoom && (
+        <div className="absolute top-[56px] left-0 right-0 z-20 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto rounded-full bg-black/70 text-white text-xs px-3 py-1.5 flex items-center gap-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>
+              {pendingCallType === "video"
+                ? language === "hi"
+                  ? "वीडियो कॉल शुरू हो रही है..."
+                  : language === "pa"
+                  ? "ਵੀਡੀਓ ਕਾਲ ਸ਼ੁਰੂ ਹੋ ਰਹੀ ਹੈ..."
+                  : "Starting video call..."
+                : language === "hi"
+                ? "ऑडियो कॉल शुरू हो रही है..."
+                : language === "pa"
+                ? "ਔਡੀਓ ਕਾਲ ਸ਼ੁਰੂ ਹੋ ਰਹੀ ਹੈ..."
+                : "Starting audio call..."}
+            </span>
+            <button
+              type="button"
+              className="ml-1 text-[10px] rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20"
+              onClick={() => {
+                setCancelRequested(true);
+                setPendingCallType(null);
+              }}
+            >
+              {language === "hi" ? "रद्द" : language === "pa" ? "ਰੱਦ" : "Cancel"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3 pb-28">
         {messagesLoading ? (
