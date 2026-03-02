@@ -655,33 +655,52 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
       </header>
 
       {pendingCallType && !inCallRoom && (
-        <div className="absolute top-[56px] left-0 right-0 z-20 flex justify-center pointer-events-none">
-          <div className="pointer-events-auto rounded-full bg-black/70 text-white text-xs px-3 py-1.5 flex items-center gap-2">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>
-              {pendingCallType === "video"
-                ? language === "hi"
-                  ? "वीडियो कॉल शुरू हो रही है..."
-                  : language === "pa"
-                  ? "ਵੀਡੀਓ ਕਾਲ ਸ਼ੁਰੂ ਹੋ ਰਹੀ ਹੈ..."
-                  : "Starting video call..."
-                : language === "hi"
-                ? "ऑडियो कॉल शुरू हो रही है..."
-                : language === "pa"
-                ? "ਔਡੀਓ ਕਾਲ ਸ਼ੁਰੂ ਹੋ ਰਹੀ ਹੈ..."
-                : "Starting audio call..."}
-            </span>
-            <button
-              type="button"
-              className="ml-1 text-[10px] rounded-full bg-white/10 px-2 py-0.5 hover:bg-white/20"
-              onClick={() => {
-                setCancelRequested(true);
-                setPendingCallType(null);
-              }}
-            >
-              {language === "hi" ? "रद्द" : language === "pa" ? "ਰੱਦ" : "Cancel"}
-            </button>
+        <div className="fixed inset-0 z-40 bg-black/85 flex flex-col items-center justify-center p-6">
+          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-6">
+            {user.selfPhoto ? (
+              <img src={user.selfPhoto} alt="" className="w-28 h-28 rounded-full object-cover" />
+            ) : (
+              <span className="text-4xl font-bold text-white">
+                {user.name.charAt(0)}
+              </span>
+            )}
           </div>
+          <p className="text-white text-lg font-semibold mb-1">
+            {group.name}
+          </p>
+          <p className="text-white/80 text-sm mb-4">
+            {pendingCallType === "video"
+              ? language === "hi"
+                ? "वीडियो कॉल"
+                : language === "pa"
+                ? "ਵੀਡੀਓ ਕਾਲ"
+                : "Video call"
+              : language === "hi"
+              ? "ऑडियो कॉल"
+              : language === "pa"
+              ? "ਔਡੀਓ ਕਾਲ"
+              : "Audio call"}
+          </p>
+          <div className="flex items-center gap-2 text-white/80 text-xs mb-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>
+              {language === "hi"
+                ? "कॉल कनेक्ट हो रही है..."
+                : language === "pa"
+                ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
+                : "Calling..."}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="mt-2 w-14 h-14 rounded-full bg-red-600 flex items-center justify-center"
+            onClick={() => {
+              setCancelRequested(true);
+              setPendingCallType(null);
+            }}
+          >
+            <PhoneOff className="h-6 w-6 text-white" />
+          </button>
         </div>
       )}
 
