@@ -14,6 +14,7 @@ import { useTranslation } from "@/lib/i18n";
 import type { AppUser } from "@shared/schema";
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import "@livekit/components-styles";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
 
@@ -91,6 +92,10 @@ interface Message {
   senderPhoto: string | null;
 }
 
+type MediaViewer =
+  | { type: "image"; url: string }
+  | null;
+
 function photoUrl(userId: string) {
   return `/api/app/user/${userId}/photo`;
 }
@@ -126,6 +131,8 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const [recording, setRecording] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [inCallRoom, setInCallRoom] = useState<InCallRoom | null>(null);
+  const [mediaViewer, setMediaViewer] = useState<MediaViewer>(null);
+  const [callSeconds, setCallSeconds] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -136,6 +143,20 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const wsRef = useRef<WebSocket | null>(null);
 
   usePhoneRing(!!incomingCall);
+
+  useEffect(() => {
+    if (!inCallRoom) {
+      setCallSeconds(0);
+      return;
+    }
+    setCallSeconds(0);
+    const id = window.setInterval(() => {
+      setCallSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [inCallRoom]);
 
   const { data: livekitConfig } = useQuery<{ configured: boolean; url: string | null }>({
     queryKey: ["/api/app/livekit-config"],
@@ -401,7 +422,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     e.target.value = "";
   };
 
-  const startRecording = () => {
+  const startRecording = (mode: "auto" | "manual" = "auto") => {
     chunksRef.current = [];
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       const mr = new MediaRecorder(stream);
@@ -414,7 +435,14 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         const reader = new FileReader();
         reader.onload = () => {
-          setAudioPreview(reader.result as string);
+          const audioDataUrl = reader.result as string;
+          if (mode === "auto") {
+            sendMutation.mutate({
+              audioUrl: audioDataUrl,
+            });
+          } else {
+            setAudioPreview(audioDataUrl);
+          }
           setRecording(false);
         };
         reader.readAsDataURL(blob);
@@ -454,6 +482,14 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     );
   }
 
+  const formatCallDuration = (secs: number) => {
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
+
   if (inCallRoom) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
@@ -470,7 +506,31 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           style={{ height: "100dvh" }}
         >
           <div className="flex flex-col h-full">
-            <div className="flex justify-end p-2">
+            <div className="flex items-center justify-between px-4 pt-3 pb-1 text-white">
+              <div>
+                <p className="text-sm font-semibold">
+                  {inCallRoom.callType === "video"
+                    ? language === "hi"
+                      ? "वीडियो कॉल"
+                      : language === "pa"
+                      ? "ਵੀਡੀਓ ਕਾਲ"
+                      : "Video call"
+                    : language === "hi"
+                    ? "ऑडियो कॉल"
+                    : language === "pa"
+                    ? "ਔਡੀਓ ਕਾਲ"
+                    : "Audio call"}
+                </p>
+                <p className="text-xs text-white/80">
+                  {callSeconds === 0
+                    ? language === "hi"
+                      ? "कॉल कनेक्ट हो रही है..."
+                      : language === "pa"
+                      ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
+                      : "Calling..."
+                    : formatCallDuration(callSeconds)}
+                </p>
+              </div>
               <Button
                 variant="destructive"
                 size="sm"
@@ -480,7 +540,8 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
                   setInCallRoom(null);
                 }}
               >
-                <PhoneOff className="h-4 w-4" /> End call
+                <PhoneOff className="h-4 w-4" />{" "}
+                {language === "hi" ? "कॉल खत्म करें" : language === "pa" ? "ਕਾਲ ਖਤਮ ਕਰੋ" : "End call"}
               </Button>
             </div>
             <div className="flex-1 min-h-0">
@@ -493,7 +554,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden">
       {incomingCall && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
           <p className="text-white text-lg font-medium mb-1">{incomingCall.callerName}</p>
@@ -578,6 +639,31 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             const isMe = msg.appUserId === user.id;
             const deleted = msg.deletedForEveryone;
             const deletedLabel = language === "hi" ? "यह संदेश हटा दिया गया" : language === "pa" ? "ਇਹ ਸੁਨੇਹਾ ਮਿਟਾ ਦਿੱਤਾ ਗਿਆ" : "This message was deleted";
+            let touchStartX = 0;
+            let touchStartY = 0;
+            const swipeThreshold = 40;
+            const maxVerticalDelta = 30;
+
+            const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+              const t = e.touches[0];
+              touchStartX = t.clientX;
+              touchStartY = t.clientY;
+            };
+
+            const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+              const t = e.changedTouches[0];
+              const dx = t.clientX - touchStartX;
+              const dy = t.clientY - touchStartY;
+              if (Math.abs(dy) > maxVerticalDelta) return;
+              if (dx > swipeThreshold) {
+                // Swipe right
+                setReplyTo(msg);
+              } else if (dx < -swipeThreshold) {
+                // Swipe left
+                setReplyTo(msg);
+              }
+            };
+
             return (
               <div key={msg.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
                 <Avatar className="w-8 h-8 flex-shrink-0">
@@ -586,8 +672,12 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
                   ) : null}
                   <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">{msg.senderName.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className={`max-w-[80%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
-                  {!isMe && <span className="text-xs text-slate-500 mb-0.5">{msg.senderName}</span>}
+                <div
+                  className={`max-w-[80%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <span className="text-xs text-slate-500 mb-0.5">{msg.senderName}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button
@@ -607,7 +697,15 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
                             <>
                               {msg.text ? <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p> : null}
                               {msg.imageUrl ? (
-                                <img src={msg.imageUrl} alt="" className="rounded max-w-full max-h-48 object-contain" />
+                                <img
+                                  src={msg.imageUrl}
+                                  alt=""
+                                  className="rounded max-w-full max-h-48 object-contain cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMediaViewer({ type: "image", url: msg.imageUrl! });
+                                  }}
+                                />
                               ) : null}
                               {msg.audioUrl ? (
                                 <audio controls src={msg.audioUrl} className="max-w-full h-8" onClick={(e) => e.stopPropagation()} />
@@ -706,15 +804,33 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}>
             <ImageIcon className="h-5 w-5" />
           </Button>
-          {!recording ? (
-            <Button variant="outline" size="icon" onClick={startRecording} title="Audio message">
-              <Mic className="h-5 w-5" />
-            </Button>
-          ) : (
-            <Button variant="destructive" size="icon" onClick={stopRecording} title="Stop recording">
-              <MicOff className="h-5 w-5" />
-            </Button>
-          )}
+          <Button
+            variant={recording ? "destructive" : "outline"}
+            size="icon"
+            title="Hold to record"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              if (!recording) startRecording("auto");
+            }}
+            onMouseUp={(e) => {
+              e.preventDefault();
+              if (recording) stopRecording();
+            }}
+            onMouseLeave={(e) => {
+              e.preventDefault();
+              if (recording) stopRecording();
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              if (!recording) startRecording("auto");
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              if (recording) stopRecording();
+            }}
+          >
+            {recording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </Button>
           <Input
             placeholder={language === "hi" ? "संदेश लिखें..." : language === "pa" ? "ਸੁਨੇਹਾ ਲਿਖੋ..." : "Type a message..."}
             value={inputText}
@@ -725,12 +841,22 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           <Button
             size="icon"
             onClick={handleSend}
-            disabled={sendMutation.isPending || (!inputText.trim() && !imagePreview && !audioPreview)}
+            disabled={!inputText.trim() && !imagePreview && !audioPreview}
           >
             {sendMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </Button>
         </div>
       </div>
+
+      <Dialog open={!!mediaViewer} onOpenChange={(open) => !open && setMediaViewer(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/90 border-0">
+          {mediaViewer?.type === "image" && (
+            <div className="flex items-center justify-center bg-black">
+              <img src={mediaViewer.url} alt="" className="max-h-[90vh] max-w-[90vw] object-contain" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
