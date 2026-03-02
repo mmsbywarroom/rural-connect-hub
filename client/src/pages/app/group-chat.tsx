@@ -922,7 +922,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             onClick={handleSend}
             disabled={!inputText.trim() && !imagePreview && !audioPreview}
           >
-            {sendMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            <Send className="h-5 w-5" />
           </Button>
         </div>
       </div>
