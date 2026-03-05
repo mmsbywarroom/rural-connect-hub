@@ -5674,6 +5674,137 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Event Venue Booking Routes =====
+
+  app.post("/api/event-venues/send-otp", async (req, res) => {
+    try {
+      const { mobileNumber } = req.body;
+      if (!mobileNumber) {
+        return res.status(400).json({ error: "Mobile number is required" });
+      }
+      if (!isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const otp = await storeOTP(`event_${normalized}`);
+      if (isSmsConfigured()) {
+        try {
+          await sendOtpSms(normalized, otp);
+          console.log(`[EventVenue OTP] SMS sent to ${maskMobile(normalized)}`);
+        } catch (smsErr: any) {
+          console.error(`[EventVenue OTP] SMS failed:`, smsErr.message);
+        }
+      }
+      res.json({ success: true, masked: maskMobile(normalized) });
+    } catch (error: any) {
+      console.error("[EventVenue OTP] Error:", error.message);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/event-venues/verify-otp", async (req, res) => {
+    try {
+      const { mobileNumber, otp } = req.body;
+      if (!mobileNumber || !otp) {
+        return res.status(400).json({ error: "Mobile number and OTP are required" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const valid = await verifyOTP(`event_${normalized}`, otp);
+      if (!valid) {
+        return res.status(400).json({ error: "Invalid or expired OTP" });
+      }
+      res.json({ success: true, verified: true });
+    } catch (error: any) {
+      console.error("[EventVenue OTP] Verify error:", error.message);
+      res.status(500).json({ error: "Failed to verify OTP" });
+    }
+  });
+
+  app.post("/api/event-venues/submit", async (req, res) => {
+    try {
+      const data = insertEventVenueSchema.parse(req.body);
+      const created = await storage.createEventVenue({ ...data });
+      res.json(created);
+    } catch (error: any) {
+      console.error("[EventVenue] Submit error:", error.message);
+      res.status(400).json({ error: "Invalid event venue data" });
+    }
+  });
+
+  app.get("/api/event-venues/my-submissions/:appUserId", async (req, res) => {
+    try {
+      const { appUserId } = req.params;
+      const list = await storage.getEventVenuesByUser(appUserId);
+      res.json(list);
+    } catch (error: any) {
+      console.error("[EventVenue] My submissions error:", error.message);
+      res.status(500).json({ error: "Failed to load submissions" });
+    }
+  });
+
+  app.patch("/api/event-venues/my-submissions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getEventVenue(id);
+      if (!existing) return res.status(404).json({ error: "Submission not found" });
+      if (existing.status === "accepted") {
+        return res.status(400).json({ error: "Accepted bookings cannot be edited" });
+      }
+      const partial = insertEventVenueSchema.partial().parse(req.body);
+      const updated = await storage.updateEventVenue(id, { ...partial, updatedAt: new Date() });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[EventVenue] Update error:", error.message);
+      res.status(400).json({ error: "Failed to update submission" });
+    }
+  });
+
+  app.get("/api/admin/event-venues", async (_req, res) => {
+    try {
+      const list = await storage.getEventVenues();
+      res.json(list);
+    } catch (error: any) {
+      console.error("[EventVenue] Admin list error:", error.message);
+      res.status(500).json({ error: "Failed to load event venues" });
+    }
+  });
+
+  app.get("/api/admin/event-venues/:id", async (req, res) => {
+    try {
+      const row = await storage.getEventVenue(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[EventVenue] Admin detail error:", error.message);
+      res.status(500).json({ error: "Failed to load event venue" });
+    }
+  });
+
+  app.patch("/api/admin/event-venues/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, adminMessage } = req.body as { status?: string; adminMessage?: string };
+      const allowedStatus = ["pending", "accepted", "rejected"];
+      const update: Partial<InsertEventVenue> = {};
+      if (status) {
+        if (!allowedStatus.includes(status)) {
+          return res.status(400).json({ error: "Invalid status" });
+        }
+        (update as any).status = status;
+      }
+      if (typeof adminMessage === "string") {
+        (update as any).adminMessage = adminMessage;
+      }
+      (update as any).updatedAt = new Date();
+      const updated = await storage.updateEventVenue(id, update);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[EventVenue] Admin update error:", error.message);
+      res.status(500).json({ error: "Failed to update event venue" });
+    }
+  });
+
   // Submit road report
   app.post("/api/road/report", async (req, res) => {
     try {

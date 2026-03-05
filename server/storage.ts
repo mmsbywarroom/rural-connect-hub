@@ -65,9 +65,10 @@ import {
   type GovSchoolIssueCategory, type InsertGovSchoolIssueCategory,
   type GovSchoolSubmission, type InsertGovSchoolSubmission,
   type GovSchoolLog, type InsertGovSchoolLog,
-  appointments, appointmentLogs,
+  appointments, appointmentLogs, eventVenues,
   type Appointment, type InsertAppointment,
   type AppointmentLog, type InsertAppointmentLog,
+  type EventVenue, type InsertEventVenue,
   roadReports, roadLogs,
   type RoadReport, type InsertRoadReport,
   type RoadLog, type InsertRoadLog,
@@ -383,6 +384,13 @@ export interface IStorage {
   getAppointmentsByUser(appUserId: string): Promise<Appointment[]>;
   createAppointmentLog(data: InsertAppointmentLog): Promise<AppointmentLog>;
   getAppointmentLogsByAppointment(appointmentId: string): Promise<AppointmentLog[]>;
+
+  // Event Venues
+  createEventVenue(data: InsertEventVenue): Promise<EventVenue>;
+  updateEventVenue(id: string, data: Partial<InsertEventVenue>): Promise<EventVenue | undefined>;
+  getEventVenue(id: string): Promise<EventVenue | undefined>;
+  getEventVenues(): Promise<EventVenue[]>;
+  getEventVenuesByUser(appUserId: string): Promise<EventVenue[]>;
 
   // Road Reports
   createRoadReport(data: InsertRoadReport): Promise<RoadReport>;
@@ -1603,6 +1611,32 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(appointmentLogs)
       .where(eq(appointmentLogs.appointmentId, appointmentId))
       .orderBy(asc(appointmentLogs.createdAt));
+  }
+
+  // Event Venues
+  async createEventVenue(data: InsertEventVenue): Promise<EventVenue> {
+    const [row] = await db.insert(eventVenues).values(data).returning();
+    return row;
+  }
+
+  async updateEventVenue(id: string, data: Partial<InsertEventVenue>): Promise<EventVenue | undefined> {
+    const [row] = await db.update(eventVenues).set(data).where(eq(eventVenues.id, id)).returning();
+    return row;
+  }
+
+  async getEventVenue(id: string): Promise<EventVenue | undefined> {
+    const [row] = await db.select().from(eventVenues).where(eq(eventVenues.id, id));
+    return row;
+  }
+
+  async getEventVenues(): Promise<EventVenue[]> {
+    return db.select().from(eventVenues).orderBy(desc(eventVenues.createdAt));
+  }
+
+  async getEventVenuesByUser(appUserId: string): Promise<EventVenue[]> {
+    return db.select().from(eventVenues)
+      .where(eq(eventVenues.appUserId, appUserId))
+      .orderBy(desc(eventVenues.createdAt));
   }
 
   // Road Reports

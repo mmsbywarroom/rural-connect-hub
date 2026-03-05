@@ -1152,6 +1152,40 @@ export const insertAppointmentLogSchema = createInsertSchema(appointmentLogs).om
 export type InsertAppointmentLog = z.infer<typeof insertAppointmentLogSchema>;
 export type AppointmentLog = typeof appointmentLogs.$inferSelect;
 
+// Event Venue bookings
+export const eventVenues = pgTable("event_venues", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id").references(() => villages.id),
+  villageName: text("village_name"),
+  requesterName: text("requester_name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  mobileVerified: boolean("mobile_verified").default(false),
+  venueName: text("venue_name").notNull(),
+  capacity: integer("capacity"),
+  venueType: text("venue_type").notNull(), // marriage_hall, banquet, ground, conference_hall, other
+  venueTypeOther: text("venue_type_other"),
+  date: date("date").notNull(),
+  time: text("time").notNull(),
+  locationLabel: text("location_label"),
+  latitude: text("latitude"),
+  longitude: text("longitude"),
+  notes: text("notes"),
+  status: text("status").default("pending").notNull(), // pending, accepted, rejected
+  adminMessage: text("admin_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEventVenueSchema = createInsertSchema(eventVenues).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertEventVenue = z.infer<typeof insertEventVenueSchema>;
+export type EventVenue = typeof eventVenues.$inferSelect;
+
 // Road Repair Reports
 export const roadReports = pgTable("road_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

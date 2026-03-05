@@ -26,6 +26,7 @@ import TaskNvy from "./task-nvy";
 import TaskOutdoorAd from "./task-outdoor-ad";
 import TaskGovSchool from "./task-gov-school";
 import TaskAppointment from "./task-appointment";
+import TaskEventVenue from "./task-event-venue";
 import TaskRoad from "./task-road";
 import TaskVoterRegistration from "./task-voter-registration";
 import SurveyForm from "./survey-form";
@@ -561,6 +562,10 @@ export default function VolunteerPortal() {
     if (location === "/task/appointment" || location === "/app/task/appointment") {
       if (!profileComplete) return <ProfileGate />;
       return <TaskAppointment user={user} />;
+    }
+    if (location === "/task/event-venue" || location === "/app/task/event-venue") {
+      if (!profileComplete) return <ProfileGate />;
+      return <TaskEventVenue user={user} />;
     }
     if (location === "/task/voter-registration" || location === "/app/task/voter-registration") {
       if (!profileComplete) return <ProfileGate />;

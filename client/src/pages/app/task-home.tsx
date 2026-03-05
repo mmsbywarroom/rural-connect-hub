@@ -141,7 +141,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
     queryKey: ["/api/app/task-categories"],
   });
 
-  const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment", "voter-registration"];
+  const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment", "event-venue", "voter-registration"];
   const slugsInAnyCategory = new Set(categories?.flatMap((c) => c.fixedTaskSlugs ?? []) ?? []);
   const uncategorizedFixedSlugs = ALL_FIXED_SLUGS.filter((slug) => !slugsInAnyCategory.has(slug));
 
@@ -373,6 +373,34 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               <div className="flex-shrink-0">
                 <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                   <ChevronRight className="h-4 w-4 text-purple-500" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        )}
+        {fixedSlugs.includes("event-venue") && (
+        <Link href="/task/event-venue">
+          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200" data-testid="task-card-event-venue">
+            <CardContent className="p-4 flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-slate-800">
+                  {language === "hi" ? "इवेंट स्थल" : language === "pa" ? "ਇਵੈਂਟ ਸਥਾਨ" : "Event Venues"}
+                </h3>
+                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                  {language === "hi"
+                    ? "यूनिट चुनकर इवेंट स्थल की बुकिंग रिक्वेस्ट भेजें"
+                    : language === "pa"
+                    ? "ਯੂਨਿਟ ਚੁਣ ਕੇ ਇਵੈਂਟ ਸਥਾਨ ਦੀ ਬੁਕਿੰਗ ਬੇਨਤੀ ਭੇਜੋ"
+                    : "Request booking for event venues with unit, date, time & map"}
+                </p>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                  <ChevronRight className="h-4 w-4 text-emerald-600" />
                 </div>
               </div>
             </CardContent>
