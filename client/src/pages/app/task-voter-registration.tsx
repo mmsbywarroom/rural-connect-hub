@@ -105,6 +105,7 @@ export default function TaskVoterRegistration({ user }: Props) {
   const [step, setStep] = useState<Step>("unit");
   const [selectedUnit, setSelectedUnit] = useState<{ villageId: string; villageName: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [submissionSearch, setSubmissionSearch] = useState("");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -412,7 +413,6 @@ export default function TaskVoterRegistration({ user }: Props) {
   };
 
   if (step === "unit") {
-    const [submissionSearch, setSubmissionSearch] = useState("");
     const filteredSubs = mySubmissions.filter((s) => {
       const sn = (s as any).serialNumber as number | null | undefined;
       const code = sn ? `B${String(sn).padStart(3, "0")}` : "";
