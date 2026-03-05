@@ -288,13 +288,25 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
 
   const joinCallMutation = useMutation({
     mutationFn: async (callId: string) => {
+      console.log("[Call] joinCallMutation start", { callId, groupId: group?.id, appUserId: user.id });
       const res = await fetch(`/api/app/group/${group!.id}/calls/${callId}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appUserId: user.id }),
       });
       if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      const data = await res.json();
+      console.log("[Call] joinCallMutation success", {
+        roomName: data.roomName,
+        hasToken: !!data.token,
+        tokenPreview: typeof data.token === "string" ? data.token.slice(0, 12) + "..." : null,
+        livekitUrl: data.livekitUrl,
+        callType: data.callType,
+      });
+      return data;
+    },
+    onError: (err: any) => {
+      console.error("[Call] joinCallMutation error", err);
     },
     onSuccess: (data) => {
       setIncomingCall(null);
@@ -528,7 +540,21 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           connect={true}
           audio={true}
           video={inCallRoom.callType === "video"}
+          onConnected={() => {
+            console.log("[LiveKit] connected", {
+              roomName: inCallRoom.roomName,
+              serverUrl: inCallRoom.serverUrl,
+              callType: inCallRoom.callType,
+            });
+          }}
+          onConnectionStateChanged={(state) => {
+            console.log("[LiveKit] connection state", state);
+          }}
+          onError={(err) => {
+            console.error("[LiveKit] room error", err);
+          }}
           onDisconnected={() => {
+            console.log("[LiveKit] disconnected");
             setInCallRoom(null);
           }}
           data-lk-theme="default"

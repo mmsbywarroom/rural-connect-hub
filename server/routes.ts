@@ -3645,7 +3645,18 @@ export async function registerRoutes(
       await storage.updateGroupCallParticipant(callId, appUserId, { status: "joined", joinedAt: new Date() });
       const user = await storage.getAppUser(appUserId);
       const roomName = `call-${callId}`;
+      console.log("[LiveKit] join request", {
+        roomName,
+        appUserId,
+        participantName: user?.name ?? "User",
+        callType: call.type,
+        livekitUrl: getLivekitUrl(),
+      });
       const token = await createLivekitToken(roomName, appUserId, user?.name ?? "User", call.type === "video");
+      console.log("[LiveKit] token generated", {
+        roomName,
+        tokenPreview: token.slice(0, 12) + "...",
+      });
       res.json({ token, roomName, livekitUrl: getLivekitUrl(), callType: call.type });
     } catch (error) {
       console.error("Join call error:", error);
