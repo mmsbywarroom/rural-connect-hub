@@ -762,6 +762,62 @@ export const insertHstcSubmissionSchema = createInsertSchema(hstcSubmissions).om
 export type InsertHstcSubmission = z.infer<typeof insertHstcSubmissionSchema>;
 export type HstcSubmission = typeof hstcSubmissions.$inferSelect;
 
+// Voter Registration Submissions
+export const voterRegistrationSubmissions = pgTable("voter_registration_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  serialNumber: integer("serial_number"),
+  // Personal
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  gender: text("gender").notNull(),
+  dateOfBirth: text("date_of_birth").notNull(),
+  placeOfBirth: text("place_of_birth"),
+  relativeName: text("relative_name").notNull(),
+  relationType: text("relation_type").notNull(),
+  // Address
+  houseNumber: text("house_number"),
+  streetMohallaVillage: text("street_mohalla_village"),
+  postOffice: text("post_office"),
+  district: text("district"),
+  state: text("state").default("Punjab"),
+  pinCode: text("pin_code"),
+  // Assembly
+  assemblyConstituency: text("assembly_constituency"),
+  // Aadhaar / Contact
+  aadhaarNumber: text("aadhaar_number"),
+  mobileNumber: text("mobile_number"),
+  email: text("email"),
+  mobileVerified: boolean("mobile_verified").default(false),
+  emailVerified: boolean("email_verified").default(false),
+  // Disability
+  disability: text("disability").default("None"),
+  // Documents (base64 or URL)
+  ageProofType: text("age_proof_type"),
+  ageProofImage: text("age_proof_image"),
+  ageProofOcrData: text("age_proof_ocr_data"),
+  addressProofType: text("address_proof_type"),
+  addressProofImage: text("address_proof_image"),
+  addressProofOcrData: text("address_proof_ocr_data"),
+  photograph: text("photograph"),
+  photographOcrData: text("photograph_ocr_data"),
+  status: text("status").default("pending"),
+  reviewNote: text("review_note"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  cardPdf: text("card_pdf"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVoterRegistrationSubmissionSchema = createInsertSchema(voterRegistrationSubmissions).omit({
+  id: true,
+  serialNumber: true,
+  createdAt: true,
+});
+
+export type InsertVoterRegistrationSubmission = z.infer<typeof insertVoterRegistrationSubmissionSchema>;
+export type VoterRegistrationSubmission = typeof voterRegistrationSubmissions.$inferSelect;
+
 // Sukh-Dukh Saanjha Karo Categories
 export const sdskCategories = pgTable("sdsk_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

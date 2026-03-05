@@ -44,6 +44,7 @@ import UserTreePage from "./user-tree";
 import LoginPageSettingsPage from "./login-page-settings";
 import TaskCategoriesPage from "./task-categories";
 import GroupChatManagementPage from "./group-chat-management";
+import VoterRegistrationSubmissionsPage from "./voter-registration-submissions";
 
 interface AdminUser {
   id: string;
@@ -71,6 +72,7 @@ const allMenuItems = [
   { id: "outdoor-ads", label: "Outdoor Ads", icon: Megaphone, path: "/admin/outdoor-ads", group: "Management" },
   { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Management" },
   { id: "appointments", label: "Appointments", icon: CalendarCheck, path: "/admin/appointments", group: "Management" },
+  { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Management" },
   { id: "villages", label: "Villages", icon: MapPin, path: "/admin/villages", group: "Master Data" },
   { id: "issues", label: "Issues", icon: AlertTriangle, path: "/admin/issues", group: "Master Data" },
   { id: "departments", label: "Departments", icon: Briefcase, path: "/admin/departments", group: "Master Data" },
@@ -414,6 +416,7 @@ export default function AdminPage() {
     if (currentPath.includes("wings")) return "wings";
     if (currentPath.includes("positions")) return "positions";
     if (currentPath.includes("leadership")) return "leadership";
+    if (currentPath.includes("voter-registration")) return "voter-registration";
     if (currentPath.includes("voter-database")) return "voter-database";
     if (currentPath.includes("csv-upload")) return "csv-upload";
     if (currentPath.includes("data-export")) return "data-export";
@@ -503,6 +506,7 @@ export default function AdminPage() {
             {activeSection === "outdoor-ads" && <OutdoorAdSubmissionsPage />}
             {activeSection === "gov-school" && <GovSchoolSubmissionsPage />}
             {activeSection === "appointments" && <AppointmentSubmissionsPage />}
+            {activeSection === "voter-registration" && <VoterRegistrationSubmissionsPage />}
             {activeSection === "form-builder" && <FormBuilderPage />}
             {activeSection === "villages" && <VillagesPage />}
             {activeSection === "issues" && <IssuesPage />}

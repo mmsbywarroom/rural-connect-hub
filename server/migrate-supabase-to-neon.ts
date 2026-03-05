@@ -78,7 +78,7 @@ async function getTableOrderByDeps(pool: pg.Pool, tables: string[]): Promise<str
     for (const t of tables) {
       if (done.has(t)) continue;
       const d = deps.get(t)!;
-      const ready = [...d].every((p) => done.has(p));
+      const ready = Array.from(d).every((p) => done.has(p));
       if (ready) { out.push(t); done.add(t); added++; }
     }
     if (added === 0) break;

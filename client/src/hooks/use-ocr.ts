@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-type OcrType = "aadhaarFront" | "aadhaarBack" | "voterId";
+type OcrType = "aadhaarFront" | "aadhaarBack" | "voterId" | "ageProof" | "addressProof";
 
 export interface OcrResult {
   name?: string;
@@ -11,6 +11,7 @@ export interface OcrResult {
   gender?: string;
   address?: string;
   voterId?: string;
+  rawText?: string;
 }
 
 interface UseOcrReturn {

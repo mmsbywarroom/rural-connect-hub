@@ -50,7 +50,7 @@ export function notifyIncomingCall(appUserIds: string[], payload: IncomingCallPa
   for (const userId of appUserIds) {
     const set = connectionsByUser.get(userId);
     if (set) {
-      for (const ws of set) {
+      for (const ws of Array.from(set)) {
         if (ws.readyState === 1) ws.send(data);
       }
     }
@@ -63,7 +63,7 @@ export function notifyCallEnded(appUserIds: string[], payload: CallEndedPayload)
   for (const userId of appUserIds) {
     const set = connectionsByUser.get(userId);
     if (set) {
-      for (const ws of set) {
+      for (const ws of Array.from(set)) {
         if (ws.readyState === 1) ws.send(data);
       }
     }

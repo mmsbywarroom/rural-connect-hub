@@ -9,7 +9,12 @@ export function isLivekitConfigured(): boolean {
 }
 
 /** Generate a token for a user to join a Livekit room (group call). Room name = call-{callId}. */
-export function createLivekitToken(roomName: string, participantIdentity: string, participantName: string, isVideo: boolean): string {
+export async function createLivekitToken(
+  roomName: string,
+  participantIdentity: string,
+  participantName: string,
+  isVideo: boolean
+): Promise<string> {
   if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
     throw new Error("Livekit not configured");
   }
@@ -25,7 +30,8 @@ export function createLivekitToken(roomName: string, participantIdentity: string
     canPublishData: true,
     canSubscribe: true,
   });
-  return at.toJwt();
+  const token = await at.toJwt();
+  return token;
 }
 
 export function getLivekitUrl(): string {

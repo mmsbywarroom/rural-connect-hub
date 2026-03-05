@@ -27,6 +27,7 @@ import TaskOutdoorAd from "./task-outdoor-ad";
 import TaskGovSchool from "./task-gov-school";
 import TaskAppointment from "./task-appointment";
 import TaskRoad from "./task-road";
+import TaskVoterRegistration from "./task-voter-registration";
 import SurveyForm from "./survey-form";
 import SurveyLeaderboard from "./survey-leaderboard";
 import Leaderboard from "./leaderboard";
@@ -560,6 +561,10 @@ export default function VolunteerPortal() {
     if (location === "/task/appointment" || location === "/app/task/appointment") {
       if (!profileComplete) return <ProfileGate />;
       return <TaskAppointment user={user} />;
+    }
+    if (location === "/task/voter-registration" || location === "/app/task/voter-registration") {
+      if (!profileComplete) return <ProfileGate />;
+      return <TaskVoterRegistration user={user} />;
     }
     if (location === "/chat" || location === "/app/chat") {
       return <GroupChat user={user} onBack={() => setLocation("/")} />;

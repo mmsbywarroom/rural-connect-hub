@@ -45,6 +45,8 @@ import {
   type GroupCallParticipant, type InsertGroupCallParticipant,
   hstcSubmissions,
   type HstcSubmission, type InsertHstcSubmission,
+  voterRegistrationSubmissions,
+  type VoterRegistrationSubmission, type InsertVoterRegistrationSubmission,
   sdskCategories, sdskSubmissions,
   type SdskCategory, type InsertSdskCategory,
   type SdskSubmission, type InsertSdskSubmission,
@@ -772,6 +774,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(supporters).where(eq(supporters.addedByUserId, id));
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.appUserId, id));
     await db.delete(hstcSubmissions).where(eq(hstcSubmissions.appUserId, id));
+    await db.delete(voterRegistrationSubmissions).where(eq(voterRegistrationSubmissions.appUserId, id));
     await db.delete(appUsers).where(eq(appUsers.id, id));
   }
 
@@ -1152,10 +1155,10 @@ export class DatabaseStorage implements IStorage {
     g = created;
     const allAppUsers = await db.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.isActive, true));
     for (const u of allAppUsers) {
-      const isMember = await this.isGroupMember(g.id, u.id);
-      if (!isMember) await this.addGroupMember(g.id, u.id, "member");
+      const isMember = await this.isGroupMember(g!.id, u.id);
+      if (!isMember) await this.addGroupMember(g!.id, u.id, "member");
     }
-    return g;
+    return g!;
   }
 
   async getChatGroup(id: string): Promise<ChatGroup | undefined> {
@@ -1176,8 +1179,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGroupMemberIds(groupId: string): Promise<string[]> {
-    const rows = await db.select({ appUserId: groupMembers.appUserId }).from(groupMembers).where(eq(groupMembers.groupId, groupId));
-    return rows.map((r) => r.appUserId);
+    const rows = await db
+      .select({ appUserId: groupMembers.appUserId })
+      .from(groupMembers)
+      .where(eq(groupMembers.groupId, groupId));
+    return rows.map((r: { appUserId: string }) => r.appUserId);
   }
 
   async isGroupMember(groupId: string, appUserId: string): Promise<boolean> {
@@ -1203,7 +1209,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGroupMessage(data: InsertGroupMessage): Promise<GroupMessage> {
-    const [msg] = await db.insert(groupMessages).values(data).returning();
+    const [msg] = await db.insert(groupMessages).values(data as any).returning();
     return msg;
   }
 
@@ -1228,7 +1234,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveGroupCallByGroupId(groupId: string): Promise<GroupCall | undefined> {
-    const [c] = await db.select().from(groupCalls).where(and(eq(groupCalls.groupId, groupId), inArray(groupCalls.status, ["ringing", "active"]))).orderBy(desc(groupCalls.createdAt)).limit(1);
+    // Only treat recent ringing/active calls as blocking; older ones are auto-considered ended
+    const [c] = await db.select().from(groupCalls)
+      .where(and(
+        eq(groupCalls.groupId, groupId),
+        inArray(groupCalls.status, ["ringing", "active"]),
+        sql`${groupCalls.createdAt} > NOW() - INTERVAL '1 minute'`
+      ))
+      .orderBy(desc(groupCalls.createdAt))
+      .limit(1);
     return c;
   }
 
@@ -1275,6 +1289,36 @@ export class DatabaseStorage implements IStorage {
   async updateHstcSubmission(id: string, data: Partial<InsertHstcSubmission>): Promise<HstcSubmission | undefined> {
     const [sub] = await db.update(hstcSubmissions).set(data).where(eq(hstcSubmissions.id, id)).returning();
     return sub;
+  }
+
+  // Voter Registration Submissions
+  async getVoterRegistrationSubmissions(): Promise<VoterRegistrationSubmission[]> {
+    return db.select().from(voterRegistrationSubmissions).orderBy(desc(voterRegistrationSubmissions.createdAt));
+  }
+
+  async getVoterRegistrationSubmission(id: string): Promise<VoterRegistrationSubmission | undefined> {
+    const [sub] = await db.select().from(voterRegistrationSubmissions).where(eq(voterRegistrationSubmissions.id, id));
+    return sub;
+  }
+
+  async getVoterRegistrationSubmissionsByUser(appUserId: string): Promise<VoterRegistrationSubmission[]> {
+    return db.select().from(voterRegistrationSubmissions)
+      .where(eq(voterRegistrationSubmissions.appUserId, appUserId))
+      .orderBy(desc(voterRegistrationSubmissions.createdAt));
+  }
+
+  async createVoterRegistrationSubmission(data: InsertVoterRegistrationSubmission): Promise<VoterRegistrationSubmission> {
+    const [sub] = await db.insert(voterRegistrationSubmissions).values(data).returning();
+    return sub;
+  }
+
+  async updateVoterRegistrationSubmission(id: string, data: Partial<InsertVoterRegistrationSubmission>): Promise<VoterRegistrationSubmission | undefined> {
+    const [sub] = await db.update(voterRegistrationSubmissions).set(data).where(eq(voterRegistrationSubmissions.id, id)).returning();
+    return sub;
+  }
+
+  async deleteVoterRegistrationSubmission(id: string): Promise<void> {
+    await db.delete(voterRegistrationSubmissions).where(eq(voterRegistrationSubmissions.id, id));
   }
 
   // SDSK Categories

@@ -265,7 +265,7 @@ export default function UserManagementPage() {
     mutationFn: async ({ targetId }: { targetId: string }) => {
       const stored = localStorage.getItem("adminUser");
       if (!stored) throw new Error("Not logged in");
-      const admin = JSON.parse(stored) as AdminUser;
+      const admin = JSON.parse(stored) as { username: string };
       const superUsername = admin.username;
       const superPassword = window.prompt("Enter your admin password to reset 2FA for this account:");
       if (!superPassword) {
@@ -303,7 +303,7 @@ export default function UserManagementPage() {
   const filteredUsers = areaFilteredUsers.filter((u) => {
     const matchesSearch = !search ||
       u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.mobileNumber.includes(search);
+      (u.mobileNumber || "").includes(search);
     const matchesRole = roleFilter === "all" || u.role === roleFilter;
     const matchesStatus = statusFilter === "all" ||
       (statusFilter === "active" && u.isActive !== false) ||

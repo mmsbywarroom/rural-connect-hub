@@ -20,10 +20,10 @@ import {
   insertOfficeManagerSchema, insertAppUserSchema, insertCscSchema, insertCscReportSchema,
   insertMappedVolunteerSchema, insertSupporterSchema, insertTaskCategorySchema, insertTaskConfigSchema,
   insertFormFieldSchema, insertFieldOptionSchema, insertFieldConditionSchema,
-  insertTaskSubmissionSchema, insertHstcSubmissionSchema, insertAdminRoleSchema,
+  insertTaskSubmissionSchema, insertHstcSubmissionSchema, insertVoterRegistrationSubmissionSchema, insertAdminRoleSchema,
   LEVELS, WINGS, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   insertGovPositionSchema, adminRoles, users,
-  taskSubmissions, taskConfigs, appUsers, voterList, officeManagers, hstcSubmissions,
+  taskSubmissions, taskConfigs, appUsers, voterList, officeManagers, hstcSubmissions, voterRegistrationSubmissions,
   mappedVolunteers, supporters, otpCodes, sdskSubmissions, sdskCategories,
   insertSdskSubmissionSchema,
   surveys, surveyQuestions, surveyResponses,
@@ -148,7 +148,8 @@ const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 function generateBase32Secret(length = 20): string {
   const buffer = crypto.randomBytes(length);
   let bits = "";
-  for (const byte of buffer) {
+  for (let i = 0; i < buffer.length; i++) {
+    const byte = buffer[i]!;
     bits += byte.toString(2).padStart(8, "0");
   }
   let secret = "";
@@ -493,6 +494,45 @@ function parseOcrText(text: string, docType: string): Record<string, string> {
     }
 
     console.log(`[OCR] Voter ID parsed - name: ${result.name}, voterId: ${result.voterId}`);
+  } else if (docType === "ageProof") {
+    const dobPatterns = [
+      /(?:DOB|D\.O\.B|Date\s*of\s*Birth|Birth|जन्म\s*तिथि)\s*[:\-]?\s*(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/i,
+      /(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/,
+    ];
+    for (const p of dobPatterns) {
+      const m = text.match(p);
+      if (m) {
+        result.dob = `${m[1]}/${m[2]}/${m[3]}`;
+        break;
+      }
+    }
+    const yobMatch = text.match(/(?:Year\s*of\s*Birth|YOB|जन्म\s*वर्ष)\s*[:\-]?\s*(\d{4})/i);
+    if (!result.dob && yobMatch) result.dob = yobMatch[1];
+    const skipWords = ["certificate", "birth", "marks", "board", "school", "passport", "government", "india"];
+    for (const line of lines) {
+      const cleaned = line.replace(/[^a-zA-Z\s.]/g, "").trim();
+      if (cleaned.length >= 3 && cleaned.length <= 60 && !skipWords.some(w => line.toLowerCase().includes(w)) && /^[A-Z]/.test(cleaned)) {
+        const words = cleaned.split(/\s+/).filter(w => w.length >= 2);
+        if (words.length >= 2 && words.length <= 6) {
+          result.name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+          break;
+        }
+      }
+    }
+    if (!result.name) result.rawText = text.slice(0, 500);
+  } else if (docType === "addressProof") {
+    const addressLines: string[] = [];
+    const skipWords = ["aadhaar", "unique", "identification", "uidai", "government", "india", "electricity", "board", "bank", "passbook", "ration", "driving", "licence", "license"];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.length < 5) continue;
+      const lower = trimmed.toLowerCase();
+      if (skipWords.some(w => lower.includes(w))) continue;
+      if (/^\d{4}\s?\d{4}\s?\d{4}$/.test(trimmed.replace(/\s/g, ""))) continue;
+      addressLines.push(trimmed);
+    }
+    if (addressLines.length > 0) result.address = addressLines.join(", ");
+    if (!result.address) result.rawText = text.slice(0, 500);
   }
 
   return result;
@@ -511,7 +551,8 @@ export async function registerRoutes(
       if (!image || !docType) {
         return res.status(400).json({ error: "Missing image or docType" });
       }
-      if (!["aadhaarFront", "aadhaarBack", "voterId"].includes(docType)) {
+      const allowedDocTypes = ["aadhaarFront", "aadhaarBack", "voterId", "ageProof", "addressProof"];
+      if (!allowedDocTypes.includes(docType)) {
         return res.status(400).json({ error: "Invalid docType" });
       }
       const result = await ocrWithVisionAPI(image, docType);
@@ -2652,7 +2693,7 @@ export async function registerRoutes(
       const group = await storage.getOrCreateDefaultChatGroup();
       const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
       const messages = await storage.getGroupMessages(group.id, limit);
-      const userIds = [...new Set(messages.map((m) => m.appUserId))];
+      const userIds = Array.from(new Set(messages.map((m) => m.appUserId)));
       const usersList = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
       const userMap = new Map(usersList.map((u) => [u.id, u.name]));
       const list = messages.map((m) => ({
@@ -3406,8 +3447,8 @@ export async function registerRoutes(
           return !Array.isArray(arr) || !arr.includes(forUserId);
         });
       }
-      const userIds = [...new Set(messages.map((m) => m.appUserId))];
-      const replyToIds = [...new Set(messages.map((m) => m.replyToMessageId).filter(Boolean))] as string[];
+      const userIds = Array.from(new Set(messages.map((m) => m.appUserId)));
+      const replyToIds = Array.from(new Set(messages.map((m) => m.replyToMessageId).filter(Boolean))) as string[];
       const usersList = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name, selfPhoto: appUsers.selfPhoto }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
       const userMap = new Map(usersList.map((u) => [u.id, u]));
       const replyMessages = replyToIds.length ? await Promise.all(replyToIds.map((id) => storage.getGroupMessage(id))) : [];
@@ -3604,7 +3645,7 @@ export async function registerRoutes(
       await storage.updateGroupCallParticipant(callId, appUserId, { status: "joined", joinedAt: new Date() });
       const user = await storage.getAppUser(appUserId);
       const roomName = `call-${callId}`;
-      const token = createLivekitToken(roomName, appUserId, user?.name ?? "User", call.type === "video");
+      const token = await createLivekitToken(roomName, appUserId, user?.name ?? "User", call.type === "video");
       res.json({ token, roomName, livekitUrl: getLivekitUrl(), callType: call.type });
     } catch (error) {
       console.error("Join call error:", error);
@@ -3924,6 +3965,224 @@ export async function registerRoutes(
     } catch (error) {
       console.error("HSTC payment error:", error);
       res.status(500).json({ error: "Failed to upload payment proof" });
+    }
+  });
+
+  // ===== Voter Registration Routes =====
+
+  app.post("/api/voter-registration/send-otp", async (req, res) => {
+    try {
+      const { mobile, email } = req.body;
+      const hasMobile = mobile && isIndianMobile(mobile);
+      const hasEmail = email && typeof email === "string" && email.includes("@");
+      if (hasMobile) {
+        const normalizedMobile = normalizeMobile(mobile);
+        const otp = await storeOTP(`voter_reg_mobile_${normalizedMobile}`);
+        if (isSmsConfigured()) {
+          await sendOtpSms(normalizedMobile, otp);
+          return res.json({ success: true, channel: "sms", masked: maskMobile(normalizedMobile) });
+        }
+      }
+      if (hasEmail) {
+        const normalizedEmail = normalizeEmail(email);
+        const otp = await storeOTP(`voter_reg_email_${normalizedEmail}`);
+        if (isEmailConfigured()) {
+          await sendOtpEmail(normalizedEmail, otp);
+          return res.json({ success: true, channel: "email", masked: normalizedEmail.replace(/(.{2}).*(@.*)/, "$1***$2") });
+        }
+      }
+      if (!hasMobile && !hasEmail) {
+        return res.status(400).json({ error: "Valid mobile or email required" });
+      }
+      res.status(500).json({ error: "SMS/Email not configured" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/voter-registration/verify-otp", async (req, res) => {
+    try {
+      const { mobile, email, otp } = req.body;
+      if (mobile && isIndianMobile(mobile)) {
+        const normalizedMobile = normalizeMobile(mobile);
+        if (await verifyOTP(`voter_reg_mobile_${normalizedMobile}`, otp)) {
+          return res.json({ success: true, verified: "mobile" });
+        }
+      }
+      if (email && typeof email === "string" && email.includes("@")) {
+        const normalizedEmail = normalizeEmail(email);
+        if (await verifyOTP(`voter_reg_email_${normalizedEmail}`, otp)) {
+          return res.json({ success: true, verified: "email" });
+        }
+      }
+      return res.status(401).json({ error: "Invalid or expired OTP" });
+    } catch (error) {
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.post("/api/voter-registration/submit", async (req, res) => {
+    try {
+      const data = { ...req.body };
+      const [{ maxSerial }] = await db
+        .select({
+          maxSerial: sql<number>`COALESCE(MAX(${voterRegistrationSubmissions.serialNumber}), 0)`,
+        })
+        .from(voterRegistrationSubmissions);
+      data.serialNumber = (maxSerial || 0) + 1;
+
+      const parsed = insertVoterRegistrationSubmissionSchema.parse(data);
+      const submission = await storage.createVoterRegistrationSubmission(parsed);
+      res.json(submission);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to submit" });
+    }
+  });
+
+  app.get("/api/voter-registration/submissions", async (_req, res) => {
+    try {
+      const submissions = await storage.getVoterRegistrationSubmissions();
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  app.get("/api/voter-registration/submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      res.json(submission);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submission" });
+    }
+  });
+
+  app.patch("/api/voter-registration/submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      const body = { ...req.body };
+      delete body.id;
+      delete body.appUserId;
+      delete body.createdAt;
+      const updated = await storage.updateVoterRegistrationSubmission(req.params.id, body);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update" });
+    }
+  });
+
+  app.delete("/api/voter-registration/submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      await storage.deleteVoterRegistrationSubmission(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete" });
+    }
+  });
+
+  app.get("/api/voter-registration/my-submissions/:appUserId", async (req, res) => {
+    try {
+      const submissions = await storage.getVoterRegistrationSubmissionsByUser(req.params.appUserId);
+      res.json(submissions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  // User edit their own submission (before approval)
+  app.patch("/api/voter-registration/my-submissions/:id", async (req, res) => {
+    try {
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      if (submission.status === "approved") {
+        return res.status(400).json({ error: "Approved submissions cannot be edited" });
+      }
+      const body = { ...req.body };
+      delete body.id;
+      delete body.appUserId;
+      delete body.createdAt;
+      delete body.status;
+      delete body.reviewNote;
+      delete body.reviewedBy;
+      delete body.reviewedAt;
+      delete body.cardPdf;
+      const updated = await storage.updateVoterRegistrationSubmission(req.params.id, body);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update" });
+    }
+  });
+
+  // Admin review (approve / reject with note)
+  app.patch("/api/voter-registration/submissions/:id/review", async (req, res) => {
+    try {
+      const { status, reviewNote, reviewedBy } = req.body;
+      if (!status || !["pending", "approved", "rejected"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      const updated = await storage.updateVoterRegistrationSubmission(req.params.id, {
+        status,
+        reviewNote: reviewNote || null,
+        reviewedBy: reviewedBy || null,
+        reviewedAt: new Date(),
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to review submission" });
+    }
+  });
+
+  // Admin uploads voter card PDF
+  app.patch("/api/voter-registration/submissions/:id/card", async (req, res) => {
+    try {
+      const { cardPdf } = req.body;
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission) return res.status(404).json({ error: "Not found" });
+      const updated = await storage.updateVoterRegistrationSubmission(req.params.id, {
+        cardPdf: cardPdf || null,
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload card" });
+    }
+  });
+
+  // Download voter card PDF
+  app.get("/api/voter-registration/submissions/:id/card", async (req, res) => {
+    try {
+      const submission = await storage.getVoterRegistrationSubmission(req.params.id);
+      if (!submission || !submission.cardPdf) {
+        return res.status(404).json({ error: "Card not found" });
+      }
+      const raw = submission.cardPdf;
+      let mimeType = "application/pdf";
+      let base64Data = raw;
+      const match = raw.match(/^data:(application\/pdf);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      }
+      const buffer = Buffer.from(base64Data, "base64");
+      res.setHeader("Content-Type", mimeType);
+      res.setHeader("Content-Disposition", `attachment; filename="voter_card_${submission.id}.pdf"`);
+      res.send(buffer);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get card" });
     }
   });
 
@@ -4541,7 +4800,7 @@ export async function registerRoutes(
   app.get("/api/surveys/:id/responses", async (req, res) => {
     try {
       const responses = await storage.getSurveyResponses(req.params.id);
-      const userIds = [...new Set(responses.map(r => r.appUserId))];
+      const userIds = Array.from(new Set(responses.map(r => r.appUserId)));
       const userMap = new Map<string, any>();
       if (userIds.length > 0) {
         const users = await db.select().from(appUsers).where(inArray(appUsers.id, userIds));
@@ -4563,7 +4822,7 @@ export async function registerRoutes(
       if (!survey) return res.status(404).json({ error: "Not found" });
       const questions = await storage.getSurveyQuestions(req.params.id);
       const responses = await storage.getSurveyResponses(req.params.id);
-      const userIds = [...new Set(responses.map(r => r.appUserId))];
+      const userIds = Array.from(new Set(responses.map(r => r.appUserId)));
       const userMap = new Map<string, any>();
       if (userIds.length > 0) {
         const users = await db.select().from(appUsers).where(inArray(appUsers.id, userIds));
