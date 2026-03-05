@@ -5722,8 +5722,48 @@ export async function registerRoutes(
 
   app.post("/api/event-venues/submit", async (req, res) => {
     try {
-      const data = insertEventVenueSchema.parse(req.body);
-      const created = await storage.createEventVenue({ ...data });
+      const {
+        appUserId,
+        villageId,
+        villageName,
+        requesterName,
+        mobileNumber,
+        mobileVerified,
+        venueName,
+        capacity,
+        venueType,
+        venueTypeOther,
+        date,
+        time,
+        locationLabel,
+        latitude,
+        longitude,
+      } = req.body as any;
+
+      if (!appUserId || !requesterName || !venueName || !venueType || !date || !time || !locationLabel) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const payload: InsertEventVenue = {
+        appUserId,
+        villageId: villageId || null,
+        villageName: villageName || null,
+        requesterName,
+        mobileNumber,
+        mobileVerified: !!mobileVerified,
+        venueName,
+        capacity: typeof capacity === "number" ? capacity : capacity ? Number(capacity) : null,
+        venueType,
+        venueTypeOther: venueType === "other" ? venueTypeOther || null : null,
+        date,
+        time,
+        locationLabel,
+        latitude: latitude || null,
+        longitude: longitude || null,
+        status: "pending",
+      } as any;
+
+      const created = await storage.createEventVenue(payload);
       res.json(created);
     } catch (error: any) {
       console.error("[EventVenue] Submit error:", error.message);
@@ -5750,8 +5790,36 @@ export async function registerRoutes(
       if (existing.status === "accepted") {
         return res.status(400).json({ error: "Accepted bookings cannot be edited" });
       }
-      const partial = insertEventVenueSchema.partial().parse(req.body);
-      const updated = await storage.updateEventVenue(id, { ...partial, updatedAt: new Date() });
+
+      const body = req.body as any;
+      const update: Partial<InsertEventVenue> = {};
+
+      const assignIfPresent = (key: keyof InsertEventVenue) => {
+        if (Object.prototype.hasOwnProperty.call(body, key)) {
+          (update as any)[key] = (body as any)[key];
+        }
+      };
+
+      [
+        "villageId",
+        "villageName",
+        "requesterName",
+        "mobileNumber",
+        "mobileVerified",
+        "venueName",
+        "capacity",
+        "venueType",
+        "venueTypeOther",
+        "date",
+        "time",
+        "locationLabel",
+        "latitude",
+        "longitude",
+      ].forEach((k) => assignIfPresent(k as keyof InsertEventVenue));
+
+      (update as any).updatedAt = new Date();
+
+      const updated = await storage.updateEventVenue(id, update);
       res.json(updated);
     } catch (error: any) {
       console.error("[EventVenue] Update error:", error.message);

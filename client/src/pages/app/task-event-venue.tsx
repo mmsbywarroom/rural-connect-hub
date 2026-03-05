@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
-import { ArrowLeft, Calendar, Clock, MapPin, Building2, Phone, CheckCircle, Loader2, ChevronRight, Edit2, Navigation } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Building2, Phone, CheckCircle, Loader2, ChevronRight, Edit2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { UnitSelector } from "@/components/unit-selector";
 import type { AppUser, EventVenue } from "@shared/schema";
@@ -54,9 +54,6 @@ export default function TaskEventVenue({ user }: Props) {
   const [locationLabel, setLocationLabel] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
-  const [notes, setNotes] = useState("");
-
-  const mapRef = useRef<HTMLDivElement | null>(null);
 
   const { data: myBookings = [] } = useQuery<EventVenueWithComputed[]>({
     queryKey: ["/api/event-venues/my-submissions", user.id],
@@ -108,7 +105,6 @@ export default function TaskEventVenue({ user }: Props) {
         locationLabel: locationLabel.trim() || null,
         latitude: latitude || null,
         longitude: longitude || null,
-        notes: notes.trim() || null,
         status: "pending",
       };
       if (editingId) {
@@ -148,7 +144,6 @@ export default function TaskEventVenue({ user }: Props) {
     setLocationLabel("");
     setLatitude("");
     setLongitude("");
-    setNotes("");
   };
 
   const handleBack = () => {
@@ -172,12 +167,6 @@ export default function TaskEventVenue({ user }: Props) {
       setLatitude(lat);
       setLongitude(lng);
     });
-  };
-
-  const openInMaps = () => {
-    if (!latitude || !longitude) return;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    window.open(url, "_blank");
   };
 
   const handleSubmit = () => {
@@ -323,24 +312,13 @@ export default function TaskEventVenue({ user }: Props) {
                             setTime(b.time || "");
                             setLocationLabel(b.locationLabel || "");
                             setLatitude(b.latitude || "");
-                            setLongitude(b.longitude || "");
-                            setNotes(b.notes || "");
+                        setLongitude(b.longitude || "");
                             setStep("form");
                           }}
                         >
                           <Edit2 className="h-3 w-3" />
                           {b.status === "accepted" ? "Editing disabled" : "Edit"}
                         </button>
-                        {b.googleMapsUrl && (
-                          <button
-                            type="button"
-                            className="text-xs text-indigo-600 flex items-center gap-1"
-                            onClick={() => window.open(b.googleMapsUrl!, "_blank")}
-                          >
-                            <Navigation className="h-3 w-3" />
-                            Open in Maps
-                          </button>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -535,38 +513,11 @@ export default function TaskEventVenue({ user }: Props) {
                       Use current location
                     </Button>
                     {latitude && longitude && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={openInMaps}
-                      >
-                        <Navigation className="h-4 w-4 mr-1" />
-                        Open in Maps
-                      </Button>
-                    )}
-                    {latitude && longitude && (
                       <span className="text-[11px] text-slate-500">
                         {latitude}, {longitude}
                       </span>
                     )}
                   </div>
-                  <div
-                    ref={mapRef}
-                    className="mt-2 w-full h-40 rounded-lg border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400"
-                  >
-                    Google Maps preview (optional)
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Notes for admin (optional)</label>
-                  <Textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Any special instructions or context for this booking..."
-                    rows={3}
-                  />
                 </div>
               </CardContent>
             </Card>
