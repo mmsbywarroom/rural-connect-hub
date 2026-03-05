@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon, MessageCircle } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Building2, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon, MessageCircle } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
