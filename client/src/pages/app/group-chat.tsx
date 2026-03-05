@@ -529,7 +529,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           audio={true}
           video={inCallRoom.callType === "video"}
           onDisconnected={() => {
-            endCallMutation.mutate({ callId: inCallRoom.callId, groupId: inCallRoom.groupId });
+            setInCallRoom(null);
           }}
           data-lk-theme="default"
           style={{ height: "100dvh" }}
