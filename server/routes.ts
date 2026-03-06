@@ -3989,6 +3989,294 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Tirth Yatra Requests =====
+
+  app.post("/api/tirth-yatra/send-otp", async (req, res) => {
+    try {
+      const { mobile } = req.body;
+      if (!mobile || !isIndianMobile(mobile)) {
+        return res.status(400).json({ error: "Valid 10-digit mobile number required" });
+      }
+      const normalizedMobile = normalizeMobile(mobile);
+      const otp = await storeOTP(`tirth_${normalizedMobile}`);
+
+      if (isSmsConfigured()) {
+        try {
+          await sendOtpSms(normalizedMobile, otp);
+          console.log(`[OTP] Sent Tirth Yatra OTP via SMS to ${normalizedMobile}`);
+          res.json({ success: true, maskedMobile: maskMobile(normalizedMobile) });
+        } catch (smsErr) {
+          console.error("[OTP] Tirth Yatra SMS send failed:", smsErr);
+          res.status(500).json({ error: "Failed to send OTP via SMS" });
+        }
+      } else {
+        console.log("[OTP] SMS not configured - cannot send Tirth Yatra OTP");
+        res.status(500).json({ error: "SMS service is not configured" });
+      }
+    } catch (error) {
+      console.error("Tirth Yatra send OTP error:", error);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/tirth-yatra/verify-otp", async (req, res) => {
+    try {
+      const { mobile, otp } = req.body;
+      const normalizedMobile = normalizeMobile(mobile || "");
+      const ok = await verifyOTP(`tirth_${normalizedMobile}`, otp);
+      if (!ok) {
+        return res.status(401).json({ error: "Invalid or expired OTP" });
+      }
+      res.json({ success: true, verified: true });
+    } catch (error) {
+      console.error("Tirth Yatra verify OTP error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.post("/api/tirth-yatra/submit", async (req, res) => {
+    try {
+      const body = req.body as any;
+      const {
+        appUserId,
+        villageId,
+        villageName,
+        applicantName,
+        mobileNumber,
+        mobileVerified,
+        dob,
+        age,
+        gender,
+        withFamily,
+        familyMembers,
+        currentLocationLabel,
+        currentLatitude,
+        currentLongitude,
+        destination,
+        destinationOther,
+        startDate,
+        endDate,
+        aadhaarFrontUrl,
+        aadhaarBackUrl,
+        voterCardUrl,
+        audioNoteUrl,
+        audioNoteText,
+      } = body;
+
+      if (!appUserId || !appUserId.toString().trim()) {
+        return res.status(400).json({ error: "appUserId is required" });
+      }
+      if (!applicantName || !applicantName.toString().trim()) {
+        return res.status(400).json({ error: "Applicant name is required" });
+      }
+      if (!mobileNumber || !mobileNumber.toString().trim()) {
+        return res.status(400).json({ error: "Mobile number is required" });
+      }
+      if (!destination || !destination.toString().trim()) {
+        return res.status(400).json({ error: "Destination is required" });
+      }
+
+      let computedAge: number | null = null;
+      if (dob) {
+        const dobDate = new Date(dob);
+        if (!Number.isNaN(dobDate.getTime())) {
+          const now = new Date();
+          let years = now.getFullYear() - dobDate.getFullYear();
+          const m = now.getMonth() - dobDate.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < dobDate.getDate())) {
+            years--;
+          }
+          if (years >= 0 && years < 200) {
+            computedAge = years;
+          }
+        }
+      }
+      if (typeof age === "number" && !Number.isNaN(age)) {
+        computedAge = age;
+      }
+
+      const family = Array.isArray(familyMembers)
+        ? familyMembers.map((m: any) => ({
+            name: (m?.name || "").toString().trim(),
+            mobileNumber: (m?.mobileNumber || "").toString().trim(),
+            mobileVerified: !!m?.mobileVerified,
+          })).filter((m: any) => m.name && m.mobileNumber)
+        : [];
+
+      const payload: InsertTirthYatraRequest = {
+        appUserId: appUserId.toString(),
+        villageId: villageId || null,
+        villageName: villageName || null,
+        applicantName: applicantName.toString().trim(),
+        mobileNumber: mobileNumber.toString().trim(),
+        mobileVerified: !!mobileVerified,
+        dob: dob || null,
+        age: computedAge ?? null,
+        gender: gender || null,
+        withFamily: !!withFamily,
+        familyMembers: family,
+        currentLocationLabel: currentLocationLabel || null,
+        currentLatitude: currentLatitude || null,
+        currentLongitude: currentLongitude || null,
+        destination: destination.toString().trim(),
+        destinationOther: destinationOther || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        aadhaarFrontUrl: aadhaarFrontUrl || null,
+        aadhaarBackUrl: aadhaarBackUrl || null,
+        voterCardUrl: voterCardUrl || null,
+        audioNoteUrl: audioNoteUrl || null,
+        audioNoteText: audioNoteText || null,
+        status: "pending",
+        adminNote: null,
+      } as any;
+
+      const created = await storage.createTirthYatraRequest(payload);
+      res.json(created);
+    } catch (error) {
+      console.error("Tirth Yatra submit error:", error);
+      res.status(400).json({ error: "Failed to submit Tirth Yatra request" });
+    }
+  });
+
+  app.get("/api/tirth-yatra/my/:appUserId", async (req, res) => {
+    try {
+      const list = await storage.getTirthYatraRequestsByUser(req.params.appUserId);
+      res.json(list);
+    } catch (error) {
+      console.error("Tirth Yatra my requests error:", error);
+      res.status(500).json({ error: "Failed to fetch Tirth Yatra requests" });
+    }
+  });
+
+  app.patch("/api/tirth-yatra/my/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body as any;
+      const existing = await storage.getTirthYatraRequest(id);
+      if (!existing) return res.status(404).json({ error: "Request not found" });
+      if (existing.appUserId !== body.appUserId) {
+        return res.status(403).json({ error: "Not allowed to edit this request" });
+      }
+      if (existing.status !== "pending") {
+        return res.status(400).json({ error: "Only pending requests can be edited" });
+      }
+
+      const update: Partial<InsertTirthYatraRequest> = {};
+      const simpleFields = [
+        "villageId",
+        "villageName",
+        "applicantName",
+        "mobileNumber",
+        "gender",
+        "currentLocationLabel",
+        "currentLatitude",
+        "currentLongitude",
+        "destination",
+        "destinationOther",
+        "startDate",
+        "endDate",
+        "aadhaarFrontUrl",
+        "aadhaarBackUrl",
+        "voterCardUrl",
+        "audioNoteUrl",
+        "audioNoteText",
+      ] as const;
+      for (const key of simpleFields) {
+        if (key in body) {
+          // @ts-ignore
+          update[key] = body[key];
+        }
+      }
+      if ("dob" in body) {
+        // @ts-ignore
+        update.dob = body.dob || null;
+      }
+      if ("withFamily" in body) {
+        // @ts-ignore
+        update.withFamily = !!body.withFamily;
+      }
+      if ("familyMembers" in body && Array.isArray(body.familyMembers)) {
+        // @ts-ignore
+        update.familyMembers = body.familyMembers.map((m: any) => ({
+          name: (m?.name || "").toString().trim(),
+          mobileNumber: (m?.mobileNumber || "").toString().trim(),
+          mobileVerified: !!m?.mobileVerified,
+        })).filter((m: any) => m.name && m.mobileNumber);
+      }
+
+      if (body.age != null) {
+        const n = Number(body.age);
+        // @ts-ignore
+        update.age = Number.isFinite(n) ? n : null;
+      } else if (body.dob) {
+        const dobDate = new Date(body.dob);
+        if (!Number.isNaN(dobDate.getTime())) {
+          const now = new Date();
+          let years = now.getFullYear() - dobDate.getFullYear();
+          const m = now.getMonth() - dobDate.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < dobDate.getDate())) {
+            years--;
+          }
+          // @ts-ignore
+          update.age = years;
+        }
+      }
+
+      const updated = await storage.updateTirthYatraRequest(id, update);
+      res.json(updated);
+    } catch (error) {
+      console.error("Tirth Yatra edit error:", error);
+      res.status(500).json({ error: "Failed to edit Tirth Yatra request" });
+    }
+  });
+
+  app.get("/api/admin/tirth-yatra", async (_req, res) => {
+    try {
+      const list = await storage.getTirthYatraRequests();
+      res.json(list);
+    } catch (error) {
+      console.error("Admin Tirth Yatra list error:", error);
+      res.status(500).json({ error: "Failed to fetch Tirth Yatra requests" });
+    }
+  });
+
+  app.get("/api/admin/tirth-yatra/:id", async (req, res) => {
+    try {
+      const row = await storage.getTirthYatraRequest(req.params.id);
+      if (!row) return res.status(404).json({ error: "Request not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Admin Tirth Yatra get error:", error);
+      res.status(500).json({ error: "Failed to fetch request" });
+    }
+  });
+
+  app.patch("/api/admin/tirth-yatra/:id", async (req, res) => {
+    try {
+      const { status, adminNote } = req.body as any;
+      const allowed = ["pending", "accepted", "rejected", "closed"];
+      if (status && !allowed.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      const update: Partial<InsertTirthYatraRequest> = {};
+      if (status) {
+        // @ts-ignore
+        update.status = status;
+      }
+      if (adminNote !== undefined) {
+        // @ts-ignore
+        update.adminNote = adminNote || null;
+      }
+      const updated = await storage.updateTirthYatraRequest(req.params.id, update);
+      if (!updated) return res.status(404).json({ error: "Request not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin Tirth Yatra update error:", error);
+      res.status(500).json({ error: "Failed to update request" });
+    }
+  });
+
   // ===== Voter Registration Routes =====
 
   app.post("/api/voter-registration/send-otp", async (req, res) => {

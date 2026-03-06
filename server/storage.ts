@@ -72,6 +72,8 @@ import {
   roadReports, roadLogs,
   type RoadReport, type InsertRoadReport,
   type RoadLog, type InsertRoadLog,
+  tirthYatraRequests,
+  type TirthYatraRequest, type InsertTirthYatraRequest,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -398,6 +400,13 @@ export interface IStorage {
   getRoadReportsByUser(appUserId: string): Promise<RoadReport[]>;
   createRoadLog(data: InsertRoadLog): Promise<RoadLog>;
   getRoadLogsByReport(reportId: string): Promise<RoadLog[]>;
+
+  // Tirth Yatra
+  createTirthYatraRequest(data: InsertTirthYatraRequest): Promise<TirthYatraRequest>;
+  updateTirthYatraRequest(id: string, data: Partial<InsertTirthYatraRequest>): Promise<TirthYatraRequest | undefined>;
+  getTirthYatraRequest(id: string): Promise<TirthYatraRequest | undefined>;
+  getTirthYatraRequests(): Promise<TirthYatraRequest[]>;
+  getTirthYatraRequestsByUser(appUserId: string): Promise<TirthYatraRequest[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1637,6 +1646,32 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(eventVenues)
       .where(eq(eventVenues.appUserId, appUserId))
       .orderBy(desc(eventVenues.createdAt));
+  }
+
+  // Tirth Yatra
+  async createTirthYatraRequest(data: InsertTirthYatraRequest): Promise<TirthYatraRequest> {
+    const [row] = await db.insert(tirthYatraRequests).values(data).returning();
+    return row;
+  }
+
+  async updateTirthYatraRequest(id: string, data: Partial<InsertTirthYatraRequest>): Promise<TirthYatraRequest | undefined> {
+    const [row] = await db.update(tirthYatraRequests).set(data).where(eq(tirthYatraRequests.id, id)).returning();
+    return row;
+  }
+
+  async getTirthYatraRequest(id: string): Promise<TirthYatraRequest | undefined> {
+    const [row] = await db.select().from(tirthYatraRequests).where(eq(tirthYatraRequests.id, id));
+    return row;
+  }
+
+  async getTirthYatraRequests(): Promise<TirthYatraRequest[]> {
+    return db.select().from(tirthYatraRequests).orderBy(desc(tirthYatraRequests.createdAt));
+  }
+
+  async getTirthYatraRequestsByUser(appUserId: string): Promise<TirthYatraRequest[]> {
+    return db.select().from(tirthYatraRequests)
+      .where(eq(tirthYatraRequests.appUserId, appUserId))
+      .orderBy(desc(tirthYatraRequests.createdAt));
   }
 
   // Road Reports

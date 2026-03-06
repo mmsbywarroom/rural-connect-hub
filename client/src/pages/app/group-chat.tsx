@@ -81,6 +81,8 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const inCallRef = useRef<{ callId: string; groupId: string; callType: "audio" | "video"; peerUserId: string; peerName?: string } | null>(null);
   const [callSeconds, setCallSeconds] = useState(0);
 
@@ -206,9 +208,13 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     };
     pc.ontrack = (event) => {
       const remoteStream = event.streams[0];
-      const videoElement = document.getElementById("remote-video") as HTMLVideoElement | null;
-      if (videoElement && remoteStream) {
-        videoElement.srcObject = remoteStream;
+      if (!remoteStream) return;
+      const currentInCall = inCallRef.current;
+      if (!currentInCall) return;
+      if (currentInCall.callType === "video" && remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
+      } else if (currentInCall.callType === "audio" && remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
       }
     };
     if (!isCaller) {
@@ -245,9 +251,13 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
       };
       pc.ontrack = (event) => {
         const remoteStream = event.streams[0];
-        const videoElement = document.getElementById("remote-video") as HTMLVideoElement | null;
-        if (videoElement && remoteStream) {
-          videoElement.srcObject = remoteStream;
+        if (!remoteStream) return;
+        const updatedInCall = inCallRef.current;
+        if (!updatedInCall) return;
+        if (updatedInCall.callType === "video" && remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+        } else if (updatedInCall.callType === "audio" && remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
         }
       };
     }
@@ -571,9 +581,11 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           </div>
           {inCall.callType === "video" && (
             <div className="w-full max-w-md aspect-video bg-black rounded-lg overflow-hidden mb-4">
-              <video id="remote-video" autoPlay playsInline className="w-full h-full object-cover" />
+              <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
             </div>
           )}
+          {/* Remote audio sink (used for audio-only calls, and as a fallback) */}
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
           <Button
             variant="destructive"
             size="lg"

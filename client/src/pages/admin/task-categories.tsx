@@ -48,6 +48,7 @@ const FIXED_TASKS: { slug: string; name: string }[] = [
   { slug: "gov-school", name: "Gov School Work" },
   { slug: "appointment", name: "Appointments" },
   { slug: "event-venue", name: "Event Venues" },
+  { slug: "tirth-yatra", name: "Tirth Yatra" },
   { slug: "voter-registration", name: "Voter Registration" },
 ];
 

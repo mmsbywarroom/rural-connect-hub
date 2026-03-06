@@ -40,6 +40,7 @@ import NvyReportsPage from "./nvy-reports";
 import GovSchoolSubmissionsPage from "./gov-school-submissions";
 import AppointmentSubmissionsPage from "./appointment-submissions";
 import EventVenuesPage from "./event-venues";
+import TirthYatraAdminPage from "./tirth-yatra";
 import RoadReportsPage from "./road-reports";
 import UserTreePage from "./user-tree";
 import LoginPageSettingsPage from "./login-page-settings";
@@ -74,6 +75,7 @@ const allMenuItems = [
   { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Management" },
   { id: "appointments", label: "Appointments", icon: CalendarCheck, path: "/admin/appointments", group: "Management" },
   { id: "event-venues", label: "Event Venues", icon: Building2, path: "/admin/event-venues", group: "Management" },
+  { id: "tirth-yatra", label: "Tirth Yatra", icon: Users, path: "/admin/tirth-yatra", group: "Management" },
   { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Management" },
   { id: "villages", label: "Villages", icon: MapPin, path: "/admin/villages", group: "Master Data" },
   { id: "issues", label: "Issues", icon: AlertTriangle, path: "/admin/issues", group: "Master Data" },
@@ -394,6 +396,7 @@ export default function AdminPage() {
     if (currentPath.includes("outdoor-ads")) return "outdoor-ads";
     if (currentPath.includes("appointments")) return "appointments";
     if (currentPath.includes("event-venues")) return "event-venues";
+    if (currentPath.includes("tirth-yatra")) return "tirth-yatra";
     if (currentPath.includes("gov-school")) return "gov-school";
     if (currentPath.includes("sunwai")) return "sunwai";
     if (currentPath.includes("nvy")) return "nvy";
@@ -510,6 +513,7 @@ export default function AdminPage() {
             {activeSection === "gov-school" && <GovSchoolSubmissionsPage />}
             {activeSection === "appointments" && <AppointmentSubmissionsPage />}
             {activeSection === "event-venues" && <EventVenuesPage />}
+            {activeSection === "tirth-yatra" && <TirthYatraAdminPage />}
             {activeSection === "voter-registration" && <VoterRegistrationSubmissionsPage />}
             {activeSection === "form-builder" && <FormBuilderPage />}
             {activeSection === "villages" && <VillagesPage />}

@@ -1186,6 +1186,47 @@ export const insertEventVenueSchema = createInsertSchema(eventVenues).omit({
 export type InsertEventVenue = z.infer<typeof insertEventVenueSchema>;
 export type EventVenue = typeof eventVenues.$inferSelect;
 
+// Tirth Yatra requests
+export const tirthYatraRequests = pgTable("tirth_yatra_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id").references(() => villages.id),
+  villageName: text("village_name"),
+  applicantName: text("applicant_name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  mobileVerified: boolean("mobile_verified").default(false),
+  dob: date("dob"),
+  age: integer("age"),
+  gender: text("gender"),
+  withFamily: boolean("with_family").default(false),
+  familyMembers: jsonb("family_members").$type<{ name: string; mobileNumber: string; mobileVerified: boolean }[]>().default([]),
+  currentLocationLabel: text("current_location_label"),
+  currentLatitude: text("current_latitude"),
+  currentLongitude: text("current_longitude"),
+  destination: text("destination").notNull(), // kashi_vishwanath, vaishno_devi, kedarnath, amarnath, haridwar, other
+  destinationOther: text("destination_other"),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  aadhaarFrontUrl: text("aadhaar_front_url"),
+  aadhaarBackUrl: text("aadhaar_back_url"),
+  voterCardUrl: text("voter_card_url"),
+  audioNoteUrl: text("audio_note_url"),
+  audioNoteText: text("audio_note_text"),
+  status: text("status").default("pending").notNull(), // pending, accepted, rejected, closed
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTirthYatraRequestSchema = createInsertSchema(tirthYatraRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTirthYatraRequest = z.infer<typeof insertTirthYatraRequestSchema>;
+export type TirthYatraRequest = typeof tirthYatraRequests.$inferSelect;
+
 // Road Repair Reports
 export const roadReports = pgTable("road_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
