@@ -1210,6 +1210,8 @@ export const tirthYatraRequests = pgTable("tirth_yatra_requests", {
   aadhaarFrontUrl: text("aadhaar_front_url"),
   aadhaarBackUrl: text("aadhaar_back_url"),
   voterCardUrl: text("voter_card_url"),
+  ocrAadhaarText: text("ocr_aadhaar_text"),
+  ocrVoterText: text("ocr_voter_text"),
   audioNoteUrl: text("audio_note_url"),
   audioNoteText: text("audio_note_text"),
   status: text("status").default("pending").notNull(), // pending, accepted, rejected, closed
