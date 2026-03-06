@@ -488,14 +488,14 @@ export default function TaskTirthYatra({ user }: Props) {
         </header>
         <main className="flex-1 p-4">
           <UnitSelector
-            user={user}
-            selectedVillageId={selectedVillageId}
-            selectedVillageName={selectedVillageName}
-            onChange={(id, name) => {
-              setSelectedVillageId(id);
-              setSelectedVillageName(name);
+            onSelect={(unit) => {
+              setSelectedVillageId(unit.villageId);
+              setSelectedVillageName(unit.villageName);
+              setStep("form");
             }}
-            onContinue={() => setStep("form")}
+            title={language === "hi" ? "यूनिट चुनें" : language === "pa" ? "ਯੂਨਿਟ ਚੁਣੋ" : "Select Unit"}
+            subtitle={language === "hi" ? "जिस गाँव/वार्ड से यात्रा होगी वह चुनें" : language === "pa" ? "ਜਿੱਥੋਂ ਯਾਤਰਾ ਹੋਵੇਗੀ ਉਹ ਯੂਨਿਟ ਚੁਣੋ" : "Choose a village/ward to work in"}
+            defaultVillageId={user?.mappedAreaId || undefined}
           />
         </main>
       </div>
