@@ -66,8 +66,9 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; callerName: string } | null>(null);
-  const [inCall, setInCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; peerUserId: string } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; callerId: string; callerName: string } | null>(null);
+  const [peerPickerType, setPeerPickerType] = useState<"audio" | "video" | null>(null);
+  const [inCall, setInCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; peerUserId: string; peerName?: string } | null>(null);
   const [pendingCallType, setPendingCallType] = useState<"audio" | "video" | null>(null);
   const [mediaViewer, setMediaViewer] = useState<MediaViewer>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +81,12 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const inCallRef = useRef<{ callId: string; groupId: string; callType: "audio" | "video"; peerUserId: string; peerName?: string } | null>(null);
   const [callSeconds, setCallSeconds] = useState(0);
+
+  useEffect(() => {
+    inCallRef.current = inCall;
+  }, [inCall]);
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/app/group/default"],
@@ -97,6 +103,16 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     refetchInterval: 5000,
   });
 
+  const { data: groupMembers = [], isLoading: membersLoading } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/app/group", group?.id, "members"],
+    queryFn: async () => {
+      const res = await fetch(`/api/app/group/${group!.id}/members`);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!group?.id && peerPickerType !== null,
+  });
+
   useEffect(() => {
     if (!group?.id || !user?.id) return;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -111,6 +127,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             callId: msg.callId,
             groupId: msg.groupId,
             callType: msg.callType || "audio",
+            callerId: msg.callerId || "",
             callerName: msg.callerName || "Someone",
           });
           return;
@@ -118,6 +135,22 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         if (msg.type === "call-ended") {
           setIncomingCall(null);
           await endWebRtcCall();
+          return;
+        }
+        if (msg.type === "peer-joined" && msg.callId && msg.peerUserId) {
+          const pc = pcRef.current;
+          const currentInCall = inCallRef.current;
+          if (pc && currentInCall && currentInCall.callId === msg.callId && currentInCall.peerUserId === msg.peerUserId) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            sendSignal({
+              type: "offer",
+              callId: msg.callId,
+              fromUserId: user.id,
+              toUserId: msg.peerUserId,
+              sdp: offer,
+            });
+          }
           return;
         }
         if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice-candidate") {
@@ -178,28 +211,23 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         videoElement.srcObject = remoteStream;
       }
     };
-    if (isCaller) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendSignal({
-        type: "offer",
-        callId,
-        fromUserId: user.id,
-        toUserId: peerUserId,
-        sdp: offer,
-      });
+    if (!isCaller) {
+      // Callee: wait for offer in handleSignalMessage
+    } else {
+      // Caller: wait for peer-joined before creating/sending offer (handled in ws.onmessage)
     }
   };
 
   const handleSignalMessage = async (msg: any) => {
-    if (!inCall || msg.callId !== inCall.callId) return;
+    const currentInCall = inCallRef.current;
+    if (!currentInCall || msg.callId !== currentInCall.callId) return;
     let pc = pcRef.current;
     if (!pc) {
       pc = new RTCPeerConnection({
         iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
       });
       pcRef.current = pc;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: inCall.callType === "video" });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentInCall.callType === "video" });
       localStreamRef.current = stream;
       for (const track of stream.getTracks()) {
         pc.addTrack(track, stream);
@@ -208,7 +236,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
         if (event.candidate) {
           sendSignal({
             type: "ice-candidate",
-            callId: inCall.callId,
+            callId: currentInCall.callId,
             fromUserId: user.id,
             toUserId: msg.fromUserId,
             candidate: event.candidate,
@@ -445,6 +473,18 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
 
   return (
     <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden relative">
+      {pendingCallType && !inCall && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
+          <Loader2 className="h-12 w-12 animate-spin text-white mb-4" />
+          <p className="text-white font-medium">
+            {language === "hi"
+              ? "कॉल कनेक्ट हो रही है..."
+              : language === "pa"
+              ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
+              : "Connecting call..."}
+          </p>
+        </div>
+      )}
       {incomingCall && !inCall && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
           <p className="text-white text-lg font-medium mb-1">{incomingCall.callerName}</p>
@@ -458,7 +498,13 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
               variant="destructive"
               size="lg"
               className="rounded-full w-16 h-16"
-              onClick={() => {
+              onClick={async () => {
+                if (!incomingCall) return;
+                await fetch(`/api/app/group/${incomingCall.groupId}/calls/${incomingCall.callId}/decline`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ appUserId: user.id }),
+                });
                 setIncomingCall(null);
               }}
             >
@@ -469,12 +515,18 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
               size="lg"
               onClick={async () => {
                 if (!incomingCall) return;
-                const peerUserId = ""; // TODO: pick actual peer user id if you later support multiple
+                const peerUserId = incomingCall.callerId;
+                await fetch(`/api/app/group/${incomingCall.groupId}/calls/${incomingCall.callId}/join`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ appUserId: user.id }),
+                });
                 setInCall({
                   callId: incomingCall.callId,
                   groupId: incomingCall.groupId,
                   callType: incomingCall.callType,
                   peerUserId,
+                  peerName: incomingCall.callerName,
                 });
                 setIncomingCall(null);
                 await createPeerConnection(peerUserId, incomingCall.callId, false, incomingCall.callType === "audio");
@@ -491,6 +543,9 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
       {inCall && (
         <div className="fixed inset-0 z-40 bg-slate-900 flex flex-col items-center justify-center p-4">
           <div className="flex flex-col items-center gap-3 text-white mb-4">
+            {inCall.peerName && (
+              <p className="text-base font-medium text-white/90">{inCall.peerName}</p>
+            )}
             <p className="text-sm font-semibold">
               {inCall.callType === "video"
                 ? language === "hi"
@@ -524,6 +579,13 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             size="lg"
             className="rounded-full w-16 h-16"
             onClick={async () => {
+              if (inCall) {
+                await fetch(`/api/app/group/${inCall.groupId}/calls/${inCall.callId}/end`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ appUserId: user.id }),
+                });
+              }
               await endWebRtcCall();
               setPendingCallType(null);
             }}
@@ -532,6 +594,69 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           </Button>
         </div>
       )}
+      <Dialog open={peerPickerType !== null} onOpenChange={(open) => !open && setPeerPickerType(null)}>
+        <DialogContent className="max-w-sm">
+          <h3 className="font-semibold text-slate-800">
+            {peerPickerType === "audio"
+              ? language === "hi"
+                ? "ऑडियो कॉल - किसे कॉल करें?"
+                : language === "pa"
+                ? "ਔਡੀਓ ਕਾਲ - ਕਿਸਨੂੰ ਕਾਲ ਕਰਨੀ ਹੈ?"
+                : "Audio call – who to call?"
+              : language === "hi"
+              ? "वीडियो कॉल - किसे कॉल करें?"
+              : language === "pa"
+              ? "ਵੀਡੀਓ ਕਾਲ - ਕਿਸਨੂੰ ਕਾਲ ਕਰਨੀ ਹੈ?"
+              : "Video call – who to call?"}
+          </h3>
+          <div className="max-h-64 overflow-y-auto space-y-1 mt-2">
+            {membersLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              </div>
+            ) : (
+              groupMembers
+              .filter((m) => m.id !== user.id)
+              .map((member) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 text-left"
+                  onClick={async () => {
+                    if (!group || !peerPickerType) return;
+                    setPendingCallType(peerPickerType);
+                    setPeerPickerType(null);
+                    const res = await fetch(`/api/app/group/${group.id}/calls`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ appUserId: user.id, type: peerPickerType, targetUserId: member.id }),
+                    });
+                    if (!res.ok) {
+                      setPendingCallType(null);
+                      return;
+                    }
+                    const data = await res.json();
+                    setInCall({ callId: data.id, groupId: data.groupId, callType: peerPickerType, peerUserId: member.id, peerName: member.name });
+                    setPendingCallType(null);
+                    await createPeerConnection(member.id, data.id, true, peerPickerType === "audio");
+                  }}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={photoUrl(member.id)} />
+                    <AvatarFallback className="bg-blue-100 text-blue-700">{member.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium text-slate-800">{member.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+          {groupMembers.length <= 1 && (
+            <p className="text-sm text-slate-500 mt-2">
+              {language === "hi" ? "ग्रुप में कोई और सदस्य नहीं।" : language === "pa" ? "ਗਰੁੱਪ ਵਿੱਚ ਕੋਈ ਹੋਰ ਮੈਂਬਰ ਨਹੀਂ।" : "No other members in the group."}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
       <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-3 shadow-md sticky top-0 z-10 flex items-center gap-3">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onBack}>
           <ArrowLeft className="h-5 w-5" />
@@ -548,18 +673,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             size="icon"
             className="text-white hover:bg-white/10"
             title="Audio call"
-            onClick={async () => {
-              const res = await fetch(`/api/app/group/${group.id}/calls`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ appUserId: user.id, type: "audio" }),
-              });
-              if (!res.ok) return;
-              const data = await res.json();
-              const peerUserId = ""; // TODO: choose other participant
-              setInCall({ callId: data.id, groupId: data.groupId, callType: "audio", peerUserId });
-              await createPeerConnection(peerUserId, data.id, true, true);
-            }}
+            onClick={() => setPeerPickerType("audio")}
             disabled={!!inCall || !!pendingCallType}
           >
             <Phone className="h-5 w-5" />
@@ -569,18 +683,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             size="icon"
             className="text-white hover:bg-white/10"
             title="Video call"
-            onClick={async () => {
-              const res = await fetch(`/api/app/group/${group.id}/calls`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ appUserId: user.id, type: "video" }),
-              });
-              if (!res.ok) return;
-              const data = await res.json();
-              const peerUserId = ""; // TODO: choose other participant
-              setInCall({ callId: data.id, groupId: data.groupId, callType: "video", peerUserId });
-              await createPeerConnection(peerUserId, data.id, true, false);
-            }}
+            onClick={() => setPeerPickerType("video")}
             disabled={!!inCall || !!pendingCallType}
           >
             <Video className="h-5 w-5" />

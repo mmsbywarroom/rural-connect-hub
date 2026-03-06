@@ -94,3 +94,14 @@ export function notifyCallEnded(appUserIds: string[], payload: CallEndedPayload)
     }
   }
 }
+
+/** Send a payload to a single user (e.g. peer-joined so caller can send offer). */
+export function sendToUser(userId: string, payload: object): void {
+  const set = connectionsByUser.get(userId);
+  if (set) {
+    const data = JSON.stringify(payload);
+    for (const ws of Array.from(set)) {
+      if (ws.readyState === 1) ws.send(data);
+    }
+  }
+}

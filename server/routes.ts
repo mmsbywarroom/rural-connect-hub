@@ -4,7 +4,7 @@ import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
 import { sendPushToAll, sendPushToUser, sendPushToGroupMembers, VAPID_PUBLIC_KEY } from "./push";
-import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded } from "./ws-calls";
+import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded, sendToUser } from "./ws-calls";
 import { translateBatch } from "./translate";
 import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
@@ -3431,6 +3431,24 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/app/group/:id/members", async (req, res) => {
+    try {
+      const { id: groupId } = req.params;
+      const group = await storage.getChatGroup(groupId);
+      if (!group) return res.status(404).json({ error: "Group not found" });
+      const memberIds = await storage.getGroupMemberIds(groupId);
+      if (memberIds.length === 0) return res.json([]);
+      const list = await db
+        .select({ id: appUsers.id, name: appUsers.name })
+        .from(appUsers)
+        .where(inArray(appUsers.id, memberIds));
+      res.json(list);
+    } catch (error) {
+      console.error("Group members error:", error);
+      res.status(500).json({ error: "Failed to get members" });
+    }
+  });
+
   app.get("/api/app/group/:id/messages", async (req, res) => {
     try {
       const { id: groupId } = req.params;
@@ -3598,7 +3616,7 @@ export async function registerRoutes(
   app.post("/api/app/group/:id/calls", async (req, res) => {
     try {
       const { id: groupId } = req.params;
-      const { appUserId, type } = req.body;
+      const { appUserId, type, targetUserId } = req.body;
       if (!appUserId || !type) return res.status(400).json({ error: "appUserId and type (audio|video) required" });
       if (!["audio", "video"].includes(type)) return res.status(400).json({ error: "type must be audio or video" });
       const group = await storage.getChatGroup(groupId);
@@ -3614,8 +3632,16 @@ export async function registerRoutes(
       }
       const caller = await storage.getAppUser(appUserId);
       const callerName = caller?.name ?? "Someone";
-      const toNotify = memberIds.filter((id) => id !== appUserId);
-      await sendPushToGroupMembers(groupId, appUserId, callerName, type === "video" ? "Incoming group video call" : "Incoming group audio call", "/app/chat");
+      let toNotify: string[];
+      if (targetUserId && targetUserId !== appUserId) {
+        const isTargetMember = await storage.isGroupMember(groupId, targetUserId);
+        if (!isTargetMember) return res.status(400).json({ error: "targetUserId must be a group member" });
+        toNotify = [targetUserId];
+        await sendPushToUser(targetUserId, callerName, type === "video" ? "Incoming video call" : "Incoming audio call", "/app/chat");
+      } else {
+        toNotify = memberIds.filter((id) => id !== appUserId);
+        await sendPushToGroupMembers(groupId, appUserId, callerName, type === "video" ? "Incoming group video call" : "Incoming group audio call", "/app/chat");
+      }
       notifyIncomingCall(toNotify, { type: "incoming-call", callId: call.id, groupId, callType: type, callerId: appUserId, callerName });
       res.json({ id: call.id, groupId: call.groupId, type: call.type, status: call.status, createdBy: call.createdBy, createdAt: call.createdAt });
     } catch (error) {
@@ -3636,6 +3662,7 @@ export async function registerRoutes(
       if (!isMember) return res.status(403).json({ error: "Not a group member" });
       await storage.updateGroupCall(callId, { status: "active" });
       await storage.updateGroupCallParticipant(callId, appUserId, { status: "joined", joinedAt: new Date() });
+      sendToUser(call.createdBy, { type: "peer-joined", callId, peerUserId: appUserId });
       const user = await storage.getAppUser(appUserId);
       const roomName = `call-${callId}`;
       // For custom WebRTC, the frontend will use this roomName and callId
