@@ -43,6 +43,17 @@ function isIndianMobile(input: string): boolean {
   return /^[6-9]\d{9}$/.test(cleaned);
 }
 
+function genId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function") {
+      return (crypto as any).randomUUID();
+    }
+  } catch {
+    // ignore and fall back
+  }
+  return Math.random().toString(36).slice(2);
+}
+
 export default function TaskTirthYatra({ user }: Props) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -221,7 +232,7 @@ export default function TaskTirthYatra({ user }: Props) {
     setFamilyMembers((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: genId(),
         name: "",
         mobile: "",
         mobileVerified: false,
