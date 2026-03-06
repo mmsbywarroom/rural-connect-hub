@@ -12,55 +12,8 @@ import {
 import { ArrowLeft, Send, Image as ImageIcon, Loader2, MoreVertical, Mic, MicOff, Reply, Trash2, Phone, Video, PhoneOff } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import type { AppUser } from "@shared/schema";
-import { LiveKitRoom, VideoConference } from "@livekit/components-react";
-import "@livekit/components-styles";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢"];
-
-/** Play a simple two-tone phone ring using Web Audio (no file needed). Stops when enabled becomes false. */
-function usePhoneRing(enabled: boolean) {
-  const ctxRef = useRef<AudioContext | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    if (!enabled) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      ctxRef.current?.close();
-      ctxRef.current = null;
-      return;
-    }
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    ctxRef.current = ctx;
-    const playTone = (freq: number, durationMs: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + durationMs / 1000);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + durationMs / 1000);
-    };
-    const ring = () => {
-      if (ctx.state === "suspended") ctx.resume();
-      playTone(400, 400);
-      setTimeout(() => playTone(500, 400), 450);
-    };
-    ring();
-    intervalRef.current = setInterval(ring, 1600);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      ctx.close();
-      ctxRef.current = null;
-    };
-  }, [enabled]);
-}
 
 interface Group {
   id: string;
@@ -100,22 +53,6 @@ function photoUrl(userId: string) {
   return `/api/app/user/${userId}/photo`;
 }
 
-interface IncomingCall {
-  callId: string;
-  groupId: string;
-  callType: "audio" | "video";
-  callerName: string;
-}
-
-interface InCallRoom {
-  token: string;
-  roomName: string;
-  serverUrl: string;
-  callType: "audio" | "video";
-  callId: string;
-  groupId: string;
-}
-
 interface GroupChatProps {
   user: AppUser;
   onBack: () => void;
@@ -129,12 +66,10 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
-  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
-  const [inCallRoom, setInCallRoom] = useState<InCallRoom | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; callerName: string } | null>(null);
+  const [inCall, setInCall] = useState<{ callId: string; groupId: string; callType: "audio" | "video"; peerUserId: string } | null>(null);
   const [pendingCallType, setPendingCallType] = useState<"audio" | "video" | null>(null);
-  const [cancelRequested, setCancelRequested] = useState(false);
   const [mediaViewer, setMediaViewer] = useState<MediaViewer>(null);
-  const [callSeconds, setCallSeconds] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -143,26 +78,9 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
-
-  usePhoneRing(!!incomingCall);
-
-  useEffect(() => {
-    if (!inCallRoom) {
-      setCallSeconds(0);
-      return;
-    }
-    setCallSeconds(0);
-    const id = window.setInterval(() => {
-      setCallSeconds((prev) => prev + 1);
-    }, 1000);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [inCallRoom]);
-
-  const { data: livekitConfig } = useQuery<{ configured: boolean; url: string | null }>({
-    queryKey: ["/api/app/livekit-config"],
-  });
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const [callSeconds, setCallSeconds] = useState(0);
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/app/group/default"],
@@ -179,177 +97,171 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     refetchInterval: 5000,
   });
 
-  const { data: activeCall, refetch: refetchActiveCall } = useQuery<{
-    id: string;
-    groupId: string;
-    type: "audio" | "video";
-    status: string;
-    createdBy: string;
-    callerName: string;
-    createdAt: string;
-  } | null>({
-    queryKey: ["/api/app/group", group?.id, "active-call"],
-    queryFn: async () => {
-      const res = await fetch(`/api/app/group/${group!.id}/active-call`);
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      return data;
-    },
-    enabled: !!group?.id && !inCallRoom,
-    refetchInterval: 3000,
-  });
-
   useEffect(() => {
-    if (!group?.id || !user?.id || inCallRoom) return;
+    if (!group?.id || !user?.id) return;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${proto}//${window.location.host}/ws/calls?userId=${encodeURIComponent(user.id)}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
-    ws.onmessage = (ev) => {
+    ws.onmessage = async (ev) => {
       try {
         const msg = JSON.parse(ev.data as string);
         if (msg.type === "incoming-call" && msg.callId && msg.groupId === group.id) {
           setIncomingCall({
             callId: msg.callId,
             groupId: msg.groupId,
-            callType: msg.callType || "video",
+            callType: msg.callType || "audio",
             callerName: msg.callerName || "Someone",
           });
+          return;
         }
-        if (msg.type === "call-ended") setIncomingCall(null);
+        if (msg.type === "call-ended") {
+          setIncomingCall(null);
+          await endWebRtcCall();
+          return;
+        }
+        if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice-candidate") {
+          await handleSignalMessage(msg);
+        }
       } catch (_) {}
     };
     return () => {
       ws.close();
       wsRef.current = null;
     };
-  }, [group?.id, user?.id, inCallRoom]);
+  }, [group?.id, user?.id]);
 
   useEffect(() => {
-    if (activeCall && activeCall.status === "ringing" && activeCall.createdBy !== user.id && !incomingCall && !inCallRoom) {
-      setIncomingCall({
-        callId: activeCall.id,
-        groupId: activeCall.groupId,
-        callType: activeCall.type,
-        callerName: activeCall.callerName,
+    if (!inCall) {
+      setCallSeconds(0);
+      return;
+    }
+    setCallSeconds(0);
+    const id = window.setInterval(() => {
+      setCallSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [inCall]);
+
+  const sendSignal = (payload: any) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify(payload));
+  };
+
+  const createPeerConnection = async (peerUserId: string, callId: string, isCaller: boolean, audioOnly: boolean) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+    });
+    pcRef.current = pc;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: !audioOnly });
+    localStreamRef.current = stream;
+    for (const track of stream.getTracks()) {
+      pc.addTrack(track, stream);
+    }
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal({
+          type: "ice-candidate",
+          callId,
+          fromUserId: user.id,
+          toUserId: peerUserId,
+          candidate: event.candidate,
+        });
+      }
+    };
+    pc.ontrack = (event) => {
+      const remoteStream = event.streams[0];
+      const videoElement = document.getElementById("remote-video") as HTMLVideoElement | null;
+      if (videoElement && remoteStream) {
+        videoElement.srcObject = remoteStream;
+      }
+    };
+    if (isCaller) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendSignal({
+        type: "offer",
+        callId,
+        fromUserId: user.id,
+        toUserId: peerUserId,
+        sdp: offer,
       });
     }
-  }, [activeCall, user.id, incomingCall, inCallRoom]);
+  };
 
-  const startCallMutation = useMutation({
-    mutationFn: async (type: "audio" | "video") => {
-      const res = await fetch(`/api/app/group/${group!.id}/calls`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appUserId: user.id, type }),
+  const handleSignalMessage = async (msg: any) => {
+    if (!inCall || msg.callId !== inCall.callId) return;
+    let pc = pcRef.current;
+    if (!pc) {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
       });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onMutate: (type) => {
-      setPendingCallType(type);
-      setCancelRequested(false);
-    },
-    onError: () => {
-      setPendingCallType(null);
-      setCancelRequested(false);
-    },
-    onSuccess: async (_data, type) => {
-      refetchActiveCall();
-      const joinRes = await fetch(`/api/app/group/${group!.id}/calls/${_data.id}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appUserId: user.id }),
-      });
-      if (!joinRes.ok) {
-        setPendingCallType(null);
-        return;
+      pcRef.current = pc;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: inCall.callType === "video" });
+      localStreamRef.current = stream;
+      for (const track of stream.getTracks()) {
+        pc.addTrack(track, stream);
       }
-      const { token, roomName, livekitUrl, callType } = await joinRes.json();
-      if (cancelRequested) {
-        // Call was cancelled while we were connecting – end it and do not join.
-        await endCallMutation.mutateAsync({ callId: _data.id, groupId: group!.id });
-        setPendingCallType(null);
-        setCancelRequested(false);
-        return;
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          sendSignal({
+            type: "ice-candidate",
+            callId: inCall.callId,
+            fromUserId: user.id,
+            toUserId: msg.fromUserId,
+            candidate: event.candidate,
+          });
+        }
+      };
+      pc.ontrack = (event) => {
+        const remoteStream = event.streams[0];
+        const videoElement = document.getElementById("remote-video") as HTMLVideoElement | null;
+        if (videoElement && remoteStream) {
+          videoElement.srcObject = remoteStream;
+        }
+      };
+    }
+    if (msg.type === "offer") {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendSignal({
+        type: "answer",
+        callId: msg.callId,
+        fromUserId: user.id,
+        toUserId: msg.fromUserId,
+        sdp: answer,
+      });
+    } else if (msg.type === "answer") {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+    } else if (msg.type === "ice-candidate") {
+      if (msg.candidate) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+        } catch {
+          // ignore
+        }
       }
-      setInCallRoom({ token, roomName, serverUrl: livekitUrl, callType, callId: _data.id, groupId: group!.id });
-      setPendingCallType(null);
-      setCancelRequested(false);
-    },
-    onSettled: () => {
-      // Safety: clear pending indicator if something went wrong and we didn't join a room
-      if (!inCallRoom) {
-        setPendingCallType(null);
-        setCancelRequested(false);
-      }
-    },
-  });
+    }
+  };
 
-  const joinCallMutation = useMutation({
-    mutationFn: async (callId: string) => {
-      console.log("[Call] joinCallMutation start", { callId, groupId: group?.id, appUserId: user.id });
-      const res = await fetch(`/api/app/group/${group!.id}/calls/${callId}/join`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appUserId: user.id }),
+  const endWebRtcCall = async () => {
+    try {
+      pcRef.current?.getSenders().forEach((s) => {
+        try {
+          s.track?.stop();
+        } catch {}
       });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      console.log("[Call] joinCallMutation success", {
-        roomName: data.roomName,
-        hasToken: !!data.token,
-        tokenPreview: typeof data.token === "string" ? data.token.slice(0, 12) + "..." : null,
-        livekitUrl: data.livekitUrl,
-        callType: data.callType,
-      });
-      return data;
-    },
-    onError: (err: any) => {
-      console.error("[Call] joinCallMutation error", err);
-    },
-    onSuccess: (data) => {
-      setIncomingCall(null);
-      setInCallRoom({
-        token: data.token,
-        roomName: data.roomName,
-        serverUrl: data.livekitUrl,
-        callType: data.callType,
-        callId: data.roomName.replace("call-", ""),
-        groupId: group!.id,
-      });
-    },
-  });
-
-  const declineCallMutation = useMutation({
-    mutationFn: async (callId: string) => {
-      const res = await fetch(`/api/app/group/${group!.id}/calls/${callId}/decline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appUserId: user.id }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-    },
-    onSuccess: (_, callId) => {
-      setIncomingCall((prev) => (prev?.callId === callId ? null : prev));
-      queryClient.invalidateQueries({ queryKey: ["/api/app/group", group?.id, "active-call"] });
-    },
-  });
-
-  const endCallMutation = useMutation({
-    mutationFn: async ({ callId, groupId }: { callId: string; groupId: string }) => {
-      const res = await fetch(`/api/app/group/${groupId}/calls/${callId}/end`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appUserId: user.id }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-    },
-    onSuccess: () => {
-      setInCallRoom(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/app/group", group?.id, "active-call"] });
-    },
-  });
+      pcRef.current?.close();
+    } catch {}
+    pcRef.current = null;
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    setInCall(null);
+    setIncomingCall(null);
+  };
 
   const sendMutation = useMutation({
     mutationFn: async (payload: { text?: string; imageUrl?: string; audioUrl?: string; replyToMessageId?: string }) => {
@@ -531,86 +443,9 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
     return `${m}:${s}`;
   };
 
-  if (inCallRoom) {
-    return (
-      <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
-        <LiveKitRoom
-          token={inCallRoom.token}
-          serverUrl={inCallRoom.serverUrl}
-          connect={true}
-          audio={true}
-          video={inCallRoom.callType === "video"}
-          onConnected={() => {
-            console.log("[LiveKit] connected", {
-              roomName: inCallRoom.roomName,
-              serverUrl: inCallRoom.serverUrl,
-              callType: inCallRoom.callType,
-            });
-          }}
-          onConnectionStateChanged={(state) => {
-            console.log("[LiveKit] connection state", state);
-          }}
-          onError={(err) => {
-            console.error("[LiveKit] room error", err);
-          }}
-          onDisconnected={() => {
-            console.log("[LiveKit] disconnected");
-            setInCallRoom(null);
-          }}
-          data-lk-theme="default"
-          style={{ height: "100dvh" }}
-        >
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between px-4 pt-3 pb-1 text-white">
-              <div>
-                <p className="text-sm font-semibold">
-                  {inCallRoom.callType === "video"
-                    ? language === "hi"
-                      ? "वीडियो कॉल"
-                      : language === "pa"
-                      ? "ਵੀਡੀਓ ਕਾਲ"
-                      : "Video call"
-                    : language === "hi"
-                    ? "ऑडियो कॉल"
-                    : language === "pa"
-                    ? "ਔਡੀਓ ਕਾਲ"
-                    : "Audio call"}
-                </p>
-                <p className="text-xs text-white/80">
-                  {callSeconds === 0
-                    ? language === "hi"
-                      ? "कॉल कनेक्ट हो रही है..."
-                      : language === "pa"
-                      ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
-                      : "Calling..."
-                    : formatCallDuration(callSeconds)}
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="gap-2"
-                onClick={() => {
-                  endCallMutation.mutate({ callId: inCallRoom.callId, groupId: inCallRoom.groupId });
-                  setInCallRoom(null);
-                }}
-              >
-                <PhoneOff className="h-4 w-4" />{" "}
-                {language === "hi" ? "कॉल खत्म करें" : language === "pa" ? "ਕਾਲ ਖਤਮ ਕਰੋ" : "End call"}
-              </Button>
-            </div>
-            <div className="flex-1 min-h-0">
-              <VideoConference />
-            </div>
-          </div>
-        </LiveKitRoom>
-      </div>
-    );
-  }
-
   return (
     <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden relative">
-      {incomingCall && (
+      {incomingCall && !inCall && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
           <p className="text-white text-lg font-medium mb-1">{incomingCall.callerName}</p>
           <p className="text-white/90 text-sm mb-6">
@@ -624,7 +459,6 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
               size="lg"
               className="rounded-full w-16 h-16"
               onClick={() => {
-                declineCallMutation.mutate(incomingCall.callId);
                 setIncomingCall(null);
               }}
             >
@@ -633,15 +467,69 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             <Button
               className="rounded-full w-16 h-16 bg-green-600 hover:bg-green-700"
               size="lg"
-              onClick={() => joinCallMutation.mutate(incomingCall.callId)}
-              disabled={joinCallMutation.isPending}
+              onClick={async () => {
+                if (!incomingCall) return;
+                const peerUserId = ""; // TODO: pick actual peer user id if you later support multiple
+                setInCall({
+                  callId: incomingCall.callId,
+                  groupId: incomingCall.groupId,
+                  callType: incomingCall.callType,
+                  peerUserId,
+                });
+                setIncomingCall(null);
+                await createPeerConnection(peerUserId, incomingCall.callId, false, incomingCall.callType === "audio");
+              }}
             >
-              {joinCallMutation.isPending ? <Loader2 className="h-8 w-8 animate-spin" /> : <Phone className="h-8 w-8" />}
+              <Phone className="h-8 w-8" />
             </Button>
           </div>
           <p className="text-white/70 text-xs mt-4">
             {language === "hi" ? "रिंग हो रही है..." : language === "pa" ? "ਘੰਟੀ ਬਜ ਰਹੀ ਹੈ..." : "Ringing..."}
           </p>
+        </div>
+      )}
+      {inCall && (
+        <div className="fixed inset-0 z-40 bg-slate-900 flex flex-col items-center justify-center p-4">
+          <div className="flex flex-col items-center gap-3 text-white mb-4">
+            <p className="text-sm font-semibold">
+              {inCall.callType === "video"
+                ? language === "hi"
+                  ? "वीडियो कॉल"
+                  : language === "pa"
+                  ? "ਵੀਡੀਓ ਕਾਲ"
+                  : "Video call"
+                : language === "hi"
+                ? "ऑडियो कॉल"
+                : language === "pa"
+                ? "ਔਡੀਓ ਕਾਲ"
+                : "Audio call"}
+            </p>
+            <p className="text-xs text-white/80">
+              {callSeconds === 0
+                ? language === "hi"
+                  ? "कॉल कनेक्ट हो रही है..."
+                  : language === "pa"
+                  ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
+                  : "Connecting..."
+                : formatCallDuration(callSeconds)}
+            </p>
+          </div>
+          {inCall.callType === "video" && (
+            <div className="w-full max-w-md aspect-video bg-black rounded-lg overflow-hidden mb-4">
+              <video id="remote-video" autoPlay playsInline className="w-full h-full object-cover" />
+            </div>
+          )}
+          <Button
+            variant="destructive"
+            size="lg"
+            className="rounded-full w-16 h-16"
+            onClick={async () => {
+              await endWebRtcCall();
+              setPendingCallType(null);
+            }}
+          >
+            <PhoneOff className="h-8 w-8" />
+          </Button>
         </div>
       )}
       <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-3 shadow-md sticky top-0 z-10 flex items-center gap-3">
@@ -654,81 +542,51 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
             {group.memberCount} {language === "hi" ? "सदस्य" : language === "pa" ? "ਮੈਂਬਰ" : "members"}
           </p>
         </div>
-        {livekitConfig?.configured && (
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-              title="Audio call"
-              onClick={() => startCallMutation.mutate("audio")}
-              disabled={startCallMutation.isPending || !!activeCall}
-            >
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-              title="Video call"
-              onClick={() => startCallMutation.mutate("video")}
-              disabled={startCallMutation.isPending || !!activeCall}
-            >
-              <Video className="h-5 w-5" />
-            </Button>
-          </div>
-        )}
-      </header>
-
-      {pendingCallType && !inCallRoom && (
-        <div className="fixed inset-0 z-40 bg-black/85 flex flex-col items-center justify-center p-6">
-          <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-6">
-            {user.selfPhoto ? (
-              <img src={user.selfPhoto} alt="" className="w-28 h-28 rounded-full object-cover" />
-            ) : (
-              <span className="text-4xl font-bold text-white">
-                {user.name.charAt(0)}
-              </span>
-            )}
-          </div>
-          <p className="text-white text-lg font-semibold mb-1">
-            {group.name}
-          </p>
-          <p className="text-white/80 text-sm mb-4">
-            {pendingCallType === "video"
-              ? language === "hi"
-                ? "वीडियो कॉल"
-                : language === "pa"
-                ? "ਵੀਡੀਓ ਕਾਲ"
-                : "Video call"
-              : language === "hi"
-              ? "ऑडियो कॉल"
-              : language === "pa"
-              ? "ਔਡੀਓ ਕਾਲ"
-              : "Audio call"}
-          </p>
-          <div className="flex items-center gap-2 text-white/80 text-xs mb-6">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>
-              {language === "hi"
-                ? "कॉल कनेक्ट हो रही है..."
-                : language === "pa"
-                ? "ਕਾਲ ਕਨੈਕਟ ਹੋ ਰਹੀ ਹੈ..."
-                : "Calling..."}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="mt-2 w-14 h-14 rounded-full bg-red-600 flex items-center justify-center"
-            onClick={() => {
-              setCancelRequested(true);
-              setPendingCallType(null);
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10"
+            title="Audio call"
+            onClick={async () => {
+              const res = await fetch(`/api/app/group/${group.id}/calls`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ appUserId: user.id, type: "audio" }),
+              });
+              if (!res.ok) return;
+              const data = await res.json();
+              const peerUserId = ""; // TODO: choose other participant
+              setInCall({ callId: data.id, groupId: data.groupId, callType: "audio", peerUserId });
+              await createPeerConnection(peerUserId, data.id, true, true);
             }}
+            disabled={!!inCall || !!pendingCallType}
           >
-            <PhoneOff className="h-6 w-6 text-white" />
-          </button>
+            <Phone className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10"
+            title="Video call"
+            onClick={async () => {
+              const res = await fetch(`/api/app/group/${group.id}/calls`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ appUserId: user.id, type: "video" }),
+              });
+              if (!res.ok) return;
+              const data = await res.json();
+              const peerUserId = ""; // TODO: choose other participant
+              setInCall({ callId: data.id, groupId: data.groupId, callType: "video", peerUserId });
+              await createPeerConnection(peerUserId, data.id, true, false);
+            }}
+            disabled={!!inCall || !!pendingCallType}
+          >
+            <Video className="h-5 w-5" />
+          </Button>
         </div>
-      )}
+      </header>
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3 pb-28">
         {messagesLoading ? (

@@ -15,6 +15,11 @@ export type CallEndedPayload = {
   callId: string;
 };
 
+export type SignalPayload =
+  | { type: "offer"; callId: string; fromUserId: string; toUserId: string; sdp: any }
+  | { type: "answer"; callId: string; fromUserId: string; toUserId: string; sdp: any }
+  | { type: "ice-candidate"; callId: string; fromUserId: string; toUserId: string; candidate: any };
+
 const connectionsByUser = new Map<string, Set<WebSocket>>();
 
 export function attachCallWebSocket(httpServer: Server): void {
@@ -33,6 +38,26 @@ export function attachCallWebSocket(httpServer: Server): void {
       connectionsByUser.set(appUserId, set);
     }
     set.add(ws);
+
+    ws.on("message", (data) => {
+      try {
+        const msg = JSON.parse(data.toString()) as SignalPayload;
+        if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice-candidate") {
+          const targetSet = connectionsByUser.get(msg.toUserId);
+          if (targetSet) {
+            const payload = JSON.stringify(msg);
+            for (const targetWs of Array.from(targetSet)) {
+              if (targetWs.readyState === 1) {
+                targetWs.send(payload);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    });
+
     ws.on("close", () => {
       set!.delete(ws);
       if (set!.size === 0) connectionsByUser.delete(appUserId);

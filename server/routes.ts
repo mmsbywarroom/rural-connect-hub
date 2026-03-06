@@ -5,7 +5,6 @@ import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
 import { sendPushToAll, sendPushToUser, sendPushToGroupMembers, VAPID_PUBLIC_KEY } from "./push";
 import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded } from "./ws-calls";
-import { createLivekitToken, isLivekitConfigured, getLivekitUrl } from "./livekit";
 import { translateBatch } from "./translate";
 import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
@@ -3570,11 +3569,7 @@ export async function registerRoutes(
     }
   });
 
-  // ===== Group audio/video calls (WhatsApp-style: ring, accept/decline) =====
-  app.get("/api/app/livekit-config", (_req, res) => {
-    res.json({ configured: isLivekitConfigured(), url: isLivekitConfigured() ? getLivekitUrl() : null });
-  });
-
+  // ===== Group audio/video calls signalling (custom WebRTC) =====
   app.get("/api/app/group/:id/active-call", async (req, res) => {
     try {
       const { id: groupId } = req.params;
@@ -3606,7 +3601,6 @@ export async function registerRoutes(
       const { appUserId, type } = req.body;
       if (!appUserId || !type) return res.status(400).json({ error: "appUserId and type (audio|video) required" });
       if (!["audio", "video"].includes(type)) return res.status(400).json({ error: "type must be audio or video" });
-      if (!isLivekitConfigured()) return res.status(503).json({ error: "Calls not configured" });
       const group = await storage.getChatGroup(groupId);
       if (!group) return res.status(404).json({ error: "Group not found" });
       const isMember = await storage.isGroupMember(groupId, appUserId);
@@ -3635,7 +3629,6 @@ export async function registerRoutes(
       const { id: groupId, callId } = req.params;
       const { appUserId } = req.body;
       if (!appUserId) return res.status(400).json({ error: "appUserId required" });
-      if (!isLivekitConfigured()) return res.status(503).json({ error: "Calls not configured" });
       const call = await storage.getGroupCall(callId);
       if (!call || call.groupId !== groupId) return res.status(404).json({ error: "Call not found" });
       if (call.status === "ended") return res.status(400).json({ error: "Call has ended" });
@@ -3645,19 +3638,9 @@ export async function registerRoutes(
       await storage.updateGroupCallParticipant(callId, appUserId, { status: "joined", joinedAt: new Date() });
       const user = await storage.getAppUser(appUserId);
       const roomName = `call-${callId}`;
-      console.log("[LiveKit] join request", {
-        roomName,
-        appUserId,
-        participantName: user?.name ?? "User",
-        callType: call.type,
-        livekitUrl: getLivekitUrl(),
-      });
-      const token = await createLivekitToken(roomName, appUserId, user?.name ?? "User", call.type === "video");
-      console.log("[LiveKit] token generated", {
-        roomName,
-        tokenPreview: token.slice(0, 12) + "...",
-      });
-      res.json({ token, roomName, livekitUrl: getLivekitUrl(), callType: call.type });
+      // For custom WebRTC, the frontend will use this roomName and callId
+      // to exchange SDP/ICE via WebSocket; no LiveKit token is needed.
+      res.json({ roomName, callType: call.type });
     } catch (error) {
       console.error("Join call error:", error);
       res.status(500).json({ error: "Failed to join call" });
