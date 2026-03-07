@@ -398,6 +398,25 @@ export const userAdditionalRoles = pgTable("user_additional_roles", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Voter Mapping Master (imported from Google Sheet / CSV: BoothId, Name, Father's Name, Gender, Age, Voter ID, Village Name)
+export const voterMappingMaster = pgTable("voter_mapping_master", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slNo: integer("sl_no"),
+  boothId: text("booth_id"),
+  name: text("name"),
+  fatherName: text("father_name"),
+  houseNumber: text("house_number"),
+  gender: text("gender"),
+  age: text("age"),
+  voterId: text("voter_id").notNull(),
+  villageName: text("village_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVoterMappingMasterSchema = createInsertSchema(voterMappingMaster).omit({ id: true, createdAt: true });
+export type VoterMappingMaster = typeof voterMappingMaster.$inferSelect;
+export type InsertVoterMappingMaster = z.infer<typeof insertVoterMappingMasterSchema>;
+
 // Voter List (imported from CSV)
 export const voterList = pgTable("voter_list", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

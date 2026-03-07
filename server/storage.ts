@@ -4,7 +4,7 @@ import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
   appUsers, cscs, cscReports, mappedVolunteers, supporters,
-  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions,   csvUploads, userAdditionalRoles, voterList, pushSubscriptions,
+  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions,   csvUploads, userAdditionalRoles, voterList, voterMappingMaster, pushSubscriptions,
   chatGroups, groupMembers, groupMessages, groupCalls, groupCallParticipants,
   adminRoles, loginPageConfig,
   type AdminRole, type InsertAdminRole,
@@ -37,6 +37,7 @@ import {
   type UserAdditionalRole, type InsertUserAdditionalRole,
   type CsvUpload, type InsertCsvUpload,
   type VoterListRecord, type InsertVoterList,
+  type VoterMappingMaster, type InsertVoterMappingMaster,
   type PushSubscription, type InsertPushSubscription,
   type ChatGroup, type InsertChatGroup,
   type GroupMember, type InsertGroupMember,
@@ -1123,6 +1124,59 @@ export class DatabaseStorage implements IStorage {
 
   async clearVoterList(): Promise<void> {
     await db.delete(voterList);
+  }
+
+  // Voter Mapping Master (sheet import: BoothId, Name, Father's Name, Gender, Age, Voter ID, Village Name)
+  async getVoterMappingMaster(limit: number, offset: number, search?: string, villageFilter?: string): Promise<VoterMappingMaster[]> {
+    const conditions = [];
+    if (search && search.trim()) {
+      const term = `%${search.trim().toLowerCase()}%`;
+      conditions.push(sql`(LOWER(${voterMappingMaster.voterId}) LIKE ${term} OR LOWER(${voterMappingMaster.name}) LIKE ${term} OR LOWER(${voterMappingMaster.fatherName}) LIKE ${term} OR LOWER(${voterMappingMaster.villageName}) LIKE ${term} OR LOWER(${voterMappingMaster.boothId}) LIKE ${term})`);
+    }
+    if (villageFilter && villageFilter.trim()) {
+      conditions.push(sql`LOWER(TRIM(${voterMappingMaster.villageName})) = LOWER(TRIM(${villageFilter}))`);
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    return db.select().from(voterMappingMaster)
+      .where(whereClause)
+      .orderBy(desc(voterMappingMaster.slNo))
+      .limit(limit).offset(offset);
+  }
+
+  async getVoterMappingMasterCount(search?: string, villageFilter?: string): Promise<number> {
+    const conditions = [];
+    if (search && search.trim()) {
+      const term = `%${search.trim().toLowerCase()}%`;
+      conditions.push(sql`(LOWER(${voterMappingMaster.voterId}) LIKE ${term} OR LOWER(${voterMappingMaster.name}) LIKE ${term} OR LOWER(${voterMappingMaster.fatherName}) LIKE ${term} OR LOWER(${voterMappingMaster.villageName}) LIKE ${term} OR LOWER(${voterMappingMaster.boothId}) LIKE ${term})`);
+    }
+    if (villageFilter && villageFilter.trim()) {
+      conditions.push(sql`LOWER(TRIM(${voterMappingMaster.villageName})) = LOWER(TRIM(${villageFilter}))`);
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const [result] = await db.select({ count: count() }).from(voterMappingMaster).where(whereClause);
+    return result?.count || 0;
+  }
+
+  async insertVoterMappingMasterChunk(rows: InsertVoterMappingMaster[]): Promise<number> {
+    if (rows.length === 0) return 0;
+    await db.insert(voterMappingMaster).values(rows);
+    return rows.length;
+  }
+
+  async clearVoterMappingMaster(): Promise<void> {
+    await db.delete(voterMappingMaster);
+  }
+
+  /** HSTC submissions that have ocr_voter_id matching any of the given normalized (lowercase trim) voter ids */
+  async getHstcSubmissionIdsByVoterIds(normalizedVoterIds: string[]): Promise<{ submissionId: string; voterId: string }[]> {
+    if (normalizedVoterIds.length === 0) return [];
+    const rows = await db.select({ id: hstcSubmissions.id, ocrVoterId: hstcSubmissions.ocrVoterId })
+      .from(hstcSubmissions)
+      .where(sql`${hstcSubmissions.ocrVoterId} IS NOT NULL`);
+    const set = new Set(normalizedVoterIds);
+    return rows
+      .filter((r) => r.ocrVoterId && set.has((r.ocrVoterId || "").trim().toLowerCase()))
+      .map((r) => ({ submissionId: r.id, voterId: (r.ocrVoterId || "").trim() }));
   }
 
   // Push Subscriptions

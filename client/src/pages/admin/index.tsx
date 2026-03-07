@@ -26,6 +26,7 @@ import AnalyticsDashboard from "./analytics";
 import TaskReportsPage from "./task-reports";
 import UserReportsPage from "./user-reports";
 import VoterDatabasePage from "./voter-database";
+import VoterMappingWorkPage from "./voter-mapping-work";
 import UserManagementPage from "./user-management";
 import GovWingsPage from "./gov-wings";
 import GovPositionsPage from "./gov-positions";
@@ -86,6 +87,7 @@ const allMenuItems = [
   { id: "positions", label: "Positions", icon: GraduationCap, path: "/admin/positions", group: "Tools" },
   { id: "leadership", label: "Leadership Flags", icon: Flag, path: "/admin/leadership", group: "Tools" },
   { id: "voter-database", label: "Voter Database", icon: Vote, path: "/admin/voter-database", group: "Tools" },
+  { id: "voter-mapping-work", label: "Voter Mapping Work", icon: Vote, path: "/admin/voter-mapping-work", group: "Tools" },
   { id: "csv-upload", label: "CSV Upload", icon: Upload, path: "/admin/csv-upload", group: "Tools" },
   { id: "data-export", label: "Data Export", icon: Database, path: "/admin/data-export", group: "Tools" },
   { id: "login-page-settings", label: "Login Page Settings", icon: ImageIcon, path: "/admin/login-page-settings", group: "Tools" },
@@ -424,6 +426,7 @@ export default function AdminPage() {
     if (currentPath.includes("leadership")) return "leadership";
     if (currentPath.includes("voter-registration")) return "voter-registration";
     if (currentPath.includes("voter-database")) return "voter-database";
+    if (currentPath.includes("voter-mapping-work")) return "voter-mapping-work";
     if (currentPath.includes("csv-upload")) return "csv-upload";
     if (currentPath.includes("data-export")) return "data-export";
     if (currentPath.includes("login-page-settings")) return "login-page-settings";
@@ -525,6 +528,7 @@ export default function AdminPage() {
             {activeSection === "positions" && <PositionsPage />}
             {activeSection === "leadership" && <LeadershipFlagsPage />}
             {activeSection === "voter-database" && <VoterDatabasePage />}
+            {activeSection === "voter-mapping-work" && <VoterMappingWorkPage />}
             {activeSection === "csv-upload" && <CsvUploadPage />}
             {activeSection === "data-export" && <DataExportPage />}
             {activeSection === "login-page-settings" && <LoginPageSettingsPage />}

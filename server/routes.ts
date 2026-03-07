@@ -2547,6 +2547,72 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Voter Mapping Work (admin): sheet import + match with task OCR voter IDs =====
+  app.get("/api/admin/voter-mapping", async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const offset = parseInt(req.query.offset as string) || 0;
+      const search = (req.query.search as string) || "";
+      const village = (req.query.village as string) || "";
+      const rows = await storage.getVoterMappingMaster(limit, offset, search || undefined, village || undefined);
+      const total = await storage.getVoterMappingMasterCount(search || undefined, village || undefined);
+      const normalizedIds = rows.map((r) => (r.voterId || "").trim().toLowerCase()).filter(Boolean);
+      const hstcMatches = await storage.getHstcSubmissionIdsByVoterIds(normalizedIds);
+      const byVoterId: Record<string, { taskKey: string; taskName: string; submissionId: string }[]> = {};
+      for (const m of hstcMatches) {
+        const key = m.voterId.trim().toLowerCase();
+        if (!byVoterId[key]) byVoterId[key] = [];
+        byVoterId[key].push({ taskKey: "hstc", taskName: "Harr Sirr te Chatt (HSTC)", submissionId: m.submissionId });
+      }
+      const list = rows.map((r) => {
+        const key = (r.voterId || "").trim().toLowerCase();
+        return { ...r, tasks: byVoterId[key] || [] };
+      });
+      res.json({ list, total, limit, offset });
+    } catch (error) {
+      console.error("Voter mapping list error:", error);
+      res.status(500).json({ error: "Failed to fetch voter mapping" });
+    }
+  });
+
+  app.post("/api/admin/voter-mapping/import", async (req, res) => {
+    try {
+      const { rows } = req.body;
+      if (!rows || !Array.isArray(rows)) {
+        return res.status(400).json({ error: "rows array required" });
+      }
+      const CHUNK = 2000;
+      let inserted = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK).map((r: any) => ({
+          slNo: r.slNo ?? r.sl_no ?? null,
+          boothId: r.boothId ?? r.booth_id ?? r.BoothId ?? null,
+          name: r.name ?? r.Name ?? null,
+          fatherName: r.fatherName ?? r.father_name ?? r["Father's Name"] ?? null,
+          houseNumber: r.houseNumber ?? r.house_number ?? r["House Number"] ?? null,
+          gender: r.gender ?? r.Gender ?? null,
+          age: r.age != null ? String(r.age) : r.Age != null ? String(r.Age) : null,
+          voterId: String(r.voterId ?? r.voter_id ?? r["Voter ID"] ?? r.vcardId ?? "").trim(),
+          villageName: r.villageName ?? r.village_name ?? r["Village Name"] ?? null,
+        })).filter((r: any) => r.voterId);
+        inserted += await storage.insertVoterMappingMasterChunk(chunk);
+      }
+      res.json({ success: true, inserted, total: rows.length });
+    } catch (error) {
+      console.error("Voter mapping import error:", error);
+      res.status(500).json({ error: "Failed to import voter mapping" });
+    }
+  });
+
+  app.delete("/api/admin/voter-mapping", async (req, res) => {
+    try {
+      await storage.clearVoterMappingMaster();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear voter mapping" });
+    }
+  });
+
   // Admin - List All App Users
   app.get("/api/admin/app-users", async (req, res) => {
     try {
