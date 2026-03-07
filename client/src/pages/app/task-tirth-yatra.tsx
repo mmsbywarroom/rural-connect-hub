@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useOcr, type OcrResult } from "@/hooks/use-ocr";
+import { compressImage } from "@/lib/image-compress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
 import { ArrowLeft, Calendar, Phone, Users, Loader2, ChevronRight, Edit2, MapPin, Mic, MicOff, Upload } from "lucide-react";
@@ -89,6 +91,15 @@ export default function TaskTirthYatra({ user }: Props) {
   const [aadhaarFront, setAadhaarFront] = useState<string | null>(null);
   const [aadhaarBack, setAadhaarBack] = useState<string | null>(null);
   const [voterCard, setVoterCard] = useState<string | null>(null);
+  const [ocrAadhaarFront, setOcrAadhaarFront] = useState<OcrResult | null>(null);
+  const [ocrAadhaarBack, setOcrAadhaarBack] = useState<OcrResult | null>(null);
+  const [ocrVoter, setOcrVoter] = useState<OcrResult | null>(null);
+
+  const aadhaarFrontRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackRef = useRef<HTMLInputElement>(null);
+  const voterCardRef = useRef<HTMLInputElement>(null);
+
+  const { processImage, processingType } = useOcr();
 
   const [recording, setRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -156,6 +167,9 @@ export default function TaskTirthYatra({ user }: Props) {
         aadhaarFrontUrl: aadhaarFront,
         aadhaarBackUrl: aadhaarBack,
         voterCardUrl: voterCard,
+        ocrAadhaarText: (ocrAadhaarFront || ocrAadhaarBack) ? JSON.stringify({ front: ocrAadhaarFront || undefined, back: ocrAadhaarBack || undefined }) : null,
+        ocrVoterText: ocrVoter ? JSON.stringify(ocrVoter) : null,
+        ocrVoterId: (ocrVoter?.voterId && ocrVoter.voterId.trim()) ? ocrVoter.voterId.trim() : null,
         audioNoteUrl,
         audioNoteText: audioNoteText.trim() || null,
       };
@@ -200,6 +214,9 @@ export default function TaskTirthYatra({ user }: Props) {
     setAadhaarFront(null);
     setAadhaarBack(null);
     setVoterCard(null);
+    setOcrAadhaarFront(null);
+    setOcrAadhaarBack(null);
+    setOcrVoter(null);
     setAudioNoteUrl(null);
     setAudioNoteText("");
   };
@@ -265,12 +282,65 @@ export default function TaskTirthYatra({ user }: Props) {
     );
   };
 
-  const handleFileAsDataUrl = (file: File, cb: (url: string) => void) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      cb(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  type OcrDocType = "aadhaarFront" | "aadhaarBack" | "voterId";
+  const isOcrTooWeak = (type: OcrDocType, result: OcrResult | null): boolean => {
+    if (!result || typeof result !== "object") return true;
+    if (type === "aadhaarFront") return !(result.name || result.aadhaarNumber);
+    if (type === "aadhaarBack") return !result.address;
+    if (type === "voterId") return !(result.voterId || result.name);
+    return true;
+  };
+
+  const handlePhotoCapture = async (
+    setter: (v: string | null) => void,
+    ref: React.RefObject<HTMLInputElement | null>,
+    ocrType: OcrDocType,
+    setOcr: (v: OcrResult | null) => void
+  ) => {
+    const file = ref.current?.files?.[0];
+    if (!file) return;
+    try {
+      const base64 = await compressImage(file);
+      setter(base64);
+      if (ocrType) {
+        try {
+          const result = await processImage(ocrType, base64);
+          const weak = !result || isOcrTooWeak(ocrType, result);
+          if (weak) {
+            setter(null);
+            setOcr(null);
+            toast({
+              title: language === "hi" ? "छवि साफ नहीं है" : language === "pa" ? "ਚਿੱਤਰ ਸਾਫ਼ ਨਹੀਂ" : "Image not clear",
+              description: language === "hi"
+                ? "OCR डेटा नहीं पढ़ सका। कृपया साफ़ छवि कैप्चर या अपलोड करें। पिछली छवि हटा दी गई है।"
+                : language === "pa"
+                  ? "OCR ਡਾਟਾ ਨਹੀਂ ਪੜ੍ਹ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਸਾਫ਼ ਚਿੱਤਰ ਕੈਪਚਰ ਜਾਂ ਅੱਪਲੋਡ ਕਰੋ। ਪਿਛਲੀ ਚਿੱਤਰ ਹਟਾ ਦਿੱਤੀ ਗਈ।"
+                  : "Could not read text from image (blur or unclear). Please capture or upload a clear image. The previous image has been removed.",
+              variant: "destructive",
+            });
+          } else {
+            setOcr(result);
+          }
+        } catch {
+          setter(null);
+          setOcr(null);
+          toast({
+            title: language === "hi" ? "छवि साफ नहीं है" : language === "pa" ? "ਚਿੱਤਰ ਸਾਫ਼ ਨਹੀਂ" : "Image not clear",
+            description: language === "hi"
+              ? "कृपया साफ़ छवि कैप्चर या अपलोड करें। पिछली छवि हटा दी गई है।"
+              : language === "pa"
+                ? "ਕਿਰਪਾ ਕਰਕੇ ਸਾਫ਼ ਚਿੱਤਰ ਕੈਪਚਰ ਜਾਂ ਅੱਪਲੋਡ ਕਰੋ। ਪਿਛਲੀ ਚਿੱਤਰ ਹਟਾ ਦਿੱਤੀ ਗਈ।"
+                : "Please capture or upload a clear image. The previous image has been removed.",
+            variant: "destructive",
+          });
+        }
+      }
+      if (ref.current) ref.current.value = "";
+    } catch {
+      setter(null);
+      setOcr(null);
+      if (ref.current) ref.current.value = "";
+    }
   };
 
   const startAudioRecording = () => {
@@ -372,6 +442,28 @@ export default function TaskTirthYatra({ user }: Props) {
     setAadhaarFront(req.aadhaarFrontUrl || null);
     setAadhaarBack(req.aadhaarBackUrl || null);
     setVoterCard(req.voterCardUrl || null);
+    try {
+      if (req.ocrAadhaarText && typeof req.ocrAadhaarText === "string") {
+        const parsed = JSON.parse(req.ocrAadhaarText) as { front?: OcrResult; back?: OcrResult };
+        setOcrAadhaarFront(parsed.front || null);
+        setOcrAadhaarBack(parsed.back || null);
+      } else {
+        setOcrAadhaarFront(null);
+        setOcrAadhaarBack(null);
+      }
+    } catch {
+      setOcrAadhaarFront(null);
+      setOcrAadhaarBack(null);
+    }
+    try {
+      if (req.ocrVoterText && typeof req.ocrVoterText === "string") {
+        setOcrVoter(JSON.parse(req.ocrVoterText) as OcrResult);
+      } else {
+        setOcrVoter(null);
+      }
+    } catch {
+      setOcrVoter(null);
+    }
     setAudioNoteUrl(req.audioNoteUrl || null);
     setAudioNoteText(req.audioNoteText || "");
   };
@@ -827,45 +919,57 @@ export default function TaskTirthYatra({ user }: Props) {
                   {language === "hi" ? "आधार कार्ड फ्रंट" : language === "pa" ? "ਆਧਾਰ ਕਾਰਡ ਫਰੰਟ" : "Aadhaar front"}
                 </label>
                 <Input
+                  ref={aadhaarFrontRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  disabled={!!processingType}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileAsDataUrl(file, setAadhaarFront);
+                    if (file) handlePhotoCapture(setAadhaarFront, aadhaarFrontRef, "aadhaarFront", setOcrAadhaarFront);
                   }}
                 />
-                {aadhaarFront && <img src={aadhaarFront} alt="" className="mt-1 h-20 rounded border object-cover" />}
+                {(processingType === "aadhaarFront" && (
+                  <span className="text-xs text-slate-500 mt-1 block">Reading...</span>
+                )) || (aadhaarFront && <img src={aadhaarFront} alt="" className="mt-1 h-20 rounded border object-cover" />)}
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   {language === "hi" ? "आधार कार्ड बैक" : language === "pa" ? "ਆਧਾਰ ਕਾਰਡ ਬੈਕ" : "Aadhaar back"}
                 </label>
                 <Input
+                  ref={aadhaarBackRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  disabled={!!processingType}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileAsDataUrl(file, setAadhaarBack);
+                    if (file) handlePhotoCapture(setAadhaarBack, aadhaarBackRef, "aadhaarBack", setOcrAadhaarBack);
                   }}
                 />
-                {aadhaarBack && <img src={aadhaarBack} alt="" className="mt-1 h-20 rounded border object-cover" />}
+                {(processingType === "aadhaarBack" && (
+                  <span className="text-xs text-slate-500 mt-1 block">Reading...</span>
+                )) || (aadhaarBack && <img src={aadhaarBack} alt="" className="mt-1 h-20 rounded border object-cover" />)}
               </div>
               <div className="space-y-1">
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   {language === "hi" ? "वोटर कार्ड" : language === "pa" ? "ਵੋਟਰ ਕਾਰਡ" : "Voter card"}
                 </label>
                 <Input
+                  ref={voterCardRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  disabled={!!processingType}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileAsDataUrl(file, setVoterCard);
+                    if (file) handlePhotoCapture(setVoterCard, voterCardRef, "voterId", setOcrVoter);
                   }}
                 />
-                {voterCard && <img src={voterCard} alt="" className="mt-1 h-20 rounded border object-cover" />}
+                {(processingType === "voterId" && (
+                  <span className="text-xs text-slate-500 mt-1 block">Reading...</span>
+                )) || (voterCard && <img src={voterCard} alt="" className="mt-1 h-20 rounded border object-cover" />)}
               </div>
             </div>
           </CardContent>

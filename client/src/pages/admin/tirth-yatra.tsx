@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -140,6 +140,15 @@ export default function TirthYatraAdminPage() {
   });
 
   const [selected, setSelected] = useState<TirthYatraRequest | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    const openId = params.get("open");
+    if (openId && data?.length) {
+      const req = data.find((r) => r.id === openId);
+      if (req) setSelected(req);
+    }
+  }, [data]);
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState<string>("");
 
@@ -349,23 +358,55 @@ export default function TirthYatraAdminPage() {
                 </div>
               )}
 
-              {((selected as any).ocrAadhaarText || (selected as any).ocrVoterText) && (
-                <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
-                  <p className="font-semibold text-slate-800">OCR Data</p>
-                  {(selected as any).ocrAadhaarText && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-600 mb-1">Aadhaar OCR</p>
-                      <pre className="text-xs bg-white p-2 rounded border overflow-auto max-h-24">{((selected as any).ocrAadhaarText as string)}</pre>
+              {(() => {
+                const ocrAadhaar = selected.ocrAadhaarText
+                  ? (() => {
+                      try {
+                        return JSON.parse(selected.ocrAadhaarText as string) as { front?: Record<string, string>; back?: Record<string, string> };
+                      } catch {
+                        return null;
+                      }
+                    })()
+                  : null;
+                const ocrVoter = selected.ocrVoterText
+                  ? (() => {
+                      try {
+                        return JSON.parse(selected.ocrVoterText as string) as Record<string, string>;
+                      } catch {
+                        return null;
+                      }
+                    })()
+                  : null;
+                const hasOcr = ocrAadhaar?.front || ocrAadhaar?.back || ocrVoter;
+                if (!hasOcr) return null;
+                const dash = "—";
+                const front = ocrAadhaar?.front;
+                const back = ocrAadhaar?.back;
+                return (
+                  <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+                    <p className="font-semibold text-slate-800 flex items-center gap-1">
+                      <FileText className="h-4 w-4" />
+                      OCR Extracted Data
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="text-slate-600">Aadhaar Name</span>
+                      <span className="text-slate-800">{front?.name || dash}</span>
+                      <span className="text-slate-600">Aadhaar Number</span>
+                      <span className="text-slate-800">{front?.aadhaarNumber || dash}</span>
+                      <span className="text-slate-600">DOB</span>
+                      <span className="text-slate-800">{front?.dob || dash}</span>
+                      <span className="text-slate-600">Gender</span>
+                      <span className="text-slate-800">{front?.gender || dash}</span>
+                      <span className="text-slate-600">Address</span>
+                      <span className="text-slate-800 col-span-1 sm:col-span-2">{back?.address || dash}</span>
+                      <span className="text-slate-600">Voter ID</span>
+                      <span className="text-slate-800 font-mono">{ocrVoter?.voterId || selected.ocrVoterId || dash}</span>
+                      <span className="text-slate-600">Voter Name</span>
+                      <span className="text-slate-800">{ocrVoter?.name || dash}</span>
                     </div>
-                  )}
-                  {(selected as any).ocrVoterText && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-600 mb-1">Voter ID OCR</p>
-                      <pre className="text-xs bg-white p-2 rounded border overflow-auto max-h-24">{((selected as any).ocrVoterText as string)}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <AttachmentCard src={selected.aadhaarFrontUrl} label="Aadhaar front" />

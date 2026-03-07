@@ -219,7 +219,11 @@ export default function TaskVoterRegistration({ user }: Props) {
         setAgeProofOcrData(JSON.stringify(result || {}));
         toast({ title: "Document accepted", description: "Age proof read successfully" });
       } else {
-        toast({ title: "Document not read", description: "Please ensure the document is clear and try again", variant: "destructive" });
+        toast({
+          title: "Image blur or unreadable",
+          description: "Could not read the document. Please capture or upload a clear image and try again. No image was saved.",
+          variant: "destructive",
+        });
       }
     } catch {
       toast({ title: "Could not read document", variant: "destructive" });
@@ -240,8 +244,8 @@ export default function TaskVoterRegistration({ user }: Props) {
         toast({ title: "Document accepted", description: "Address proof read successfully" });
       } else {
         toast({
-          title: "Document not read",
-          description: "Please ensure the document is clear and try again",
+          title: "Image blur or unreadable",
+          description: "Could not read the document. Please capture or upload a clear image and try again. No image was saved.",
           variant: "destructive",
         });
       }
@@ -268,8 +272,8 @@ export default function TaskVoterRegistration({ user }: Props) {
           toast({ title: "Document accepted", description: "Address proof read successfully" });
         } else {
           toast({
-            title: "Document not read",
-            description: "Please ensure the Aadhaar front side is clear and try again",
+            title: "Image blur or unreadable",
+            description: "Could not read Aadhaar. Please capture or upload a clear image and try again. No image was saved.",
             variant: "destructive",
           });
         }

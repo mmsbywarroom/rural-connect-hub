@@ -569,6 +569,24 @@ export default function TaskHstc({ user }: Props) {
     }
   };
 
+  const isOcrTooWeak = (type: "aadhaarFront" | "aadhaarBack" | "voterId", result: any): boolean => {
+    if (!result || typeof result !== "object") return true;
+    if (type === "aadhaarFront") return !(result.name || result.aadhaarNumber);
+    if (type === "aadhaarBack") return !result.address;
+    if (type === "voterId") return !(result.voterId || result.name);
+    return true;
+  };
+
+  const clearOcrFieldsFor = (type: "aadhaarFront" | "aadhaarBack" | "voterId") => {
+    if (type === "aadhaarFront") {
+      setOcrData((prev: any) => ({ ...prev, ocrName: "", ocrAadhaarNumber: "", ocrDob: "", ocrGender: "" }));
+    } else if (type === "aadhaarBack") {
+      setOcrData((prev: any) => ({ ...prev, ocrAddress: "" }));
+    } else {
+      setOcrData((prev: any) => ({ ...prev, ocrVoterId: "", ocrVoterName: "" }));
+    }
+  };
+
   const handlePhotoCapture = async (setter: (v: string) => void, ref: React.RefObject<HTMLInputElement | null>, ocrType?: "aadhaarFront" | "aadhaarBack" | "voterId") => {
     const file = ref.current?.files?.[0];
     if (!file) return;
@@ -578,7 +596,20 @@ export default function TaskHstc({ user }: Props) {
       if (ocrType) {
         try {
           const result = await processImage(ocrType, base64);
-          if (result) {
+          const weak = !result || isOcrTooWeak(ocrType, result);
+          if (weak) {
+            setter("");
+            clearOcrFieldsFor(ocrType);
+            toast({
+              title: language === "hi" ? "छवि साफ नहीं है" : language === "pa" ? "ਚਿੱਤਰ ਸਾਫ਼ ਨਹੀਂ" : "Image not clear",
+              description: language === "hi"
+                ? "OCR डेटा नहीं पढ़ सका। कृपया साफ़ छवि कैप्चर या अपलोड करें। पिछली छवि हटा दी गई है।"
+                : language === "pa"
+                  ? "OCR ਡਾਟਾ ਨਹੀਂ ਪੜ੍ਹ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਸਾਫ਼ ਚਿੱਤਰ ਕੈਪਚਰ ਜਾਂ ਅੱਪਲੋਡ ਕਰੋ। ਪਿਛਲੀ ਚਿੱਤਰ ਹਟਾ ਦਿੱਤੀ ਗਈ।"
+                  : "Could not read text from image (blur or unclear). Please capture or upload a clear image. The previous image has been removed.",
+              variant: "destructive",
+            });
+          } else {
             const mapped: any = {};
             if (result.name) mapped.ocrName = result.name;
             if (result.aadhaarNumber) mapped.ocrAadhaarNumber = result.aadhaarNumber;
@@ -592,7 +623,19 @@ export default function TaskHstc({ user }: Props) {
               setHouseOwnerName(result.name);
             }
           }
-        } catch {}
+        } catch {
+          setter("");
+          clearOcrFieldsFor(ocrType!);
+          toast({
+            title: language === "hi" ? "छवि साफ नहीं है" : language === "pa" ? "ਚਿੱਤਰ ਸਾਫ਼ ਨਹੀਂ" : "Image not clear",
+            description: language === "hi"
+              ? "कृपया साफ़ छवि कैप्चर या अपलोड करें। पिछली छवि हटा दी गई है।"
+              : language === "pa"
+                ? "ਕਿਰਪਾ ਕਰਕੇ ਸਾਫ਼ ਚਿੱਤਰ ਕੈਪਚਰ ਜਾਂ ਅੱਪਲੋਡ ਕਰੋ। ਪਿਛਲੀ ਚਿੱਤਰ ਹਟਾ ਦਿੱਤੀ ਗਈ।"
+                : "Please capture or upload a clear image. The previous image has been removed.",
+            variant: "destructive",
+          });
+        }
       }
       if (ref.current) ref.current.value = "";
     } catch {}

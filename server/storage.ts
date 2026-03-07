@@ -408,6 +408,8 @@ export interface IStorage {
   getTirthYatraRequest(id: string): Promise<TirthYatraRequest | undefined>;
   getTirthYatraRequests(): Promise<TirthYatraRequest[]>;
   getTirthYatraRequestsByUser(appUserId: string): Promise<TirthYatraRequest[]>;
+  getVoterIdsWithTirthYatraMatch(): Promise<Set<string>>;
+  getTirthYatraIdsByVoterIds(normalizedVoterIds: string[]): Promise<{ id: string; ocrVoterId: string }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1127,7 +1129,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Voter Mapping Master (sheet import: BoothId, Name, Father's Name, Gender, Age, Voter ID, Village Name)
-  async getVoterMappingMaster(limit: number, offset: number, search?: string, villageFilter?: string): Promise<VoterMappingMaster[]> {
+  // When voterIdsWithTasks is provided, rows with that voter_id (normalized) are ordered first (jiska task aya hai sabse upar)
+  async getVoterMappingMaster(limit: number, offset: number, search?: string, villageFilter?: string, voterIdsWithTasks?: string[]): Promise<VoterMappingMaster[]> {
     const conditions = [];
     if (search && search.trim()) {
       const term = `%${search.trim().toLowerCase()}%`;
@@ -1137,10 +1140,15 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`LOWER(TRIM(${voterMappingMaster.villageName})) = LOWER(TRIM(${villageFilter}))`);
     }
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    return db.select().from(voterMappingMaster)
-      .where(whereClause)
-      .orderBy(desc(voterMappingMaster.slNo))
-      .limit(limit).offset(offset);
+    const hasTaskSet = voterIdsWithTasks && voterIdsWithTasks.length > 0;
+    const q = db.select().from(voterMappingMaster).where(whereClause);
+    if (hasTaskSet) {
+      const inList = sql.join(voterIdsWithTasks.map((id) => sql`${id}`), sql`, `);
+      return q
+        .orderBy(asc(sql`CASE WHEN LOWER(TRIM(${voterMappingMaster.voterId})) IN (${inList}) THEN 0 ELSE 1 END`), desc(voterMappingMaster.slNo))
+        .limit(limit).offset(offset);
+    }
+    return q.orderBy(desc(voterMappingMaster.slNo)).limit(limit).offset(offset);
   }
 
   async getVoterMappingMasterCount(search?: string, villageFilter?: string): Promise<number> {
@@ -1165,6 +1173,18 @@ export class DatabaseStorage implements IStorage {
 
   async clearVoterMappingMaster(): Promise<void> {
     await db.delete(voterMappingMaster);
+  }
+
+  /** All distinct normalized (lowercase trim) voter ids that have at least one HSTC submission (for "has task" sort) */
+  async getVoterIdsWithHstcMatch(): Promise<Set<string>> {
+    const rows = await db.select({ ocrVoterId: hstcSubmissions.ocrVoterId })
+      .from(hstcSubmissions)
+      .where(sql`${hstcSubmissions.ocrVoterId} IS NOT NULL`);
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.ocrVoterId) set.add((r.ocrVoterId as string).trim().toLowerCase());
+    }
+    return set;
   }
 
   /** HSTC submissions that have ocr_voter_id matching any of the given normalized (lowercase trim) voter ids */
@@ -1831,6 +1851,30 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(tirthYatraRequests)
       .where(eq(tirthYatraRequests.appUserId, appUserId))
       .orderBy(desc(tirthYatraRequests.createdAt));
+  }
+
+  /** All distinct normalized (lowercase trim) voter ids that have at least one Tirth Yatra request with OCR voter id */
+  async getVoterIdsWithTirthYatraMatch(): Promise<Set<string>> {
+    const rows = await db.select({ ocrVoterId: tirthYatraRequests.ocrVoterId })
+      .from(tirthYatraRequests)
+      .where(sql`${tirthYatraRequests.ocrVoterId} IS NOT NULL`);
+    const set = new Set<string>();
+    for (const r of rows) {
+      if (r.ocrVoterId) set.add((r.ocrVoterId as string).trim().toLowerCase());
+    }
+    return set;
+  }
+
+  /** Tirth Yatra request ids that have ocr_voter_id matching any of the given normalized voter ids */
+  async getTirthYatraIdsByVoterIds(normalizedVoterIds: string[]): Promise<{ id: string; ocrVoterId: string }[]> {
+    if (normalizedVoterIds.length === 0) return [];
+    const rows = await db.select({ id: tirthYatraRequests.id, ocrVoterId: tirthYatraRequests.ocrVoterId })
+      .from(tirthYatraRequests)
+      .where(sql`${tirthYatraRequests.ocrVoterId} IS NOT NULL`);
+    const set = new Set(normalizedVoterIds);
+    return rows
+      .filter((r) => r.ocrVoterId && set.has((r.ocrVoterId || "").trim().toLowerCase()))
+      .map((r) => ({ id: r.id, ocrVoterId: (r.ocrVoterId || "").trim() }));
   }
 
   // Road Reports

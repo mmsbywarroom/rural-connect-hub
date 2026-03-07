@@ -1231,6 +1231,7 @@ export const tirthYatraRequests = pgTable("tirth_yatra_requests", {
   voterCardUrl: text("voter_card_url"),
   ocrAadhaarText: text("ocr_aadhaar_text"),
   ocrVoterText: text("ocr_voter_text"),
+  ocrVoterId: text("ocr_voter_id"),
   audioNoteUrl: text("audio_note_url"),
   audioNoteText: text("audio_note_text"),
   status: text("status").default("pending").notNull(), // pending, accepted, rejected, closed

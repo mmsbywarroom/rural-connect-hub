@@ -2548,21 +2548,37 @@ export async function registerRoutes(
   });
 
   // ===== Voter Mapping Work (admin): sheet import + match with task OCR voter IDs =====
+  // Rows with at least one task match (Voter ID) are shown first; task names and links to open that submission
   app.get("/api/admin/voter-mapping", async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
       const offset = parseInt(req.query.offset as string) || 0;
       const search = (req.query.search as string) || "";
       const village = (req.query.village as string) || "";
-      const rows = await storage.getVoterMappingMaster(limit, offset, search || undefined, village || undefined);
+      const [hstcVoterIds, tirthVoterIds] = await Promise.all([
+        storage.getVoterIdsWithHstcMatch(),
+        storage.getVoterIdsWithTirthYatraMatch(),
+      ]);
+      const voterIdsWithTasksSet = new Set([...hstcVoterIds, ...tirthVoterIds]);
+      const voterIdsWithTasksArr = voterIdsWithTasksSet.size > 0 ? Array.from(voterIdsWithTasksSet) : undefined;
+      const rows = await storage.getVoterMappingMaster(limit, offset, search || undefined, village || undefined, voterIdsWithTasksArr);
       const total = await storage.getVoterMappingMasterCount(search || undefined, village || undefined);
       const normalizedIds = rows.map((r) => (r.voterId || "").trim().toLowerCase()).filter(Boolean);
-      const hstcMatches = await storage.getHstcSubmissionIdsByVoterIds(normalizedIds);
+      const [hstcMatches, tirthMatches] = await Promise.all([
+        storage.getHstcSubmissionIdsByVoterIds(normalizedIds),
+        storage.getTirthYatraIdsByVoterIds(normalizedIds),
+      ]);
       const byVoterId: Record<string, { taskKey: string; taskName: string; submissionId: string }[]> = {};
       for (const m of hstcMatches) {
         const key = m.voterId.trim().toLowerCase();
         if (!byVoterId[key]) byVoterId[key] = [];
         byVoterId[key].push({ taskKey: "hstc", taskName: "Harr Sirr te Chatt (HSTC)", submissionId: m.submissionId });
+      }
+      for (const m of tirthMatches) {
+        const key = (m.ocrVoterId || "").trim().toLowerCase();
+        if (!key) continue;
+        if (!byVoterId[key]) byVoterId[key] = [];
+        byVoterId[key].push({ taskKey: "tirthYatra", taskName: "Tirth Yatra", submissionId: m.id });
       }
       const list = rows.map((r) => {
         const key = (r.voterId || "").trim().toLowerCase();
@@ -4125,6 +4141,9 @@ export async function registerRoutes(
         aadhaarFrontUrl,
         aadhaarBackUrl,
         voterCardUrl,
+        ocrAadhaarText,
+        ocrVoterText,
+        ocrVoterId,
         audioNoteUrl,
         audioNoteText,
       } = body;
@@ -4191,6 +4210,9 @@ export async function registerRoutes(
         aadhaarFrontUrl: aadhaarFrontUrl || null,
         aadhaarBackUrl: aadhaarBackUrl || null,
         voterCardUrl: voterCardUrl || null,
+        ocrAadhaarText: ocrAadhaarText || null,
+        ocrVoterText: ocrVoterText || null,
+        ocrVoterId: (ocrVoterId && String(ocrVoterId).trim()) || null,
         audioNoteUrl: audioNoteUrl || null,
         audioNoteText: audioNoteText || null,
         status: "pending",
@@ -4245,6 +4267,9 @@ export async function registerRoutes(
         "aadhaarFrontUrl",
         "aadhaarBackUrl",
         "voterCardUrl",
+        "ocrAadhaarText",
+        "ocrVoterText",
+        "ocrVoterId",
         "audioNoteUrl",
         "audioNoteText",
       ] as const;

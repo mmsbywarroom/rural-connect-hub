@@ -199,6 +199,9 @@ export default function VoterMappingWorkPage() {
     if (task.taskKey === "hstc") {
       return `/admin/hstc?open=${encodeURIComponent(task.submissionId)}`;
     }
+    if (task.taskKey === "tirthYatra") {
+      return `/admin/tirth-yatra?open=${encodeURIComponent(task.submissionId)}`;
+    }
     return "#";
   };
 
