@@ -478,10 +478,21 @@ export default function HstcSubmissionsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const selected = selectedId ? submissions?.find((s) => s.id === selectedId) : null;
+  // Fetch full submission (with images) when a row is selected - list API omits heavy columns
+  const { data: selectedSubmission, isLoading: selectedLoading } = useQuery<HstcSubmission>({
+    queryKey: ["/api/hstc/submissions", selectedId],
+    enabled: !!selectedId,
+  });
 
-  if (selected) {
-    return <SubmissionDetail submission={selected} onBack={() => setSelectedId(null)} />;
+  if (selectedId && selectedSubmission) {
+    return <SubmissionDetail submission={selectedSubmission} onBack={() => setSelectedId(null)} />;
+  }
+  if (selectedId && selectedLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   const pendingCount = areaFilteredSubmissions.filter((s) => s.status === "pending").length;

@@ -1282,9 +1282,62 @@ export class DatabaseStorage implements IStorage {
     return p;
   }
 
-  // HSTC Submissions
+  // HSTC Submissions - list without heavy image columns to avoid response size limit (e.g. Neon 67MB)
   async getHstcSubmissions(): Promise<HstcSubmission[]> {
-    return db.select().from(hstcSubmissions).orderBy(desc(hstcSubmissions.createdAt));
+    const rows = await db
+      .select({
+        id: hstcSubmissions.id,
+        appUserId: hstcSubmissions.appUserId,
+        villageId: hstcSubmissions.villageId,
+        villageName: hstcSubmissions.villageName,
+        houseOwnerName: hstcSubmissions.houseOwnerName,
+        fatherHusbandName: hstcSubmissions.fatherHusbandName,
+        mobileNumber: hstcSubmissions.mobileNumber,
+        repairMaterialCost: hstcSubmissions.repairMaterialCost,
+        estimatedLabourCost: hstcSubmissions.estimatedLabourCost,
+        totalCost: hstcSubmissions.totalCost,
+        numberOfPeople: hstcSubmissions.numberOfPeople,
+        roomSize: hstcSubmissions.roomSize,
+        roomSizeUnit: hstcSubmissions.roomSizeUnit,
+        bricksQty: hstcSubmissions.bricksQty,
+        sandSqFt: hstcSubmissions.sandSqFt,
+        gravelTonKg: hstcSubmissions.gravelTonKg,
+        cementKgQty: hstcSubmissions.cementKgQty,
+        sariaKtKg: hstcSubmissions.sariaKtKg,
+        nodalVolunteerName: hstcSubmissions.nodalVolunteerName,
+        nodalVolunteerMobile: hstcSubmissions.nodalVolunteerMobile,
+        superVolunteerName: hstcSubmissions.superVolunteerName,
+        superVolunteerMobile: hstcSubmissions.superVolunteerMobile,
+        bankAccountName: hstcSubmissions.bankAccountName,
+        bankAccountNumber: hstcSubmissions.bankAccountNumber,
+        bankName: hstcSubmissions.bankName,
+        bankBranchName: hstcSubmissions.bankBranchName,
+        bankIfscCode: hstcSubmissions.bankIfscCode,
+        loanConsent: hstcSubmissions.loanConsent,
+        mobileVerified: hstcSubmissions.mobileVerified,
+        completionNotes: hstcSubmissions.completionNotes,
+        completedAt: hstcSubmissions.completedAt,
+        paymentAmount: hstcSubmissions.paymentAmount,
+        paymentMode: hstcSubmissions.paymentMode,
+        paymentNote: hstcSubmissions.paymentNote,
+        paymentUploadedAt: hstcSubmissions.paymentUploadedAt,
+        ocrAadhaarName: hstcSubmissions.ocrAadhaarName,
+        ocrAadhaarNumber: hstcSubmissions.ocrAadhaarNumber,
+        ocrAadhaarDob: hstcSubmissions.ocrAadhaarDob,
+        ocrAadhaarGender: hstcSubmissions.ocrAadhaarGender,
+        ocrAadhaarAddress: hstcSubmissions.ocrAadhaarAddress,
+        ocrVoterId: hstcSubmissions.ocrVoterId,
+        ocrVoterName: hstcSubmissions.ocrVoterName,
+        status: hstcSubmissions.status,
+        reviewNote: hstcSubmissions.reviewNote,
+        reviewedBy: hstcSubmissions.reviewedBy,
+        reviewedAt: hstcSubmissions.reviewedAt,
+        editAllowed: hstcSubmissions.editAllowed,
+        createdAt: hstcSubmissions.createdAt,
+      })
+      .from(hstcSubmissions)
+      .orderBy(desc(hstcSubmissions.createdAt));
+    return rows as HstcSubmission[];
   }
 
   async getHstcSubmission(id: string): Promise<HstcSubmission | undefined> {
@@ -1293,9 +1346,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getHstcSubmissionsByUser(appUserId: string): Promise<HstcSubmission[]> {
-    return db.select().from(hstcSubmissions)
+    const rows = await db
+      .select({
+        id: hstcSubmissions.id,
+        appUserId: hstcSubmissions.appUserId,
+        villageId: hstcSubmissions.villageId,
+        villageName: hstcSubmissions.villageName,
+        houseOwnerName: hstcSubmissions.houseOwnerName,
+        fatherHusbandName: hstcSubmissions.fatherHusbandName,
+        mobileNumber: hstcSubmissions.mobileNumber,
+        repairMaterialCost: hstcSubmissions.repairMaterialCost,
+        estimatedLabourCost: hstcSubmissions.estimatedLabourCost,
+        totalCost: hstcSubmissions.totalCost,
+        numberOfPeople: hstcSubmissions.numberOfPeople,
+        roomSize: hstcSubmissions.roomSize,
+        roomSizeUnit: hstcSubmissions.roomSizeUnit,
+        bricksQty: hstcSubmissions.bricksQty,
+        sandSqFt: hstcSubmissions.sandSqFt,
+        gravelTonKg: hstcSubmissions.gravelTonKg,
+        cementKgQty: hstcSubmissions.cementKgQty,
+        sariaKtKg: hstcSubmissions.sariaKtKg,
+        nodalVolunteerName: hstcSubmissions.nodalVolunteerName,
+        nodalVolunteerMobile: hstcSubmissions.nodalVolunteerMobile,
+        superVolunteerName: hstcSubmissions.superVolunteerName,
+        superVolunteerMobile: hstcSubmissions.superVolunteerMobile,
+        bankAccountName: hstcSubmissions.bankAccountName,
+        bankAccountNumber: hstcSubmissions.bankAccountNumber,
+        bankName: hstcSubmissions.bankName,
+        bankBranchName: hstcSubmissions.bankBranchName,
+        bankIfscCode: hstcSubmissions.bankIfscCode,
+        loanConsent: hstcSubmissions.loanConsent,
+        mobileVerified: hstcSubmissions.mobileVerified,
+        completionNotes: hstcSubmissions.completionNotes,
+        completedAt: hstcSubmissions.completedAt,
+        paymentAmount: hstcSubmissions.paymentAmount,
+        paymentMode: hstcSubmissions.paymentMode,
+        paymentNote: hstcSubmissions.paymentNote,
+        paymentUploadedAt: hstcSubmissions.paymentUploadedAt,
+        ocrAadhaarName: hstcSubmissions.ocrAadhaarName,
+        ocrAadhaarNumber: hstcSubmissions.ocrAadhaarNumber,
+        ocrAadhaarDob: hstcSubmissions.ocrAadhaarDob,
+        ocrAadhaarGender: hstcSubmissions.ocrAadhaarGender,
+        ocrAadhaarAddress: hstcSubmissions.ocrAadhaarAddress,
+        ocrVoterId: hstcSubmissions.ocrVoterId,
+        ocrVoterName: hstcSubmissions.ocrVoterName,
+        status: hstcSubmissions.status,
+        reviewNote: hstcSubmissions.reviewNote,
+        reviewedBy: hstcSubmissions.reviewedBy,
+        reviewedAt: hstcSubmissions.reviewedAt,
+        editAllowed: hstcSubmissions.editAllowed,
+        createdAt: hstcSubmissions.createdAt,
+      })
+      .from(hstcSubmissions)
       .where(eq(hstcSubmissions.appUserId, appUserId))
       .orderBy(desc(hstcSubmissions.createdAt));
+    return rows as HstcSubmission[];
   }
 
   async createHstcSubmission(data: InsertHstcSubmission): Promise<HstcSubmission> {
