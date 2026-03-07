@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -431,7 +430,6 @@ function SubmissionDetail({ submission, onBack }: { submission: HstcSubmission; 
 }
 
 export default function HstcSubmissionsPage() {
-  const [location] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -440,10 +438,11 @@ export default function HstcSubmissionsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const params = new URLSearchParams(location.split("?")[1] || "");
+    const query = typeof window !== "undefined" ? window.location.search : "";
+    const params = new URLSearchParams(query);
     const openId = params.get("open");
     if (openId) setSelectedId(openId);
-  }, [location]);
+  }, []);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {

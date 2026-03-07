@@ -213,7 +213,7 @@ export default function VoterMappingWorkPage() {
           Voter Mapping Work
         </h1>
         <CardDescription>
-          Import voter list (BoothId, Name, Father&apos;s Name, Gender, Age, Voter ID, Village Name). Matches with Voter ID from task OCR (e.g. HSTC). Click task to open submission.
+          Import voter list (BoothId, Name, Father&apos;s Name, Gender, Age, Voter ID, Village Name). Matches with Voter ID from task OCR (HSTC, Tirth Yatra). Click a task to open its detail view.
         </CardDescription>
       </div>
 
