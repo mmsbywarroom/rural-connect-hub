@@ -285,9 +285,21 @@ export default function TaskTirthYatra({ user }: Props) {
   type OcrDocType = "aadhaarFront" | "aadhaarBack" | "voterId";
   const isOcrTooWeak = (type: OcrDocType, result: OcrResult | null): boolean => {
     if (!result || typeof result !== "object") return true;
-    if (type === "aadhaarFront") return !(result.name || result.aadhaarNumber);
-    if (type === "aadhaarBack") return !result.address;
-    if (type === "voterId") return !(result.voterId || result.name);
+    const str = (v: any) => (v && typeof v === "string" ? v.trim() : "");
+    if (type === "aadhaarFront") {
+      const name = str(result.name);
+      const num = str(result.aadhaarNumber).replace(/\s/g, "");
+      return name.length < 2 || num.length < 10 || !/^\d+$/.test(num);
+    }
+    if (type === "aadhaarBack") {
+      const addr = str(result.address);
+      return addr.length < 15;
+    }
+    if (type === "voterId") {
+      const vid = str(result.voterId);
+      const name = str(result.name);
+      return vid.length < 8 || name.length < 2;
+    }
     return true;
   };
 
