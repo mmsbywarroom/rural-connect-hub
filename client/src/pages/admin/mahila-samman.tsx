@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Calendar, Eye, Download } from "lucide-react";
+import { Loader2, Users, Calendar, Eye, Download, FileText } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MahilaSammanSubmission } from "@shared/schema";
 
@@ -16,6 +16,39 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 border border-red-200",
   closed: "bg-slate-100 text-slate-700 border border-slate-200",
 };
+
+function DocLink({ src, label }: { src: string | null | undefined; label: string }) {
+  const [viewOpen, setViewOpen] = useState(false);
+  if (!src) return <span className="text-xs text-muted-foreground">Not uploaded</span>;
+  const handleDownload = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = `${label.replace(/\s+/g, "-")}.png`;
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+  return (
+    <>
+      <span className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={() => setViewOpen(true)} className="text-xs text-blue-600 underline cursor-pointer">
+          View {label}
+        </button>
+        <span className="text-slate-400">|</span>
+        <button type="button" onClick={handleDownload} className="text-xs text-blue-600 underline cursor-pointer">
+          Download
+        </button>
+      </span>
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{label}</DialogTitle></DialogHeader>
+          <img src={src} alt={label} className="w-full rounded-md" />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export default function MahilaSammanAdminPage() {
   const { data: list = [], isLoading } = useQuery<MahilaSammanSubmission[]>({
@@ -165,24 +198,17 @@ export default function MahilaSammanAdminPage() {
                 </div>
               </div>
 
-              {selected.aadhaarFront && (
-                <div>
-                  <p className="font-semibold text-slate-600 text-xs mb-1">Aadhaar Front</p>
-                  <img src={selected.aadhaarFront} alt="Aadhaar front" className="rounded border h-24 object-cover" />
+              <div>
+                <p className="font-semibold text-slate-700 mb-2 flex items-center gap-1">
+                  <FileText className="h-4 w-4" />
+                  Documents
+                </p>
+                <div className="space-y-1.5 text-sm">
+                  <div><DocLink src={selected.aadhaarFront} label="Aadhaar Front" /></div>
+                  <div><DocLink src={selected.aadhaarBack} label="Aadhaar Back" /></div>
+                  <div><DocLink src={selected.sakhiPhoto} label="Sakhi Live Photo" /></div>
                 </div>
-              )}
-              {selected.aadhaarBack && (
-                <div>
-                  <p className="font-semibold text-slate-600 text-xs mb-1">Aadhaar Back</p>
-                  <img src={selected.aadhaarBack} alt="Aadhaar back" className="rounded border h-24 object-cover" />
-                </div>
-              )}
-              {selected.sakhiPhoto && (
-                <div>
-                  <p className="font-semibold text-slate-600 text-xs mb-1">Sakhi Photo</p>
-                  <img src={selected.sakhiPhoto} alt="Sakhi" className="rounded border h-32 object-cover" />
-                </div>
-              )}
+              </div>
 
               <div className="border-t pt-3 space-y-2">
                 <div className="flex items-center gap-2">
