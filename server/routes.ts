@@ -4368,6 +4368,212 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Mahila Samman Rashi =====
+  app.post("/api/mahila-samman/send-otp", async (req, res) => {
+    try {
+      const { mobile } = req.body;
+      if (!mobile || !isIndianMobile(mobile)) {
+        return res.status(400).json({ error: "Valid 10-digit mobile number required" });
+      }
+      const normalizedMobile = normalizeMobile(mobile);
+      const otp = await storeOTP(`mahila_samman_${normalizedMobile}`);
+      if (isSmsConfigured()) {
+        await sendOtpSms(normalizedMobile, otp);
+        return res.json({ success: true, maskedMobile: maskMobile(normalizedMobile) });
+      }
+      res.status(500).json({ error: "SMS not configured" });
+    } catch (error) {
+      console.error("Mahila Samman send OTP error:", error);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/mahila-samman/verify-otp", async (req, res) => {
+    try {
+      const { mobile, otp } = req.body;
+      const normalizedMobile = normalizeMobile(mobile || "");
+      const ok = await verifyOTP(`mahila_samman_${normalizedMobile}`, otp);
+      if (!ok) return res.status(401).json({ error: "Invalid or expired OTP" });
+      res.json({ success: true, verified: true });
+    } catch (error) {
+      console.error("Mahila Samman verify OTP error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.get("/api/mahila-samman/voter-match", async (req, res) => {
+    try {
+      const voterId = (req.query.voterId as string) || "";
+      if (!voterId.trim()) {
+        return res.json({ match: null });
+      }
+      const row = await storage.getVoterMappingByVoterId(voterId);
+      if (!row) return res.json({ match: null });
+      res.json({
+        match: {
+          boothId: row.boothId,
+          name: row.name,
+          fatherName: row.fatherName,
+          villageName: row.villageName,
+        },
+      });
+    } catch (error) {
+      console.error("Mahila Samman voter match error:", error);
+      res.status(500).json({ error: "Failed to match voter" });
+    }
+  });
+
+  app.post("/api/mahila-samman/submit", async (req, res) => {
+    try {
+      const body = req.body as any;
+      const {
+        appUserId,
+        villageId,
+        villageName,
+        sakhiName,
+        mobileNumber,
+        mobileVerified,
+        fatherHusbandName,
+        aadhaarFront,
+        aadhaarBack,
+        ocrAadhaarName,
+        ocrAadhaarNumber,
+        ocrAadhaarDob,
+        ocrAadhaarGender,
+        ocrAadhaarAddress,
+        aadhaarVerifiedSameAsVoter,
+        ocrVoterId,
+        ocrVoterName,
+        voterMappingBoothId,
+        voterMappingName,
+        voterMappingFatherName,
+        voterMappingVillageName,
+        sakhiPhoto,
+        declarationChecked,
+      } = body;
+      if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified || !fatherHusbandName?.trim()) {
+        return res.status(400).json({ error: "Sakhi name, verified mobile, and father/husband name required" });
+      }
+      if (!aadhaarFront || !aadhaarBack) {
+        return res.status(400).json({ error: "Aadhaar front and back required" });
+      }
+      if (!aadhaarVerifiedSameAsVoter) {
+        return res.status(400).json({ error: "Please verify Aadhaar same as Voter ID" });
+      }
+      if (!ocrVoterId?.trim()) {
+        return res.status(400).json({ error: "Voter ID from document required" });
+      }
+      if (!sakhiPhoto) {
+        return res.status(400).json({ error: "Sakhi live photo required" });
+      }
+      if (!declarationChecked) {
+        return res.status(400).json({ error: "Declaration must be checked" });
+      }
+      const payload = {
+        appUserId: String(appUserId),
+        villageId: villageId || null,
+        villageName: villageName || null,
+        sakhiName: String(sakhiName).trim(),
+        mobileNumber: String(mobileNumber).trim(),
+        mobileVerified: !!mobileVerified,
+        fatherHusbandName: String(fatherHusbandName).trim(),
+        aadhaarFront: aadhaarFront || null,
+        aadhaarBack: aadhaarBack || null,
+        ocrAadhaarName: ocrAadhaarName || null,
+        ocrAadhaarNumber: ocrAadhaarNumber || null,
+        ocrAadhaarDob: ocrAadhaarDob || null,
+        ocrAadhaarGender: ocrAadhaarGender || null,
+        ocrAadhaarAddress: ocrAadhaarAddress || null,
+        aadhaarVerifiedSameAsVoter: !!aadhaarVerifiedSameAsVoter,
+        ocrVoterId: (ocrVoterId && String(ocrVoterId).trim()) || null,
+        ocrVoterName: ocrVoterName || null,
+        voterMappingBoothId: voterMappingBoothId || null,
+        voterMappingName: voterMappingName || null,
+        voterMappingFatherName: voterMappingFatherName || null,
+        voterMappingVillageName: voterMappingVillageName || null,
+        sakhiPhoto: sakhiPhoto || null,
+        declarationChecked: !!declarationChecked,
+        status: "pending",
+      };
+      const created = await storage.createMahilaSammanSubmission(payload as any);
+      res.json(created);
+    } catch (error) {
+      console.error("Mahila Samman submit error:", error);
+      res.status(400).json({ error: "Failed to submit" });
+    }
+  });
+
+  app.get("/api/mahila-samman/my/:appUserId", async (req, res) => {
+    try {
+      const list = await storage.getMahilaSammanSubmissionsByUser(req.params.appUserId);
+      res.json(list);
+    } catch (error) {
+      console.error("Mahila Samman my list error:", error);
+      res.status(500).json({ error: "Failed to fetch list" });
+    }
+  });
+
+  app.patch("/api/mahila-samman/my/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body as any;
+      const existing = await storage.getMahilaSammanSubmission(id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
+      if (existing.status !== "pending") return res.status(400).json({ error: "Only pending can be edited" });
+      const update: any = {};
+      const keys = ["villageId", "villageName", "sakhiName", "mobileNumber", "fatherHusbandName", "aadhaarFront", "aadhaarBack",
+        "ocrAadhaarName", "ocrAadhaarNumber", "ocrAadhaarDob", "ocrAadhaarGender", "ocrAadhaarAddress", "aadhaarVerifiedSameAsVoter",
+        "ocrVoterId", "ocrVoterName", "voterMappingBoothId", "voterMappingName", "voterMappingFatherName", "voterMappingVillageName",
+        "sakhiPhoto", "declarationChecked"];
+      for (const k of keys) {
+        if (body[k] !== undefined) update[k] = body[k];
+      }
+      const updated = await storage.updateMahilaSammanSubmission(id, update);
+      res.json(updated);
+    } catch (error) {
+      console.error("Mahila Samman edit error:", error);
+      res.status(500).json({ error: "Failed to update" });
+    }
+  });
+
+  app.get("/api/admin/mahila-samman", async (_req, res) => {
+    try {
+      const list = await storage.getMahilaSammanSubmissions();
+      res.json(list);
+    } catch (error) {
+      console.error("Admin Mahila Samman list error:", error);
+      res.status(500).json({ error: "Failed to fetch list" });
+    }
+  });
+
+  app.get("/api/admin/mahila-samman/:id", async (req, res) => {
+    try {
+      const row = await storage.getMahilaSammanSubmission(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Admin Mahila Samman get error:", error);
+      res.status(500).json({ error: "Not found" });
+    }
+  });
+
+  app.patch("/api/admin/mahila-samman/:id", async (req, res) => {
+    try {
+      const { status, adminNote } = req.body as any;
+      const existing = await storage.getMahilaSammanSubmission(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      const update: any = {};
+      if (status) update.status = status;
+      if (adminNote !== undefined) update.adminNote = adminNote;
+      const updated = await storage.updateMahilaSammanSubmission(req.params.id, update);
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin Mahila Samman update error:", error);
+      res.status(500).json({ error: "Failed to update" });
+    }
+  });
+
   // ===== Voter Registration Routes =====
 
   app.post("/api/voter-registration/send-otp", async (req, res) => {

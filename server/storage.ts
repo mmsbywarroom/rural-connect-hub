@@ -75,6 +75,8 @@ import {
   type RoadLog, type InsertRoadLog,
   tirthYatraRequests,
   type TirthYatraRequest, type InsertTirthYatraRequest,
+  mahilaSammanSubmissions,
+  type MahilaSammanSubmission, type InsertMahilaSammanSubmission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -410,6 +412,13 @@ export interface IStorage {
   getTirthYatraRequestsByUser(appUserId: string): Promise<TirthYatraRequest[]>;
   getVoterIdsWithTirthYatraMatch(): Promise<Set<string>>;
   getTirthYatraIdsByVoterIds(normalizedVoterIds: string[]): Promise<{ id: string; ocrVoterId: string }[]>;
+
+  getVoterMappingByVoterId(voterId: string): Promise<VoterMappingMaster | null>;
+  createMahilaSammanSubmission(data: InsertMahilaSammanSubmission): Promise<MahilaSammanSubmission>;
+  updateMahilaSammanSubmission(id: string, data: Partial<InsertMahilaSammanSubmission>): Promise<MahilaSammanSubmission | undefined>;
+  getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
+  getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]>;
+  getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1875,6 +1884,40 @@ export class DatabaseStorage implements IStorage {
     return rows
       .filter((r) => r.ocrVoterId && set.has((r.ocrVoterId || "").trim().toLowerCase()))
       .map((r) => ({ id: r.id, ocrVoterId: (r.ocrVoterId || "").trim() }));
+  }
+
+  async getVoterMappingByVoterId(voterId: string): Promise<VoterMappingMaster | null> {
+    const normalized = (voterId || "").trim().toLowerCase();
+    if (!normalized) return null;
+    const rows = await db.select().from(voterMappingMaster)
+      .where(sql`LOWER(TRIM(${voterMappingMaster.voterId})) = ${normalized}`)
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  async createMahilaSammanSubmission(data: InsertMahilaSammanSubmission): Promise<MahilaSammanSubmission> {
+    const [row] = await db.insert(mahilaSammanSubmissions).values(data).returning();
+    return row;
+  }
+
+  async updateMahilaSammanSubmission(id: string, data: Partial<InsertMahilaSammanSubmission>): Promise<MahilaSammanSubmission | undefined> {
+    const [row] = await db.update(mahilaSammanSubmissions).set({ ...data, updatedAt: new Date() }).where(eq(mahilaSammanSubmissions.id, id)).returning();
+    return row;
+  }
+
+  async getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined> {
+    const [row] = await db.select().from(mahilaSammanSubmissions).where(eq(mahilaSammanSubmissions.id, id));
+    return row;
+  }
+
+  async getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]> {
+    return db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
+  }
+
+  async getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]> {
+    return db.select().from(mahilaSammanSubmissions)
+      .where(eq(mahilaSammanSubmissions.appUserId, appUserId))
+      .orderBy(desc(mahilaSammanSubmissions.createdAt));
   }
 
   // Road Reports

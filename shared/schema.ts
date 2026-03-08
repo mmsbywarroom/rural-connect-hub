@@ -1249,6 +1249,47 @@ export const insertTirthYatraRequestSchema = createInsertSchema(tirthYatraReques
 export type InsertTirthYatraRequest = z.infer<typeof insertTirthYatraRequestSchema>;
 export type TirthYatraRequest = typeof tirthYatraRequests.$inferSelect;
 
+// Mahila Samman Rashi Submissions
+export const mahilaSammanSubmissions = pgTable("mahila_samman_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id"),
+  villageName: text("village_name"),
+  sakhiName: text("sakhi_name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  mobileVerified: boolean("mobile_verified").default(false),
+  fatherHusbandName: text("father_husband_name").notNull(),
+  aadhaarFront: text("aadhaar_front"),
+  aadhaarBack: text("aadhaar_back"),
+  ocrAadhaarName: text("ocr_aadhaar_name"),
+  ocrAadhaarNumber: text("ocr_aadhaar_number"),
+  ocrAadhaarDob: text("ocr_aadhaar_dob"),
+  ocrAadhaarGender: text("ocr_aadhaar_gender"),
+  ocrAadhaarAddress: text("ocr_aadhaar_address"),
+  aadhaarVerifiedSameAsVoter: boolean("aadhaar_verified_same_as_voter").default(false),
+  ocrVoterId: text("ocr_voter_id"),
+  ocrVoterName: text("ocr_voter_name"),
+  voterMappingBoothId: text("voter_mapping_booth_id"),
+  voterMappingName: text("voter_mapping_name"),
+  voterMappingFatherName: text("voter_mapping_father_name"),
+  voterMappingVillageName: text("voter_mapping_village_name"),
+  sakhiPhoto: text("sakhi_photo"),
+  declarationChecked: boolean("declaration_checked").default(false),
+  status: text("status").default("pending").notNull(),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMahilaSammanSubmissionSchema = createInsertSchema(mahilaSammanSubmissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMahilaSammanSubmission = z.infer<typeof insertMahilaSammanSubmissionSchema>;
+export type MahilaSammanSubmission = typeof mahilaSammanSubmissions.$inferSelect;
+
 // Road Repair Reports
 export const roadReports = pgTable("road_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
