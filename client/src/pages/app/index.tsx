@@ -574,7 +574,6 @@ export default function VolunteerPortal() {
       return <TaskTirthYatra user={user} />;
     }
     if (location === "/task/mahila-samman-rashi" || location === "/app/task/mahila-samman-rashi") {
-      if (!profileComplete) return <ProfileGate />;
       return <TaskMahilaSamman user={user} />;
     }
     if (location === "/task/voter-registration" || location === "/app/task/voter-registration") {

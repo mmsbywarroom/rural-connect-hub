@@ -173,13 +173,14 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const surveyTop3 = (surveyLeaderboard || []).filter(e => e.count > 0).slice(0, 3);
 
-  /** Fixed slugs + dynamic tasks list – jis category ke niche dikhana hai wahi pass karo */
+  /** Fixed slugs + dynamic tasks list – jis category ke niche dikhana hai wahi pass karo. Mahila Samman sirf upar alag dikhaya hai. */
   function renderTaskList(fixedSlugs: string[], taskList: TaskConfig[]) {
-    const hasFixed = fixedSlugs.length > 0;
+    const fixedSlugsFiltered = fixedSlugs.filter((slug) => slug !== "mahila-samman-rashi");
+    const hasFixed = fixedSlugsFiltered.length > 0;
     const hasDynamic = taskList.length > 0;
     return (
       <>
-        {fixedSlugs.includes("nasha-viruddh-yuddh") && (
+        {fixedSlugsFiltered.includes("nasha-viruddh-yuddh") && (
         <Link href="/task/nasha-viruddh-yuddh">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -207,7 +208,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("road-report") && (
+        {fixedSlugsFiltered.includes("road-report") && (
         <Link href="/task/road-report">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -235,7 +236,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("harr-sirr-te-chatt") && (
+        {fixedSlugsFiltered.includes("harr-sirr-te-chatt") && (
         <Link href="/task/harr-sirr-te-chatt">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -259,7 +260,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("sukh-dukh-saanjha-karo") && (
+        {fixedSlugsFiltered.includes("sukh-dukh-saanjha-karo") && (
         <Link href="/task/sukh-dukh-saanjha-karo">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sdsk">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -283,7 +284,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("sunwai") && (
+        {fixedSlugsFiltered.includes("sunwai") && (
         <Link href="/task/sunwai">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-teal-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sunwai">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -307,7 +308,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("outdoor-ad") && (
+        {fixedSlugsFiltered.includes("outdoor-ad") && (
         <Link href="/task/outdoor-ad">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-outdoor-ad">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -331,7 +332,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("gov-school") && (
+        {fixedSlugsFiltered.includes("gov-school") && (
         <Link href="/task/gov-school">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-green-200 hover:shadow-md transition-all duration-200" data-testid="task-card-gov-school">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -355,7 +356,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("appointment") && (
+        {fixedSlugsFiltered.includes("appointment") && (
         <Link href="/task/appointment">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-appointment">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -379,7 +380,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("event-venue") && (
+        {fixedSlugsFiltered.includes("event-venue") && (
         <Link href="/task/event-venue">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200" data-testid="task-card-event-venue">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -407,7 +408,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("tirth-yatra") && (
+        {fixedSlugsFiltered.includes("tirth-yatra") && (
         <Link href="/task/tirth-yatra">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200" data-testid="task-card-tirth-yatra">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -435,35 +436,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </Card>
         </Link>
         )}
-        {fixedSlugs.includes("mahila-samman-rashi") && (
-        <Link href="/task/mahila-samman-rashi">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-mahila-samman">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
-                    : language === "pa"
-                    ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                    : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugs.includes("voter-registration") && (
+        {fixedSlugsFiltered.includes("voter-registration") && (
         <Link href="/task/voter-registration">
           <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-voter-registration">
             <CardContent className="p-4 flex items-center gap-3.5">
@@ -762,6 +735,34 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           <div className="space-y-2.5">
+          {/* Mahila Samman Rashi – sabse upar alag */}
+          <Link href="/task/mahila-samman-rashi">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 border-2 border-purple-100" data-testid="task-card-mahila-samman">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800">
+                    {language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    {language === "hi"
+                      ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
+                      : language === "pa"
+                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
+                      : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
           {categories && categories.length > 0 && (
             <>
               {/* All – task list sirf iske niche jab All selected ho */}
@@ -794,7 +795,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </button>
                 {selectedCategoryId === null && (
                   <div className="pl-0 space-y-2.5">
-                    {renderTaskList(uncategorizedFixedSlugs, tasks?.filter((t) => !(t as any).categoryId) ?? [])}
+                    {renderTaskList(uncategorizedFixedSlugs.filter((slug) => slug !== "mahila-samman-rashi"), tasks?.filter((t) => !(t as any).categoryId) ?? [])}
                   </div>
                 )}
               </div>
