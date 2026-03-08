@@ -19,9 +19,7 @@ interface Props {
   user: AppUser;
 }
 
-type Step = "description" | "unit" | "sakhi" | "father" | "aadhaar" | "voter" | "photo" | "declaration";
-
-const STEPS: Step[] = ["description", "unit", "sakhi", "father", "aadhaar", "voter", "photo", "declaration"];
+type Step = "description" | "unit" | "form";
 
 function isIndianMobile(input: string): boolean {
   const cleaned = input.replace(/\D/g, "").replace(/^91/, "");
@@ -154,7 +152,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     } else setVoterMatch(null);
     setSakhiPhoto(editSubmission.sakhiPhoto || null);
     setDeclarationChecked(!!editSubmission.declarationChecked);
-    setStep("sakhi");
+    setStep("form");
   }, [editingId, editSubmission?.id, editSubmission?.sakhiName]);
 
   const isOcrTooWeak = (type: "aadhaarFront" | "aadhaarBack" | "voterId", result: OcrResult | null): boolean => {
@@ -344,12 +342,10 @@ export default function TaskMahilaSamman({ user }: Props) {
     sakhiPhoto &&
     declarationChecked;
 
-  const stepIndex = STEPS.indexOf(step);
-  const goNext = () => {
-    if (stepIndex < STEPS.length - 1) setStep(STEPS[stepIndex + 1]);
-  };
   const goPrev = () => {
-    if (stepIndex > 0) setStep(STEPS[stepIndex - 1]);
+    if (step === "form") setStep("unit");
+    else if (step === "unit") setStep("description");
+    else setLocation("/app");
   };
 
   if (step === "description") {
@@ -365,7 +361,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           <Card>
             <CardContent className="p-4">
               <p className="text-slate-700 text-sm leading-relaxed">{L("desc", language)}</p>
-              <Button className="w-full mt-4" onClick={goNext}>
+              <Button className="w-full mt-4" onClick={() => setStep("unit")}>
                 {L("next", language)} <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </CardContent>
@@ -389,7 +385,7 @@ export default function TaskMahilaSamman({ user }: Props) {
             onSelect={(u) => {
               setSelectedVillageId(u.villageId);
               setSelectedVillageName(u.villageName);
-              goNext();
+              setStep("form");
             }}
             title={language === "hi" ? "यूनिट चुनें" : language === "pa" ? "ਯੂਨਿਟ ਚੁਣੋ" : "Select Unit"}
             subtitle={language === "hi" ? "गाँव/वार्ड चुनें" : language === "pa" ? "ਪਿੰਡ/ਵਾਰਡ ਚੁਣੋ" : "Choose village/ward"}
@@ -408,142 +404,123 @@ export default function TaskMahilaSamman({ user }: Props) {
         </Button>
         <h1 className="font-semibold text-base truncate">{L("title", language)}</h1>
       </header>
-      <main className="flex-1 px-4 py-4 space-y-4">
-        {step === "sakhi" && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{L("sakhiName", language)}</label>
-                <Input value={sakhiName} onChange={(e) => setSakhiName(e.target.value)} placeholder={L("sakhiName", language)} />
+      <main className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("sakhiName", language)}</label>
+              <Input value={sakhiName} onChange={(e) => setSakhiName(e.target.value)} placeholder={L("sakhiName", language)} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("mobile", language)}</label>
+              <div className="flex gap-2">
+                <Input value={mobileNumber} onChange={(e) => { setMobileNumber(e.target.value); setMobileVerified(false); setOtpSent(false); }} inputMode="tel" maxLength={14} className="flex-1" />
+                <Button type="button" variant="outline" size="sm" onClick={sendOtp} disabled={!isIndianMobile(mobileNumber)}>{L("sendOtp", language)}</Button>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{L("mobile", language)}</label>
-                <div className="flex gap-2">
-                  <Input value={mobileNumber} onChange={(e) => { setMobileNumber(e.target.value); setMobileVerified(false); setOtpSent(false); }} inputMode="tel" maxLength={14} className="flex-1" />
-                  <Button type="button" variant="outline" size="sm" onClick={sendOtp} disabled={!isIndianMobile(mobileNumber)}>{L("sendOtp", language)}</Button>
-                </div>
-                {otpSent && !mobileVerified && (
-                  <div className="flex gap-2 mt-2">
-                    <Input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder={L("enterOtp", language)} inputMode="numeric" className="flex-1" />
-                    <Button type="button" size="sm" onClick={verifyOtp}>{L("verify", language)}</Button>
-                  </div>
-                )}
-                {mobileVerified && <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><Phone className="h-3 w-3" /> Verified</p>}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === "father" && (
-          <Card>
-            <CardContent className="p-4">
-              <label className="block text-xs font-medium text-slate-600 mb-1">{L("fatherHusband", language)}</label>
-              <Input value={fatherHusbandName} onChange={(e) => setFatherHusbandName(e.target.value)} placeholder={L("fatherHusband", language)} />
-            </CardContent>
-          </Card>
-        )}
-
-        {step === "aadhaar" && (
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{L("aadhaarFront", language)}</label>
-                <Input ref={aadhaarFrontRef} type="file" accept="image/*" capture="environment" disabled={!!processingType}
-                  onChange={() => { const f = aadhaarFrontRef.current?.files?.[0]; if (f) handleAadhaarCapture(setAadhaarFront, aadhaarFrontRef, "aadhaarFront"); }} />
-                {(processingType === "aadhaarFront" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (aadhaarFront && <img src={aadhaarFront} alt="" className="mt-1 h-20 rounded border object-cover" />)}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{L("aadhaarBack", language)}</label>
-                <Input ref={aadhaarBackRef} type="file" accept="image/*" capture="environment" disabled={!!processingType}
-                  onChange={() => { const f = aadhaarBackRef.current?.files?.[0]; if (f) handleAadhaarCapture(setAadhaarBack, aadhaarBackRef, "aadhaarBack"); }} />
-                {(processingType === "aadhaarBack" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (aadhaarBack && <img src={aadhaarBack} alt="" className="mt-1 h-20 rounded border object-cover" />)}
-              </div>
-              <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
-                <p className="text-xs font-semibold text-slate-700">{L("ocrData", language)}</p>
-                <Input value={ocrAadhaarName} onChange={(e) => setOcrAadhaarName(e.target.value)} placeholder="Name" className="mb-2" />
-                <Input value={ocrAadhaarNumber} onChange={(e) => setOcrAadhaarNumber(e.target.value)} placeholder="Aadhaar Number" className="mb-2" />
-                <Input value={ocrAadhaarDob} onChange={(e) => setOcrAadhaarDob(e.target.value)} placeholder="DOB" className="mb-2" />
-                <Input value={ocrAadhaarGender} onChange={(e) => setOcrAadhaarGender(e.target.value)} placeholder="Gender" className="mb-2" />
-                <Input value={ocrAadhaarAddress} onChange={(e) => setOcrAadhaarAddress(e.target.value)} placeholder="Address" />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox id="verifyVoter" checked={aadhaarVerifiedSameAsVoter} onCheckedChange={(c) => setAadhaarVerifiedSameAsVoter(!!c)} />
-                <label htmlFor="verifyVoter" className="text-sm">{L("verifySameAsVoter", language)}</label>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {step === "voter" && (
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{L("voterId", language)}</label>
-                <Input ref={voterIdRef} type="file" accept="image/*" capture="environment" disabled={!!processingType} onChange={handleVoterCapture} />
-                {(processingType === "voterId" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (voterIdImage && <img src={voterIdImage} alt="" className="mt-1 h-20 rounded border object-cover" />)}
-              </div>
-              {(ocrVoterId || ocrVoterName) && (
-                <div className="space-y-1">
-                  <Input value={ocrVoterId} onChange={(e) => setOcrVoterId(e.target.value)} placeholder="Voter ID" />
-                  <Input value={ocrVoterName} onChange={(e) => setOcrVoterName(e.target.value)} placeholder="Voter Name" />
+              {otpSent && !mobileVerified && (
+                <div className="flex gap-2 mt-2">
+                  <Input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder={L("enterOtp", language)} inputMode="numeric" className="flex-1" />
+                  <Button type="button" size="sm" onClick={verifyOtp}>{L("verify", language)}</Button>
                 </div>
               )}
-              {voterMatch && (
-                <div className="border rounded-lg p-3 bg-green-50">
-                  <p className="text-xs font-semibold text-slate-700 mb-2">{L("voterMatch", language)}</p>
-                  <p className="text-xs"><span className="text-slate-600">{L("boothId", language)}:</span> {voterMatch.boothId ?? "—"}</p>
-                  <p className="text-xs"><span className="text-slate-600">{L("name", language)}:</span> {voterMatch.name ?? "—"}</p>
-                  <p className="text-xs"><span className="text-slate-600">{L("fatherName", language)}:</span> {voterMatch.fatherName ?? "—"}</p>
-                  <p className="text-xs"><span className="text-slate-600">{L("village", language)}:</span> {voterMatch.villageName ?? "—"}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+              {mobileVerified && <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><Phone className="h-3 w-3" /> Verified</p>}
+            </div>
+          </CardContent>
+        </Card>
 
-        {step === "photo" && (
-          <Card>
-            <CardContent className="p-4">
-              <label className="block text-xs font-medium text-slate-600 mb-1">{L("sakhiPhoto", language)}</label>
-              <Input ref={photoRef} type="file" accept="image/*" capture="user"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    try {
-                      const base64 = await compressImage(f);
-                      setSakhiPhoto(base64);
-                    } catch {
-                      toast({ title: "Failed to load image", variant: "destructive" });
-                    }
-                    if (photoRef.current) photoRef.current.value = "";
+        <Card>
+          <CardContent className="p-4">
+            <label className="block text-xs font-medium text-slate-600 mb-1">{L("fatherHusband", language)}</label>
+            <Input value={fatherHusbandName} onChange={(e) => setFatherHusbandName(e.target.value)} placeholder={L("fatherHusband", language)} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("aadhaarFront", language)}</label>
+              <Input ref={aadhaarFrontRef} type="file" accept="image/*" capture="environment" disabled={!!processingType}
+                onChange={() => { const f = aadhaarFrontRef.current?.files?.[0]; if (f) handleAadhaarCapture(setAadhaarFront, aadhaarFrontRef, "aadhaarFront"); }} />
+              {(processingType === "aadhaarFront" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (aadhaarFront && <img src={aadhaarFront} alt="" className="mt-1 h-20 rounded border object-cover" />)}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("aadhaarBack", language)}</label>
+              <Input ref={aadhaarBackRef} type="file" accept="image/*" capture="environment" disabled={!!processingType}
+                onChange={() => { const f = aadhaarBackRef.current?.files?.[0]; if (f) handleAadhaarCapture(setAadhaarBack, aadhaarBackRef, "aadhaarBack"); }} />
+              {(processingType === "aadhaarBack" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (aadhaarBack && <img src={aadhaarBack} alt="" className="mt-1 h-20 rounded border object-cover" />)}
+            </div>
+            <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
+              <p className="text-xs font-semibold text-slate-700">{L("ocrData", language)}</p>
+              <Input value={ocrAadhaarName} onChange={(e) => setOcrAadhaarName(e.target.value)} placeholder="Name" className="mb-2" />
+              <Input value={ocrAadhaarNumber} onChange={(e) => setOcrAadhaarNumber(e.target.value)} placeholder="Aadhaar Number" className="mb-2" />
+              <Input value={ocrAadhaarDob} onChange={(e) => setOcrAadhaarDob(e.target.value)} placeholder="DOB" className="mb-2" />
+              <Input value={ocrAadhaarGender} onChange={(e) => setOcrAadhaarGender(e.target.value)} placeholder="Gender" className="mb-2" />
+              <Input value={ocrAadhaarAddress} onChange={(e) => setOcrAadhaarAddress(e.target.value)} placeholder="Address" />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="verifyVoter" checked={aadhaarVerifiedSameAsVoter} onCheckedChange={(c) => setAadhaarVerifiedSameAsVoter(!!c)} />
+              <label htmlFor="verifyVoter" className="text-sm">{L("verifySameAsVoter", language)}</label>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("voterId", language)}</label>
+              <Input ref={voterIdRef} type="file" accept="image/*" capture="environment" disabled={!!processingType} onChange={handleVoterCapture} />
+              {(processingType === "voterId" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (voterIdImage && <img src={voterIdImage} alt="" className="mt-1 h-20 rounded border object-cover" />)}
+            </div>
+            {(ocrVoterId || ocrVoterName) && (
+              <div className="space-y-1">
+                <Input value={ocrVoterId} onChange={(e) => setOcrVoterId(e.target.value)} placeholder="Voter ID" />
+                <Input value={ocrVoterName} onChange={(e) => setOcrVoterName(e.target.value)} placeholder="Voter Name" />
+              </div>
+            )}
+            {voterMatch && (
+              <div className="border rounded-lg p-3 bg-green-50">
+                <p className="text-xs font-semibold text-slate-700 mb-2">{L("voterMatch", language)}</p>
+                <p className="text-xs"><span className="text-slate-600">{L("boothId", language)}:</span> {voterMatch.boothId ?? "—"}</p>
+                <p className="text-xs"><span className="text-slate-600">{L("name", language)}:</span> {voterMatch.name ?? "—"}</p>
+                <p className="text-xs"><span className="text-slate-600">{L("fatherName", language)}:</span> {voterMatch.fatherName ?? "—"}</p>
+                <p className="text-xs"><span className="text-slate-600">{L("village", language)}:</span> {voterMatch.villageName ?? "—"}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <label className="block text-xs font-medium text-slate-600 mb-1">{L("sakhiPhoto", language)}</label>
+            <Input ref={photoRef} type="file" accept="image/*" capture="user"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  try {
+                    const base64 = await compressImage(f);
+                    setSakhiPhoto(base64);
+                  } catch {
+                    toast({ title: "Failed to load image", variant: "destructive" });
                   }
-                }} />
-              {sakhiPhoto && <img src={sakhiPhoto} alt="" className="mt-2 h-32 rounded border object-cover" />}
-            </CardContent>
-          </Card>
-        )}
+                  if (photoRef.current) photoRef.current.value = "";
+                }
+              }} />
+            {sakhiPhoto && <img src={sakhiPhoto} alt="" className="mt-2 h-32 rounded border object-cover" />}
+          </CardContent>
+        </Card>
 
-        {step === "declaration" && (
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-2">
-                <Checkbox id="decl" checked={declarationChecked} onCheckedChange={(c) => setDeclarationChecked(!!c)} className="mt-0.5" />
-                <label htmlFor="decl" className="text-sm leading-tight">{L("declaration", language)}</label>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start space-x-2">
+              <Checkbox id="decl" checked={declarationChecked} onCheckedChange={(c) => setDeclarationChecked(!!c)} className="mt-0.5" />
+              <label htmlFor="decl" className="text-sm leading-tight">{L("declaration", language)}</label>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex justify-between gap-2">
-          <Button variant="outline" onClick={goPrev} disabled={stepIndex <= 0}>{L("prev", language)}</Button>
-          {step === "declaration" ? (
-            <Button onClick={() => submitMutation.mutate()} disabled={!canSubmit || submitMutation.isPending}>
-              {submitMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}{L("submit", language)}
-            </Button>
-          ) : (
-            <Button onClick={goNext}>{L("next", language)} <ChevronRight className="h-4 w-4 ml-1" /></Button>
-          )}
-        </div>
+        <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={!canSubmit || submitMutation.isPending}>
+          {submitMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}{L("submit", language)}
+        </Button>
       </main>
 
       {submittedId && (
@@ -568,7 +545,7 @@ export default function TaskMahilaSamman({ user }: Props) {
               <div key={s.id} className="flex items-center justify-between border rounded px-3 py-2 bg-white text-sm">
                 <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
                 <div className="flex gap-1 flex-shrink-0">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("sakhi"); /* TODO load s into form */ }}>{L("edit", language)}</Button>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditingId(s.id)}>{L("edit", language)}</Button>
                 </div>
               </div>
             ))}
