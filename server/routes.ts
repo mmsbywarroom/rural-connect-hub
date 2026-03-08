@@ -347,28 +347,8 @@ function parseOcrText(text: string, docType: string): Record<string, string> {
     }
 
   } else if (docType === "aadhaarBack") {
+    // Aadhaar back: only extract address (nothing else)
     const addressLines: string[] = [];
-    let capturing = false;
-    let pinCodeFound = false;
-
-    const addressStartPatterns = [
-      /^address\s*[:\-]/i,
-      /^पता\s*[:\-]/i,
-      /\baddress\b/i,
-      /\bपता\b/,
-    ];
-    const relationPatterns = [
-      /\b[SDWC]\/[Oo]\b/,
-      /\bS\/O\b/i, /\bD\/O\b/i, /\bW\/O\b/i, /\bC\/O\b/i,
-      /\bSON\s+OF\b/i, /\bDAUGHTER\s+OF\b/i, /\bWIFE\s+OF\b/i, /\bCARE\s+OF\b/i,
-    ];
-    const addressKeywords = [
-      "house", "village", "vill", "vpo", "dist", "distt", "district",
-      "pin", "nagar", "colony", "street", "road", "sector", "ward",
-      "block", "tehsil", "teh", "post", "p.o", "state", "punjab",
-      "haryana", "patiala", "mohalla", "gali", "near",
-      "गांव", "जिला", "पिन", "मकान", "गली", "मोहल्ला", "पंजाब"
-    ];
     const stopPatterns = [
       /^\d{4}\s?\d{4}\s?\d{4}$/,
       /\baadhaar\b/i,
@@ -376,68 +356,81 @@ function parseOcrText(text: string, docType: string): Record<string, string> {
       /\buidai\b/i,
       /\bmy\s*aadhaar/i,
       /\benrol/i,
+      /unique\s*identification\s*authority/i,
+      /government\s*of\s*india/i,
+      /भारतीय विशिष्ट पहचान प्राधिकरण/i,
+      /आधार/i,
+    ];
+    const addressLabelPatterns = [
+      /address\s*[:\-]?\s*/i,
+      /पता\s*[:\-]?\s*/i,
     ];
 
+    // 1) Find line containing "Address" or "पता" and take from there
+    let startIdx = -1;
+    let prefixRemoved = "";
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const lower = line.toLowerCase();
-
-      if (stopPatterns.some(p => p.test(line))) {
-        if (capturing) break;
-        continue;
-      }
-
-      if (!capturing) {
-        if (addressStartPatterns.some(p => p.test(line))) {
-          capturing = true;
-          const cleaned = line.replace(/^(?:address|पता)\s*[:\-]?\s*/i, "").trim();
-          if (cleaned.length > 2) addressLines.push(cleaned);
-          continue;
-        }
-        if (relationPatterns.some(p => p.test(line))) {
-          capturing = true;
-          addressLines.push(line.trim());
-          continue;
-        }
-        if (addressKeywords.some(kw => lower.includes(kw))) {
-          capturing = true;
-          addressLines.push(line.trim());
-          continue;
-        }
-      } else {
-        if (line.length > 1) {
-          addressLines.push(line.trim());
-        }
-        if (/\b\d{6}\b/.test(line)) {
-          pinCodeFound = true;
+      if (stopPatterns.some((p) => p.test(line))) continue;
+      for (const labelRe of addressLabelPatterns) {
+        if (labelRe.test(line)) {
+          startIdx = i;
+          prefixRemoved = line.replace(labelRe, "").trim();
           break;
         }
-        if (addressLines.length >= 10) break;
+      }
+      if (startIdx >= 0) break;
+    }
+
+    if (startIdx >= 0) {
+      if (prefixRemoved.length > 2) addressLines.push(prefixRemoved);
+      for (let i = startIdx + 1; i < lines.length && addressLines.length < 12; i++) {
+        const line = lines[i].trim();
+        if (line.length < 2) continue;
+        if (stopPatterns.some((p) => p.test(line))) break;
+        addressLines.push(line);
+        if (/\b\d{6}\b/.test(line)) break;
       }
     }
 
+    // 2) Fallback: lines with S/O, D/O, village, dist, state, pin, etc.
     if (addressLines.length === 0) {
-      let startIdx = -1;
+      const addrKeywords = [
+        /[SDWC]\/[Oo]/i, /\bS\/O\b/i, /\bD\/O\b/i, /\bC\/O\b/i,
+        /\b(house|village|vpo|dist|nagar|colony|street|road|sector|block|teh|gali|mohalla|near|post|state|pin)\b/i,
+        /\b(गांव|जिला|पिन|मकान|गली|मोहल्ला|पंजाब|राज्य)\b/,
+      ];
       for (let i = 0; i < lines.length; i++) {
-        if (/[SDWC]\/[Oo]/i.test(lines[i]) || /\b(house|village|vpo|dist|nagar|colony|street|road|sector|block|teh|gali|mohalla|near|post)\b/i.test(lines[i])) {
-          startIdx = i;
-          break;
+        const line = lines[i].trim();
+        if (line.length < 3) continue;
+        if (stopPatterns.some((p) => p.test(line))) break;
+        if (addressLines.length > 0 || addrKeywords.some((p) => p.test(line))) {
+          addressLines.push(line);
+          if (/\b\d{6}\b/.test(line) || addressLines.length >= 10) break;
         }
       }
-      if (startIdx >= 0) {
-        for (let i = startIdx; i < Math.min(startIdx + 10, lines.length); i++) {
-          if (stopPatterns.some(p => p.test(lines[i]))) break;
-          if (lines[i].length > 1) addressLines.push(lines[i].trim());
-          if (/\b\d{6}\b/.test(lines[i])) break;
-        }
+    }
+
+    // 3) Last resort: all lines except header/footer keywords
+    if (addressLines.length === 0) {
+      const skip = [
+        /unique\s*identification/i, /uidai/i, /government\s*of\s*india/i,
+        /भारतीय विशिष्ट पहचान प्राधिकरण/i, /आधार/i, /aadhaar/i,
+        /^[\d\s\-]+$/,  // only digits/dashes
+      ];
+      for (const line of lines) {
+        const t = line.trim();
+        if (t.length < 3) continue;
+        if (skip.some((p) => p.test(t))) continue;
+        addressLines.push(t);
+        if (addressLines.length >= 12) break;
       }
     }
 
     if (addressLines.length > 0) {
       result.address = addressLines.join(", ");
     }
-
-    console.log(`[OCR] Aadhaar back parsed - address: ${result.address}`);
+    console.log(`[OCR] Aadhaar back (address only): ${result.address || "(none)"}`);
   } else if (docType === "voterId") {
     const voterIdPatterns = [
       /(?:EPIC|No|Number|ID)\s*[:\-]?\s*([A-Z]{2,3}\d{6,8}[A-Z]?)/i,

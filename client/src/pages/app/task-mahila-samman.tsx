@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,7 +21,7 @@ interface Props {
   user: AppUser;
 }
 
-type Step = "description" | "unit" | "form";
+type Step = "description" | "nominate" | "unit" | "form";
 
 function isIndianMobile(input: string): boolean {
   const cleaned = input.replace(/\D/g, "").replace(/^91/, "");
@@ -71,6 +72,9 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   view: { en: "View", hi: "देखें", pa: "ਦੇਖੋ" },
   edit: { en: "Edit", hi: "संपादित करें", pa: "ਸੋਧੋ" },
   submissionLog: { en: "Submission log", hi: "जमा लॉग", pa: "ਜਮ੍ਹਾਂ ਲੌਗ" },
+  matchNotFound: { en: "Match not found – enter Booth No below", hi: "मिलान नहीं मिला – नीचे बूथ नंबर दर्ज करें", pa: "ਮਿਲਾਨ ਨਹੀਂ ਮਿਲਿਆ – ਹੇਠਾਂ ਬੂਥ ਨੰਬਰ ਦਰਜ ਕਰੋ" },
+  nominateSakhi: { en: "Nominate a Sakhi", hi: "एक सखी नामांकित करें", pa: "ਇੱਕ ਸਖੀ ਨਾਮਜ਼ਦ ਕਰੋ" },
+  addNewNomination: { en: "Add new nomination", hi: "नया नामांकन जोड़ें", pa: "ਨਵਾਂ ਨਾਮਜ਼ਦਗੀ ਜੋੜੋ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
 };
 
@@ -108,6 +112,7 @@ export default function TaskMahilaSamman({ user }: Props) {
   const [ocrVoterId, setOcrVoterId] = useState("");
   const [ocrVoterName, setOcrVoterName] = useState("");
   const [voterMatch, setVoterMatch] = useState<{ boothId: string; name: string; fatherName: string; villageName: string } | null>(null);
+  const [manualBoothId, setManualBoothId] = useState("");
 
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
@@ -174,7 +179,7 @@ export default function TaskMahilaSamman({ user }: Props) {
       return name.length < 2 || num.length < 10 || !/^\d+$/.test(num);
     }
     if (type === "aadhaarBack") {
-      return str(result.address).length < 15;
+      return false;
     }
     return str(result.voterId).length < 8 || str(result.name).length < 2;
   };
@@ -200,7 +205,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           setOcrAadhaarDob(result.dob || "");
           setOcrAadhaarGender(result.gender || "");
         } else {
-          setOcrAadhaarAddress(result.address || "");
+          setOcrAadhaarAddress((result.address || "").trim());
         }
       }
       if (ref.current) ref.current.value = "";
@@ -231,8 +236,10 @@ export default function TaskMahilaSamman({ user }: Props) {
           const res = await fetch(`/api/mahila-samman/voter-match?voterId=${encodeURIComponent(vid)}`, { credentials: "include" });
           const data = await res.json();
           setVoterMatch(data.match || null);
+          setManualBoothId("");
         } else {
           setVoterMatch(null);
+          setManualBoothId("");
         }
       }
       if (voterIdRef.current) voterIdRef.current.value = "";
@@ -291,7 +298,7 @@ export default function TaskMahilaSamman({ user }: Props) {
         aadhaarVerifiedSameAsVoter,
         ocrVoterId: ocrVoterId.trim() || null,
         ocrVoterName: ocrVoterName.trim() || null,
-        voterMappingBoothId: voterMatch?.boothId || null,
+        voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
         voterMappingName: voterMatch?.name || null,
         voterMappingFatherName: voterMatch?.fatherName || null,
         voterMappingVillageName: voterMatch?.villageName || null,
@@ -310,7 +317,7 @@ export default function TaskMahilaSamman({ user }: Props) {
       setSubmittedId(data.id);
       setEditingId(null);
       resetForm();
-      setStep("description");
+      setStep("nominate");
       toast({ title: editingId ? "Updated" : "Submitted successfully" });
     },
     onError: (e: any) => {
@@ -337,10 +344,12 @@ export default function TaskMahilaSamman({ user }: Props) {
     setOcrVoterId("");
     setOcrVoterName("");
     setVoterMatch(null);
+    setManualBoothId("");
     setSakhiPhoto(null);
     setDeclarationChecked(false);
   }
 
+  const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
   const canSubmit =
     sakhiName.trim() &&
     mobileVerified &&
@@ -349,12 +358,14 @@ export default function TaskMahilaSamman({ user }: Props) {
     aadhaarBack &&
     aadhaarVerifiedSameAsVoter &&
     ocrVoterId.trim() &&
+    hasVoterBooth &&
     sakhiPhoto &&
     declarationChecked;
 
   const goPrev = () => {
     if (step === "form") setStep("unit");
-    else if (step === "unit") setStep("description");
+    else if (step === "unit") setStep("nominate");
+    else if (step === "nominate") setStep("description");
     else setLocation("/app");
   };
 
@@ -371,12 +382,90 @@ export default function TaskMahilaSamman({ user }: Props) {
           <Card>
             <CardContent className="p-4">
               <p className="text-slate-700 text-sm leading-relaxed">{L("desc", language)}</p>
-              <Button className="w-full mt-4" onClick={() => setStep("unit")}>
+              <Button className="w-full mt-4" onClick={() => setStep("nominate")}>
                 {L("next", language)} <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </CardContent>
           </Card>
         </main>
+      </div>
+    );
+  }
+
+  if (step === "nominate") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
+          <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={goPrev}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="font-semibold text-base">{L("title", language)}</h1>
+        </header>
+        <main className="flex-1 px-4 py-6 space-y-6">
+          <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-wide text-center">
+            {L("nominateSakhi", language)}
+          </h2>
+          <div>
+            <p className="text-xs font-semibold text-slate-600 mb-1">{L("mySubmissions", language)}</p>
+            <p className="text-xs text-slate-500 mb-2">{L("submissionLog", language)}</p>
+            <Input placeholder={L("search", language)} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="mb-2" />
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {(myList || [])
+                .filter((s) => !searchQuery.trim() || [s.sakhiName, s.mobileNumber, s.id].some((v) => (v || "").toLowerCase().includes(searchQuery.toLowerCase())))
+                .map((s) => (
+                  <div key={s.id} className="flex items-center justify-between border rounded px-3 py-2 bg-white text-sm">
+                    <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("edit", language)}</Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+            <Button className="w-full mt-4" onClick={() => { setEditingId(null); setStep("unit"); }}>
+              {L("addNewNomination", language)} <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </main>
+        <Dialog open={!!viewingId} onOpenChange={(open) => !open && setViewingId(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Submission details</DialogTitle>
+            </DialogHeader>
+            {viewingId && (() => {
+              const sub = myList.find((s) => s.id === viewingId);
+              if (!sub) return null;
+              return (
+                <div className="space-y-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-600 text-xs">Sakhi Name</p>
+                      <p className="text-slate-800">{sub.sakhiName}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-600 text-xs">Mobile</p>
+                      <p className="text-slate-800">{sub.mobileNumber} {sub.mobileVerified ? "(Verified)" : ""}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-600 text-xs">Father/Husband Name</p>
+                      <p className="text-slate-800">{sub.fatherHusbandName || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-600 text-xs">Unit / Village</p>
+                      <p className="text-slate-800">{sub.villageName || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    {sub.status === "pending" && (
+                      <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("edit", language)}</Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>Close</Button>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -471,14 +560,14 @@ export default function TaskMahilaSamman({ user }: Props) {
               </div>
               {(processingType === "aadhaarBack" && <p className="text-xs text-slate-500 mt-1">{L("reading", language)}</p>) || (aadhaarBack && <img src={aadhaarBack} alt="" className="mt-1 h-20 rounded border object-cover" />)}
             </div>
-            {(ocrAadhaarName || ocrAadhaarNumber || ocrAadhaarDob || ocrAadhaarGender || ocrAadhaarAddress) && (
+            {(aadhaarFront && aadhaarBack) && (
               <div className="border rounded-lg p-3 bg-slate-50 space-y-2">
                 <p className="text-xs font-semibold text-slate-700">{L("ocrData", language)}</p>
                 <Input value={ocrAadhaarName} onChange={(e) => setOcrAadhaarName(e.target.value)} placeholder="Name" className="mb-2" />
                 <Input value={ocrAadhaarNumber} onChange={(e) => setOcrAadhaarNumber(e.target.value)} placeholder="Aadhaar Number" className="mb-2" />
                 <Input value={ocrAadhaarDob} onChange={(e) => setOcrAadhaarDob(e.target.value)} placeholder="DOB" className="mb-2" />
                 <Input value={ocrAadhaarGender} onChange={(e) => setOcrAadhaarGender(e.target.value)} placeholder="Gender" className="mb-2" />
-                <Input value={ocrAadhaarAddress} onChange={(e) => setOcrAadhaarAddress(e.target.value)} placeholder="Address" />
+                <Textarea value={ocrAadhaarAddress} onChange={(e) => setOcrAadhaarAddress(e.target.value)} placeholder="Address (edit if OCR did not read correctly)" rows={3} className="min-h-[72px]" />
               </div>
             )}
             <div className="flex items-center space-x-2">
@@ -515,6 +604,12 @@ export default function TaskMahilaSamman({ user }: Props) {
                 <p className="text-xs"><span className="text-slate-600">{L("name", language)}:</span> {voterMatch.name ?? "—"}</p>
                 <p className="text-xs"><span className="text-slate-600">{L("fatherName", language)}:</span> {voterMatch.fatherName ?? "—"}</p>
                 <p className="text-xs"><span className="text-slate-600">{L("village", language)}:</span> {voterMatch.villageName ?? "—"}</p>
+              </div>
+            )}
+            {(ocrVoterId && !voterMatch) && (
+              <div className="border rounded-lg p-3 bg-amber-50 border-amber-200">
+                <p className="text-xs font-semibold text-slate-700 mb-2">{L("matchNotFound", language)}</p>
+                <Input value={manualBoothId} onChange={(e) => setManualBoothId(e.target.value)} placeholder={L("boothId", language)} />
               </div>
             )}
           </CardContent>
@@ -578,31 +673,12 @@ export default function TaskMahilaSamman({ user }: Props) {
           <Card className="max-w-sm w-full">
             <CardContent className="p-4 text-center space-y-3">
               <p className="text-green-600 font-medium">Submitted successfully!</p>
-              <Button className="w-full" onClick={() => { setSubmittedId(null); setStep("description"); }}>{L("addAnother", language)}</Button>
+              <Button className="w-full" onClick={() => { setSubmittedId(null); setStep("nominate"); }}>{L("addAnother", language)}</Button>
               <Button variant="outline" className="w-full" onClick={() => setSubmittedId(null)}>Close</Button>
             </CardContent>
           </Card>
         </div>
       )}
-
-      <div className="px-4 pb-4">
-        <p className="text-xs font-semibold text-slate-600 mb-1">{L("mySubmissions", language)}</p>
-        <p className="text-xs text-slate-500 mb-2">{L("submissionLog", language)}</p>
-        <Input placeholder={L("search", language)} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="mb-2" />
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {(myList || [])
-            .filter((s) => !searchQuery.trim() || [s.sakhiName, s.mobileNumber, s.id].some((v) => (v || "").toLowerCase().includes(searchQuery.toLowerCase())))
-            .map((s) => (
-              <div key={s.id} className="flex items-center justify-between border rounded px-3 py-2 bg-white text-sm">
-                <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
-                <div className="flex gap-1 flex-shrink-0">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setEditingId(s.id)}>{L("edit", language)}</Button>
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
 
       <Dialog open={!!viewingId} onOpenChange={(open) => !open && setViewingId(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
