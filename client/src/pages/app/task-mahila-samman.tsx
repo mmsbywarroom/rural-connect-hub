@@ -74,7 +74,26 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   submissionLog: { en: "Submission log", hi: "जमा लॉग", pa: "ਜਮ੍ਹਾਂ ਲੌਗ" },
   matchNotFound: { en: "Match not found – enter Booth No below", hi: "मिलान नहीं मिला – नीचे बूथ नंबर दर्ज करें", pa: "ਮਿਲਾਨ ਨਹੀਂ ਮਿਲਿਆ – ਹੇਠਾਂ ਬੂਥ ਨੰਬਰ ਦਰਜ ਕਰੋ" },
   nominateSakhi: { en: "Nominate a Sakhi", hi: "एक सखी नामांकित करें", pa: "ਇੱਕ ਸਖੀ ਨਾਮਜ਼ਦ ਕਰੋ" },
+  nominateBoothSakhi: { en: "Nominate a Booth Sakhi", hi: "बूथ सखी नामांकित करें", pa: "ਬੂਥ ਸਖੀ ਨਾਮਜ਼ਦ ਕਰੋ" },
+  sakhiDescTitle: { en: "What is a Booth Sakhi?", hi: "बूथ सखी क्या है?", pa: "ਬੂਥ ਸਖੀ ਕੀ ਹੈ?" },
+  sakhiDefinition: {
+    en: "A Sakhi is a voter from that booth who is responsible for registering up to 100 eligible women voters under the Mahila Samman Rashi scheme.",
+    hi: "सखी उस बूथ का मतदाता होता है जो महिला सम्मान राशि योजना के तहत 100 पात्र महिला मतदाताओं को पंजीकृत करने के लिए जिम्मेदार है।",
+    pa: "ਸਖੀ ਉਸ ਬੂਥ ਦਾ ਵੋਟਰ ਹੈ ਜੋ ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ ਸਕੀਮ ਅਧੀਨ 100 ਯੋਗ ਔਰਤ ਵੋਟਰਾਂ ਨੂੰ ਰਜਿਸਟਰ ਕਰਨ ਲਈ ਜ਼ਿੰਮੇਵਾਰ ਹੈ।",
+  },
+  sakhiDuties: {
+    en: "Duties include: home visits, document verification, and registration support at Anganwadi centers.",
+    hi: "कर्तव्यों में शामिल: घर भ्रमण, दस्तावेज़ जांच, और आंगनवाड़ी केंद्रों पर पंजीकरण सहायता।",
+    pa: "ਜ਼ਿੰਮੇਵਾਰੀਆਂ: ਘਰ ਦੇ ਦੌਰੇ, ਦਸਤਾਵੇਜ਼ ਤਸਦੀਕ, ਅਤੇ ਆਂਗਨਵਾੜੀ ਸੈਂਟਰਾਂ 'ਤੇ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਸਹਾਇਤਾ।",
+  },
+  sakhiVideoNote: {
+    en: "Watch the video below to understand the Sakhi role, qualifications, and responsibilities.",
+    hi: "सखी की भूमिका, योग्यता और जिम्मेदारियों को समझने के लिए नीचे दिया वीडियो देखें।",
+    pa: "ਸਖੀ ਦੀ ਭੂਮਿਕਾ, ਯੋਗਤਾ ਅਤੇ ਜ਼ਿੰਮੇਵਾਰੀਆਂ ਸਮਝਣ ਲਈ ਹੇਠਾਂ ਦਿੱਤਾ ਵੀਡੀਓ ਦੇਖੋ।",
+  },
   addNewNomination: { en: "Add new nomination", hi: "नया नामांकन जोड़ें", pa: "ਨਵਾਂ ਨਾਮਜ਼ਦਗੀ ਜੋੜੋ" },
+  submissionDetails: { en: "Submission details", hi: "जमा विवरण", pa: "ਜਮ੍ਹਾਂ ਵੇਰਵੇ" },
+  close: { en: "Close", hi: "बंद करें", pa: "ਬੰਦ ਕਰੋ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
 };
 
@@ -405,6 +424,17 @@ export default function TaskMahilaSamman({ user }: Props) {
           <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-wide text-center">
             {L("nominateSakhi", language)}
           </h2>
+
+          <Card className="border-purple-100 bg-white">
+            <CardContent className="p-4 space-y-3">
+              <h3 className="font-semibold text-slate-800 text-sm">{L("nominateBoothSakhi", language)}</h3>
+              <p className="font-medium text-slate-700 text-xs">{L("sakhiDescTitle", language)}</p>
+              <p className="text-slate-600 text-sm leading-relaxed">{L("sakhiDefinition", language)}</p>
+              <p className="text-slate-600 text-sm leading-relaxed">{L("sakhiDuties", language)}</p>
+              <p className="text-slate-500 text-xs italic">{L("sakhiVideoNote", language)}</p>
+            </CardContent>
+          </Card>
+
           <div>
             <p className="text-xs font-semibold text-slate-600 mb-1">{L("mySubmissions", language)}</p>
             <p className="text-xs text-slate-500 mb-2">{L("submissionLog", language)}</p>
@@ -430,7 +460,7 @@ export default function TaskMahilaSamman({ user }: Props) {
         <Dialog open={!!viewingId} onOpenChange={(open) => !open && setViewingId(null)}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Submission details</DialogTitle>
+              <DialogTitle>{L("submissionDetails", language)}</DialogTitle>
             </DialogHeader>
             {viewingId && (() => {
               const sub = myList.find((s) => s.id === viewingId);
@@ -439,15 +469,15 @@ export default function TaskMahilaSamman({ user }: Props) {
                 <div className="space-y-4 text-sm">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <p className="font-semibold text-slate-600 text-xs">Sakhi Name</p>
+                      <p className="font-semibold text-slate-600 text-xs">{L("sakhiName", language)}</p>
                       <p className="text-slate-800">{sub.sakhiName}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-600 text-xs">Mobile</p>
+                      <p className="font-semibold text-slate-600 text-xs">{L("mobile", language)}</p>
                       <p className="text-slate-800">{sub.mobileNumber} {sub.mobileVerified ? "(Verified)" : ""}</p>
                     </div>
                     <div>
-                      <p className="font-semibold text-slate-600 text-xs">Father/Husband Name</p>
+                      <p className="font-semibold text-slate-600 text-xs">{L("fatherHusband", language)}</p>
                       <p className="text-slate-800">{sub.fatherHusbandName || "—"}</p>
                     </div>
                     <div>
@@ -459,7 +489,7 @@ export default function TaskMahilaSamman({ user }: Props) {
                     {sub.status === "pending" && (
                       <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("edit", language)}</Button>
                     )}
-                    <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>Close</Button>
+                    <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
                   </div>
                 </div>
               );
@@ -674,7 +704,7 @@ export default function TaskMahilaSamman({ user }: Props) {
             <CardContent className="p-4 text-center space-y-3">
               <p className="text-green-600 font-medium">Submitted successfully!</p>
               <Button className="w-full" onClick={() => { setSubmittedId(null); setStep("nominate"); }}>{L("addAnother", language)}</Button>
-              <Button variant="outline" className="w-full" onClick={() => setSubmittedId(null)}>Close</Button>
+              <Button variant="outline" className="w-full" onClick={() => setSubmittedId(null)}>{L("close", language)}</Button>
             </CardContent>
           </Card>
         </div>
@@ -683,7 +713,7 @@ export default function TaskMahilaSamman({ user }: Props) {
       <Dialog open={!!viewingId} onOpenChange={(open) => !open && setViewingId(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Submission details</DialogTitle>
+            <DialogTitle>{L("submissionDetails", language)}</DialogTitle>
           </DialogHeader>
           {viewingId && (() => {
             const sub = myList.find((s) => s.id === viewingId);
@@ -692,7 +722,7 @@ export default function TaskMahilaSamman({ user }: Props) {
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <p className="font-semibold text-slate-600 text-xs">Sakhi Name</p>
+                    <p className="font-semibold text-slate-600 text-xs">{L("sakhiName", language)}</p>
                     <p className="text-slate-800">{sub.sakhiName}</p>
                   </div>
                   <div>
@@ -742,7 +772,7 @@ export default function TaskMahilaSamman({ user }: Props) {
                   {sub.status === "pending" && (
                     <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); }}>{L("edit", language)}</Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>Close</Button>
+                  <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
                 </div>
               </div>
             );
