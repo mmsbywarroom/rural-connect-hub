@@ -130,7 +130,12 @@ interface SurveyWithQuestions extends Survey {
 
 export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   const { t, language } = useTranslation();
-  const roleLabel = user.role === "party_post_holder" ? t('partyPostHolder') : t('volunteer');
+  const roleLabel =
+    user.role === "party_post_holder"
+      ? t("partyPostHolder")
+      : user.role === "mahila_sakhi"
+      ? (language === "hi" ? "महिला सखी" : language === "pa" ? "ਮਹਿਲਾ ਸਖੀ" : "Mahila Sakhi")
+      : t("volunteer");
   const completion = getProfileCompletion(user);
   const isComplete = completion.percentage === 100;
   const isAbove90 = completion.percentage >= 90;
@@ -172,6 +177,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   });
 
   const surveyTop3 = (surveyLeaderboard || []).filter(e => e.count > 0).slice(0, 3);
+  const isMahilaSakhi = user.role === "mahila_sakhi";
 
   /** Fixed slugs + dynamic tasks list – jis category ke niche dikhana hai wahi pass karo. Mahila Samman sirf upar alag dikhaya hai. */
   function renderTaskList(fixedSlugs: string[], taskList: TaskConfig[]) {
@@ -654,6 +660,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </section>
         )}
 
+        {!isMahilaSakhi && (
+        {!isMahilaSakhi && (
         <section>
           <div className="grid grid-cols-2 gap-3">
             <Link href="/leaderboard">
@@ -727,6 +735,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             </Link>
           </div>
         </section>
+        )}
+        )}
 
         <section>
           <div className="flex items-center gap-2 mb-3">

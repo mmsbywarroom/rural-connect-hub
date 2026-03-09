@@ -4449,6 +4449,23 @@ export async function registerRoutes(
         if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified) {
           return res.status(400).json({ error: "Sakhi name and verified mobile required" });
         }
+
+        // Auto-create/update Mahila Sakhi app account for the nominated mobile
+        try {
+          const normalizedSakhiMobile = normalizeMobile(mobileNumber);
+          let sakhiUser = await storage.getAppUserByMobile(normalizedSakhiMobile);
+          if (!sakhiUser) {
+            sakhiUser = await storage.createAppUser({
+              mobileNumber: normalizedSakhiMobile,
+              name: String(sakhiName).trim(),
+              role: "mahila_sakhi",
+              registrationSource: "mahila_samman_nomination",
+            } as any);
+          }
+        } catch (e) {
+          console.error("Mahila Samman auto Sakhi account error:", e);
+        }
+
         const payload = {
           appUserId: String(appUserId),
           villageId: villageId || null,
