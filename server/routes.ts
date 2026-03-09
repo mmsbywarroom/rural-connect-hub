@@ -4421,11 +4421,14 @@ export async function registerRoutes(
       const body = req.body as any;
       const {
         appUserId,
+        // unit / village
         villageId,
         villageName,
+        // Sakhi basic details
         sakhiName,
         mobileNumber,
         mobileVerified,
+        // Full KYC details
         fatherHusbandName,
         aadhaarFront,
         aadhaarBack,
@@ -4443,43 +4446,9 @@ export async function registerRoutes(
         voterMappingVillageName,
         sakhiPhoto,
         declarationChecked,
+        // New: caste / social category
+        category,
       } = body;
-      const isMinimal = !!body.consentServeSakhi50 && !body.aadhaarFront;
-      if (isMinimal) {
-        if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified) {
-          return res.status(400).json({ error: "Sakhi name and verified mobile required" });
-        }
-        const payload = {
-          appUserId: String(appUserId),
-          villageId: villageId || null,
-          villageName: villageName || null,
-          sakhiName: String(sakhiName).trim(),
-          mobileNumber: String(mobileNumber).trim(),
-          mobileVerified: true,
-          consentServeSakhi50: !!body.consentServeSakhi50,
-          profileComplete: false,
-          fatherHusbandName: null,
-          aadhaarFront: null,
-          aadhaarBack: null,
-          ocrAadhaarName: null,
-          ocrAadhaarNumber: null,
-          ocrAadhaarDob: null,
-          ocrAadhaarGender: null,
-          ocrAadhaarAddress: null,
-          aadhaarVerifiedSameAsVoter: false,
-          ocrVoterId: null,
-          ocrVoterName: null,
-          voterMappingBoothId: null,
-          voterMappingName: null,
-          voterMappingFatherName: null,
-          voterMappingVillageName: null,
-          sakhiPhoto: null,
-          declarationChecked: false,
-          status: "pending",
-        };
-        const created = await storage.createMahilaSammanSubmission(payload as any);
-        return res.json(created);
-      }
       if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified || !fatherHusbandName?.trim()) {
         return res.status(400).json({ error: "Sakhi name, verified mobile, and father/husband name required" });
       }
@@ -4498,6 +4467,31 @@ export async function registerRoutes(
       if (!declarationChecked) {
         return res.status(400).json({ error: "Declaration must be checked" });
       }
+
+      // Ensure there is an app user account for the nominated Sakhi (for mobile OTP login)
+      // This does not change the creator appUserId being tracked on the submission,
+      // but guarantees that the Sakhi can log in later with her mobile number.
+      if (mobileNumber && sakhiName) {
+        const normalizedMobile = normalizeMobile(mobileNumber);
+        const existingSakhiUser = await storage.getAppUserByMobile(normalizedMobile);
+        if (!existingSakhiUser) {
+          try {
+            await storage.createAppUser({
+              name: String(sakhiName).trim(),
+              mobileNumber: normalizedMobile,
+              role: "volunteer",
+              registrationSource: "mahila_samman_sakhi",
+              isActive: true,
+              isApproved: false,
+              mappedAreaId: villageId || null,
+              mappedAreaName: villageName || null,
+            } as any);
+          } catch (e) {
+            console.error("Failed to auto-create Sakhi app user:", e);
+          }
+        }
+      }
+
       const payload = {
         appUserId: String(appUserId),
         villageId: villageId || null,
@@ -4505,7 +4499,9 @@ export async function registerRoutes(
         sakhiName: String(sakhiName).trim(),
         mobileNumber: String(mobileNumber).trim(),
         mobileVerified: !!mobileVerified,
+        // Two-step profile has been removed – all submissions are full profile by design
         profileComplete: true,
+        category: category || null,
         fatherHusbandName: String(fatherHusbandName).trim(),
         aadhaarFront: aadhaarFront || null,
         aadhaarBack: aadhaarBack || null,
