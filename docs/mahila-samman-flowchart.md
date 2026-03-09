@@ -119,15 +119,15 @@ flowchart LR
         S4[Enter OTP]
         S5[Verify → POST /api/mahila-samman/verify-otp]
         S6[mobileVerified = true]
-        S7[Consent: Haan main tayar hoon 500 sakhi ko jodne ke liye]
+        S7[Consent: Serve as Sakhi and ensure at least 50 women receive Mahila Samman Rashi]
         S8[Submit button]
     end
     S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8
 
     subgraph SIMPLE_API["On Submit"]
         SA1[POST /api/mahila-samman/submit]
-        SA2[Body: appUserId, villageId, villageName, sakhiName, mobileNumber, mobileVerified, consent500Sakhi]
-        SA3[Backend: isMinimal = consent500Sakhi && !aadhaarFront]
+        SA2[Body: appUserId, villageId, villageName, sakhiName, mobileNumber, mobileVerified, consentServeSakhi50]
+        SA3[Backend: isMinimal = consentServeSakhi50 && !aadhaarFront]
         SA4[Create row: profile_complete = false, rest null/false]
         SA5[Return created submission]
         SA6[Client: invalidate my list, resetForm, step = nominate, toast]
@@ -228,7 +228,7 @@ flowchart TB
     subgraph SUBMIT["Submit"]
         SUB1[POST /api/mahila-samman/submit]
         SUB2[Read body]
-        SUB3{isMinimal? consent500Sakhi && !aadhaarFront}
+        SUB3{isMinimal? consentServeSakhi50 && !aadhaarFront}
         SUB4[Minimal: require appUserId, sakhiName, mobileNumber, mobileVerified]
         SUB5[Insert: profile_complete false, consent_500_sakhi true, rest null]
         SUB6[Full: require all fields incl fatherHusbandName, aadhaar, voter, photo, declaration]

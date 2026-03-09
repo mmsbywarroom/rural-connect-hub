@@ -95,11 +95,6 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   submissionDetails: { en: "Submission details", hi: "जमा विवरण", pa: "ਜਮ੍ਹਾਂ ਵੇਰਵੇ" },
   close: { en: "Close", hi: "बंद करें", pa: "ਬੰਦ ਕਰੋ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
-  consent500Sakhi: {
-    en: "Yes, I am ready to enrol 500 Sakhis.",
-    hi: "हाँ, मैं 500 सखियों को जोड़ने के लिए तैयार हूँ।",
-    pa: "ਹਾਂ, ਮੈਂ 500 ਸਖੀਆਂ ਨੂੰ ਜੋੜਨ ਲਈ ਤਿਆਰ ਹਾਂ।",
-  },
   consentServeSakhi50: {
     en: "I am ready to serve as a Sakhi and I will actively help ensure that at least 50 women receive the Mahila Samman Rashi benefit.",
     hi: "मैं सखी के रूप में सेवा करने के लिए तैयार हूँ और सक्रिय रूप से यह सुनिश्चित करूंगी कि कम से कम 50 महिलाओं को महिला सम्मान राशि का लाभ मिले।",
@@ -146,7 +141,6 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
-  const [consent500Sakhi, setConsent500Sakhi] = useState(false);
   const [consentServeSakhi50, setConsentServeSakhi50] = useState(false);
 
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
@@ -199,7 +193,6 @@ export default function TaskMahilaSamman({ user }: Props) {
     } else setVoterMatch(null);
     setSakhiPhoto(editSubmission.sakhiPhoto || null);
     setDeclarationChecked(!!editSubmission.declarationChecked);
-    setConsent500Sakhi(!!editSubmission.consent500Sakhi);
     setConsentServeSakhi50(!!editSubmission.consentServeSakhi50);
     setStep("form");
   }, [editingId, editSubmission?.id, editSubmission?.sakhiName]);
@@ -375,7 +368,6 @@ export default function TaskMahilaSamman({ user }: Props) {
     setOtpSent(false);
     setOtp("");
     setFatherHusbandName("");
-    setConsent500Sakhi(false);
     setConsentServeSakhi50(false);
     setAadhaarFront(null);
     setAadhaarBack(null);

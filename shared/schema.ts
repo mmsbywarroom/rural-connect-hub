@@ -1258,7 +1258,6 @@ export const mahilaSammanSubmissions = pgTable("mahila_samman_submissions", {
   sakhiName: text("sakhi_name").notNull(),
   mobileNumber: text("mobile_number").notNull(),
   mobileVerified: boolean("mobile_verified").default(false),
-  consent500Sakhi: boolean("consent_500_sakhi").default(false),
   consentServeSakhi50: boolean("consent_serve_sakhi_50").default(false),
   profileComplete: boolean("profile_complete").default(false),
   fatherHusbandName: text("father_husband_name"),
