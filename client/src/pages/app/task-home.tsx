@@ -735,7 +735,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
         </section>
         )}
-        )}
 
         <section>
           <div className="flex items-center gap-2 mb-3">
