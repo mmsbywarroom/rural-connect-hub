@@ -141,7 +141,7 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
-  const [category, setCategory] = useState<"" | "General" | "OBC" | "SC" | "ST">("");
+  const [consentServeSakhi50, setConsentServeSakhi50] = useState(false);
 
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
@@ -307,37 +307,45 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      if (editingId) {
+        const payload = {
+          appUserId: user.id,
+          villageId: selectedVillageId || null,
+          villageName: selectedVillageName || null,
+          sakhiName: sakhiName.trim(),
+          mobileNumber: mobileNumber.trim(),
+          mobileVerified,
+          fatherHusbandName: fatherHusbandName.trim(),
+          aadhaarFront,
+          aadhaarBack,
+          ocrAadhaarName: ocrAadhaarName.trim() || null,
+          ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
+          ocrAadhaarDob: ocrAadhaarDob.trim() || null,
+          ocrAadhaarGender: ocrAadhaarGender.trim() || null,
+          ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
+          aadhaarVerifiedSameAsVoter,
+          ocrVoterId: ocrVoterId.trim() || null,
+          ocrVoterName: ocrVoterName.trim() || null,
+          voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
+          voterMappingName: voterMatch?.name || null,
+          voterMappingFatherName: voterMatch?.fatherName || null,
+          voterMappingVillageName: voterMatch?.villageName || null,
+          sakhiPhoto,
+          declarationChecked,
+        };
+        const res = await apiRequest("PATCH", `/api/mahila-samman/my/${editingId}`, { ...payload, appUserId: user.id });
+        return res.json();
+      }
+      const minimalPayload = {
         appUserId: user.id,
         villageId: selectedVillageId || null,
         villageName: selectedVillageName || null,
         sakhiName: sakhiName.trim(),
         mobileNumber: mobileNumber.trim(),
-        mobileVerified,
-        fatherHusbandName: fatherHusbandName.trim(),
-        aadhaarFront,
-        aadhaarBack,
-        ocrAadhaarName: ocrAadhaarName.trim() || null,
-        ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
-        ocrAadhaarDob: ocrAadhaarDob.trim() || null,
-        ocrAadhaarGender: ocrAadhaarGender.trim() || null,
-        ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
-        aadhaarVerifiedSameAsVoter,
-        ocrVoterId: ocrVoterId.trim() || null,
-        ocrVoterName: ocrVoterName.trim() || null,
-        voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
-        voterMappingName: voterMatch?.name || null,
-        voterMappingFatherName: voterMatch?.fatherName || null,
-        voterMappingVillageName: voterMatch?.villageName || null,
-        sakhiPhoto,
-        declarationChecked,
-        category: category || null,
+        mobileVerified: true,
+        consentServeSakhi50: true,
       };
-      if (editingId) {
-        const res = await apiRequest("PATCH", `/api/mahila-samman/my/${editingId}`, { ...payload, appUserId: user.id });
-        return res.json();
-      }
-      const res = await apiRequest("POST", "/api/mahila-samman/submit", payload);
+      const res = await apiRequest("POST", "/api/mahila-samman/submit", minimalPayload);
       return res.json();
     },
     onSuccess: (data) => {
@@ -360,6 +368,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     setOtpSent(false);
     setOtp("");
     setFatherHusbandName("");
+    setConsentServeSakhi50(false);
     setAadhaarFront(null);
     setAadhaarBack(null);
     setOcrAadhaarName("");
@@ -375,14 +384,13 @@ export default function TaskMahilaSamman({ user }: Props) {
     setManualBoothId("");
     setSakhiPhoto(null);
     setDeclarationChecked(false);
-    setCategory("");
   }
 
   const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
+  const canSubmitMinimal = !!(sakhiName.trim() && mobileVerified && consentServeSakhi50);
   const canSubmitFull =
     sakhiName.trim() &&
     mobileVerified &&
-    category &&
     fatherHusbandName.trim() &&
     aadhaarFront &&
     aadhaarBack &&
@@ -391,7 +399,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     hasVoterBooth &&
     sakhiPhoto &&
     declarationChecked;
-  const canSubmit = canSubmitFull;
+  const canSubmit = editingId ? canSubmitFull : canSubmitMinimal;
 
   const goPrev = () => {
     if (step === "form") setStep("unit");
@@ -544,6 +552,8 @@ export default function TaskMahilaSamman({ user }: Props) {
     );
   }
 
+  const isSimpleForm = !editingId;
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24">
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
@@ -562,80 +572,35 @@ export default function TaskMahilaSamman({ user }: Props) {
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">{L("mobile", language)}</label>
               <div className="flex gap-2">
-                <Input
-                  value={mobileNumber}
-                  onChange={(e) => {
-                    setMobileNumber(e.target.value);
-                    setMobileVerified(false);
-                    setOtpSent(false);
-                  }}
-                  inputMode="tel"
-                  maxLength={14}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={sendOtp}
-                  disabled={!isIndianMobile(mobileNumber)}
-                >
-                  {L("sendOtp", language)}
-                </Button>
+                <Input value={mobileNumber} onChange={(e) => { setMobileNumber(e.target.value); setMobileVerified(false); setOtpSent(false); }} inputMode="tel" maxLength={14} className="flex-1" />
+                <Button type="button" variant="outline" size="sm" onClick={sendOtp} disabled={!isIndianMobile(mobileNumber)}>{L("sendOtp", language)}</Button>
               </div>
               {otpSent && !mobileVerified && (
                 <div className="flex gap-2 mt-2">
-                  <Input
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    placeholder={L("enterOtp", language)}
-                    inputMode="numeric"
-                    className="flex-1"
-                  />
-                  <Button type="button" size="sm" onClick={verifyOtp}>
-                    {L("verify", language)}
-                  </Button>
+                  <Input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder={L("enterOtp", language)} inputMode="numeric" className="flex-1" />
+                  <Button type="button" size="sm" onClick={verifyOtp}>{L("verify", language)}</Button>
                 </div>
               )}
-              {mobileVerified && (
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <Phone className="h-3 w-3" /> Verified
-                </p>
-              )}
+              {mobileVerified && <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><Phone className="h-3 w-3" /> Verified</p>}
             </div>
           </CardContent>
         </Card>
 
-        {/* Category selection (General / OBC / SC / ST) */}
-        <Card>
-          <CardContent className="p-4 space-y-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              Category
-            </label>
-            <select
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as any)}
-            >
-              <option value="">Select Category</option>
-              <option value="General">General</option>
-              <option value="OBC">OBC</option>
-              <option value="SC">SC</option>
-              <option value="ST">ST</option>
-            </select>
-          </CardContent>
-        </Card>
-
+        {isSimpleForm ? (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-start space-x-2">
+                <Checkbox id="consentServe50" checked={consentServeSakhi50} onCheckedChange={(c) => setConsentServeSakhi50(!!c)} className="mt-0.5" />
+                <label htmlFor="consentServe50" className="text-sm leading-tight">{L("consentServeSakhi50", language)}</label>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         <Card>
           <CardContent className="p-4">
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              {L("fatherHusband", language)}
-            </label>
-            <Input
-              value={fatherHusbandName}
-              onChange={(e) => setFatherHusbandName(e.target.value)}
-              placeholder={L("fatherHusband", language)}
-            />
+            <label className="block text-xs font-medium text-slate-600 mb-1">{L("fatherHusband", language)}</label>
+            <Input value={fatherHusbandName} onChange={(e) => setFatherHusbandName(e.target.value)} placeholder={L("fatherHusband", language)} />
           </CardContent>
         </Card>
 
@@ -767,6 +732,8 @@ export default function TaskMahilaSamman({ user }: Props) {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
 
         <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={!canSubmit || submitMutation.isPending}>
           {submitMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}{L("submit", language)}

@@ -1260,8 +1260,6 @@ export const mahilaSammanSubmissions = pgTable("mahila_samman_submissions", {
   mobileVerified: boolean("mobile_verified").default(false),
   consentServeSakhi50: boolean("consent_serve_sakhi_50").default(false),
   profileComplete: boolean("profile_complete").default(false),
-  // Caste / social category of the Sakhi (General / OBC / SC / ST)
-  category: text("category"),
   fatherHusbandName: text("father_husband_name"),
   aadhaarFront: text("aadhaar_front"),
   aadhaarBack: text("aadhaar_back"),

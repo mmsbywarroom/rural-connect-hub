@@ -72,14 +72,6 @@ export default function MahilaSammanAdminPage() {
   });
 
   const sorted = list.slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
-
-  // Group by Sakhi mobile to show how many entries each Sakhi has added
-  const countsByMobile = sorted.reduce<Record<string, number>>((acc, s) => {
-    if (!s.mobileNumber) return acc;
-    const key = s.mobileNumber;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
   const filtered = !search.trim()
     ? sorted
     : sorted.filter(
@@ -145,14 +137,6 @@ export default function MahilaSammanAdminPage() {
                         <>
                           <span className="mx-1">•</span>
                           {s.villageName}
-                        </>
-                      )}
-                      {s.mobileNumber && (
-                        <>
-                          <span className="mx-1">•</span>
-                          <span className="text-[11px] text-slate-500">
-                            Entries by this Sakhi: {countsByMobile[s.mobileNumber] || 1}
-                          </span>
                         </>
                       )}
                     </p>
