@@ -95,6 +95,12 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   submissionDetails: { en: "Submission details", hi: "जमा विवरण", pa: "ਜਮ੍ਹਾਂ ਵੇਰਵੇ" },
   close: { en: "Close", hi: "बंद करें", pa: "ਬੰਦ ਕਰੋ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
+  consent500Sakhi: {
+    en: "Yes, I am ready to enrol 500 Sakhis.",
+    hi: "हाँ, मैं 500 सखियों को जोड़ने के लिए तैयार हूँ।",
+    pa: "ਹਾਂ, ਮੈਂ 500 ਸਖੀਆਂ ਨੂੰ ਜੋੜਨ ਲਈ ਤਿਆਰ ਹਾਂ।",
+  },
+  profileIncomplete: { en: "Profile incomplete", hi: "प्रोफाइल अधूरी", pa: "ਪ੍ਰੋਫਾਈਲ ਅਧੂਰੀ" },
 };
 
 function L(key: string, lang: string): string {
@@ -135,6 +141,7 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
+  const [consent500Sakhi, setConsent500Sakhi] = useState(false);
 
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
@@ -186,6 +193,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     } else setVoterMatch(null);
     setSakhiPhoto(editSubmission.sakhiPhoto || null);
     setDeclarationChecked(!!editSubmission.declarationChecked);
+    setConsent500Sakhi(!!editSubmission.consent500Sakhi);
     setStep("form");
   }, [editingId, editSubmission?.id, editSubmission?.sakhiName]);
 
@@ -299,36 +307,45 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      if (editingId) {
+        const payload = {
+          appUserId: user.id,
+          villageId: selectedVillageId || null,
+          villageName: selectedVillageName || null,
+          sakhiName: sakhiName.trim(),
+          mobileNumber: mobileNumber.trim(),
+          mobileVerified,
+          fatherHusbandName: fatherHusbandName.trim(),
+          aadhaarFront,
+          aadhaarBack,
+          ocrAadhaarName: ocrAadhaarName.trim() || null,
+          ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
+          ocrAadhaarDob: ocrAadhaarDob.trim() || null,
+          ocrAadhaarGender: ocrAadhaarGender.trim() || null,
+          ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
+          aadhaarVerifiedSameAsVoter,
+          ocrVoterId: ocrVoterId.trim() || null,
+          ocrVoterName: ocrVoterName.trim() || null,
+          voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
+          voterMappingName: voterMatch?.name || null,
+          voterMappingFatherName: voterMatch?.fatherName || null,
+          voterMappingVillageName: voterMatch?.villageName || null,
+          sakhiPhoto,
+          declarationChecked,
+        };
+        const res = await apiRequest("PATCH", `/api/mahila-samman/my/${editingId}`, { ...payload, appUserId: user.id });
+        return res.json();
+      }
+      const minimalPayload = {
         appUserId: user.id,
         villageId: selectedVillageId || null,
         villageName: selectedVillageName || null,
         sakhiName: sakhiName.trim(),
         mobileNumber: mobileNumber.trim(),
-        mobileVerified,
-        fatherHusbandName: fatherHusbandName.trim(),
-        aadhaarFront,
-        aadhaarBack,
-        ocrAadhaarName: ocrAadhaarName.trim() || null,
-        ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
-        ocrAadhaarDob: ocrAadhaarDob.trim() || null,
-        ocrAadhaarGender: ocrAadhaarGender.trim() || null,
-        ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
-        aadhaarVerifiedSameAsVoter,
-        ocrVoterId: ocrVoterId.trim() || null,
-        ocrVoterName: ocrVoterName.trim() || null,
-        voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
-        voterMappingName: voterMatch?.name || null,
-        voterMappingFatherName: voterMatch?.fatherName || null,
-        voterMappingVillageName: voterMatch?.villageName || null,
-        sakhiPhoto,
-        declarationChecked,
+        mobileVerified: true,
+        consent500Sakhi: true,
       };
-      if (editingId) {
-        const res = await apiRequest("PATCH", `/api/mahila-samman/my/${editingId}`, { ...payload, appUserId: user.id });
-        return res.json();
-      }
-      const res = await apiRequest("POST", "/api/mahila-samman/submit", payload);
+      const res = await apiRequest("POST", "/api/mahila-samman/submit", minimalPayload);
       return res.json();
     },
     onSuccess: (data) => {
@@ -351,6 +368,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     setOtpSent(false);
     setOtp("");
     setFatherHusbandName("");
+    setConsent500Sakhi(false);
     setAadhaarFront(null);
     setAadhaarBack(null);
     setOcrAadhaarName("");
@@ -369,7 +387,8 @@ export default function TaskMahilaSamman({ user }: Props) {
   }
 
   const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
-  const canSubmit =
+  const canSubmitMinimal = !!(sakhiName.trim() && mobileVerified && consent500Sakhi);
+  const canSubmitFull =
     sakhiName.trim() &&
     mobileVerified &&
     fatherHusbandName.trim() &&
@@ -380,6 +399,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     hasVoterBooth &&
     sakhiPhoto &&
     declarationChecked;
+  const canSubmit = editingId ? canSubmitFull : canSubmitMinimal;
 
   const goPrev = () => {
     if (step === "form") setStep("unit");
@@ -447,7 +467,11 @@ export default function TaskMahilaSamman({ user }: Props) {
                     <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
                     <div className="flex gap-1 flex-shrink-0">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("edit", language)}</Button>
+                      {!s.profileComplete ? (
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("profileIncomplete", language)}</Button>
+                      ) : s.status === "pending" ? (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("edit", language)}</Button>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -485,8 +509,11 @@ export default function TaskMahilaSamman({ user }: Props) {
                       <p className="text-slate-800">{sub.villageName || "—"}</p>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2 pt-2 border-t">
-                    {sub.status === "pending" && (
+                  <div className="flex justify-end gap-2 pt-2 border-t flex-wrap">
+                    {!sub.profileComplete && (
+                      <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("profileIncomplete", language)}</Button>
+                    )}
+                    {sub.profileComplete && sub.status === "pending" && (
                       <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("edit", language)}</Button>
                     )}
                     <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
@@ -525,6 +552,8 @@ export default function TaskMahilaSamman({ user }: Props) {
     );
   }
 
+  const isSimpleForm = !editingId;
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24">
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
@@ -557,6 +586,17 @@ export default function TaskMahilaSamman({ user }: Props) {
           </CardContent>
         </Card>
 
+        {isSimpleForm ? (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-start space-x-2">
+                <Checkbox id="consent500" checked={consent500Sakhi} onCheckedChange={(c) => setConsent500Sakhi(!!c)} className="mt-0.5" />
+                <label htmlFor="consent500" className="text-sm leading-tight">{L("consent500Sakhi", language)}</label>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         <Card>
           <CardContent className="p-4">
             <label className="block text-xs font-medium text-slate-600 mb-1">{L("fatherHusband", language)}</label>
@@ -692,6 +732,8 @@ export default function TaskMahilaSamman({ user }: Props) {
             </div>
           </CardContent>
         </Card>
+          </>
+        )}
 
         <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={!canSubmit || submitMutation.isPending}>
           {submitMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}{L("submit", language)}

@@ -4444,6 +4444,42 @@ export async function registerRoutes(
         sakhiPhoto,
         declarationChecked,
       } = body;
+      const isMinimal = !!body.consent500Sakhi && !body.aadhaarFront;
+      if (isMinimal) {
+        if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified) {
+          return res.status(400).json({ error: "Sakhi name and verified mobile required" });
+        }
+        const payload = {
+          appUserId: String(appUserId),
+          villageId: villageId || null,
+          villageName: villageName || null,
+          sakhiName: String(sakhiName).trim(),
+          mobileNumber: String(mobileNumber).trim(),
+          mobileVerified: true,
+          consent500Sakhi: true,
+          profileComplete: false,
+          fatherHusbandName: null,
+          aadhaarFront: null,
+          aadhaarBack: null,
+          ocrAadhaarName: null,
+          ocrAadhaarNumber: null,
+          ocrAadhaarDob: null,
+          ocrAadhaarGender: null,
+          ocrAadhaarAddress: null,
+          aadhaarVerifiedSameAsVoter: false,
+          ocrVoterId: null,
+          ocrVoterName: null,
+          voterMappingBoothId: null,
+          voterMappingName: null,
+          voterMappingFatherName: null,
+          voterMappingVillageName: null,
+          sakhiPhoto: null,
+          declarationChecked: false,
+          status: "pending",
+        };
+        const created = await storage.createMahilaSammanSubmission(payload as any);
+        return res.json(created);
+      }
       if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified || !fatherHusbandName?.trim()) {
         return res.status(400).json({ error: "Sakhi name, verified mobile, and father/husband name required" });
       }
@@ -4469,6 +4505,8 @@ export async function registerRoutes(
         sakhiName: String(sakhiName).trim(),
         mobileNumber: String(mobileNumber).trim(),
         mobileVerified: !!mobileVerified,
+        consent500Sakhi: !!body.consent500Sakhi,
+        profileComplete: true,
         fatherHusbandName: String(fatherHusbandName).trim(),
         aadhaarFront: aadhaarFront || null,
         aadhaarBack: aadhaarBack || null,
@@ -4522,6 +4560,7 @@ export async function registerRoutes(
       for (const k of keys) {
         if (body[k] !== undefined) update[k] = body[k];
       }
+      if (body.aadhaarFront && body.aadhaarBack && body.sakhiPhoto) update.profileComplete = true;
       const updated = await storage.updateMahilaSammanSubmission(id, update);
       res.json(updated);
     } catch (error) {
