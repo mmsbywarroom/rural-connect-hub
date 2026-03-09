@@ -661,7 +661,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
         )}
 
         {!isMahilaSakhi && (
-        {!isMahilaSakhi && (
         <section>
           <div className="grid grid-cols-2 gap-3">
             <Link href="/leaderboard">
