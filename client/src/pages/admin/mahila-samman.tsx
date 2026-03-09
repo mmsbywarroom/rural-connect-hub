@@ -176,6 +176,25 @@ export default function MahilaSammanAdminPage() {
               </div>
 
               <div>
+                <p className="font-semibold text-slate-700 mb-1">Consent</p>
+                <div className="space-y-1 text-xs">
+                  {selected.consent500Sakhi != null && (
+                    <p className="text-slate-700">
+                      <span className="text-slate-600">Ready to enrol 500 Sakhis:</span> {selected.consent500Sakhi ? "Yes" : "No"}
+                    </p>
+                  )}
+                  {selected.consentServeSakhi50 != null && (
+                    <p className="text-slate-700">
+                      <span className="text-slate-600">Serve as Sakhi, 50 women benefit:</span> {selected.consentServeSakhi50 ? "Yes" : "No"}
+                    </p>
+                  )}
+                  {selected.consent500Sakhi == null && selected.consentServeSakhi50 == null && (
+                    <p className="text-slate-500">—</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
                 <p className="font-semibold text-slate-700 mb-1">OCR Aadhaar Data</p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span className="text-slate-600">Name:</span><span>{selected.ocrAadhaarName || "—"}</span>
