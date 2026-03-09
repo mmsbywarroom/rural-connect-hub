@@ -100,6 +100,11 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
     hi: "हाँ, मैं 500 सखियों को जोड़ने के लिए तैयार हूँ।",
     pa: "ਹਾਂ, ਮੈਂ 500 ਸਖੀਆਂ ਨੂੰ ਜੋੜਨ ਲਈ ਤਿਆਰ ਹਾਂ।",
   },
+  consentServeSakhi50: {
+    en: "I am ready to serve as a Sakhi and I will actively help ensure that at least 50 women receive the Mahila Samman Rashi benefit.",
+    hi: "मैं सखी के रूप में सेवा करने के लिए तैयार हूँ और सक्रिय रूप से यह सुनिश्चित करूंगी कि कम से कम 50 महिलाओं को महिला सम्मान राशि का लाभ मिले।",
+    pa: "ਮੈਂ ਸਖੀ ਵਜੋਂ ਸੇਵਾ ਕਰਨ ਲਈ ਤਿਆਰ ਹਾਂ ਅਤੇ ਸਰਗਰਮੀ ਨਾਲ ਇਹ ਯਕੀਨੀ ਬਣਾਵਾਂਗੀ ਕਿ ਘੱਟੋ-ਘੱਟ 50 ਔਰਤਾਂ ਨੂੰ ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ ਦਾ ਲਾਭ ਮਿਲੇ।",
+  },
   profileIncomplete: { en: "Profile incomplete", hi: "प्रोफाइल अधूरी", pa: "ਪ੍ਰੋਫਾਈਲ ਅਧੂਰੀ" },
 };
 
@@ -142,6 +147,7 @@ export default function TaskMahilaSamman({ user }: Props) {
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
   const [consent500Sakhi, setConsent500Sakhi] = useState(false);
+  const [consentServeSakhi50, setConsentServeSakhi50] = useState(false);
 
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
@@ -194,6 +200,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     setSakhiPhoto(editSubmission.sakhiPhoto || null);
     setDeclarationChecked(!!editSubmission.declarationChecked);
     setConsent500Sakhi(!!editSubmission.consent500Sakhi);
+    setConsentServeSakhi50(!!editSubmission.consentServeSakhi50);
     setStep("form");
   }, [editingId, editSubmission?.id, editSubmission?.sakhiName]);
 
@@ -343,7 +350,7 @@ export default function TaskMahilaSamman({ user }: Props) {
         sakhiName: sakhiName.trim(),
         mobileNumber: mobileNumber.trim(),
         mobileVerified: true,
-        consent500Sakhi: true,
+        consentServeSakhi50: true,
       };
       const res = await apiRequest("POST", "/api/mahila-samman/submit", minimalPayload);
       return res.json();
@@ -369,6 +376,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     setOtp("");
     setFatherHusbandName("");
     setConsent500Sakhi(false);
+    setConsentServeSakhi50(false);
     setAadhaarFront(null);
     setAadhaarBack(null);
     setOcrAadhaarName("");
@@ -387,7 +395,7 @@ export default function TaskMahilaSamman({ user }: Props) {
   }
 
   const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
-  const canSubmitMinimal = !!(sakhiName.trim() && mobileVerified && consent500Sakhi);
+  const canSubmitMinimal = !!(sakhiName.trim() && mobileVerified && consentServeSakhi50);
   const canSubmitFull =
     sakhiName.trim() &&
     mobileVerified &&
@@ -590,8 +598,8 @@ export default function TaskMahilaSamman({ user }: Props) {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-start space-x-2">
-                <Checkbox id="consent500" checked={consent500Sakhi} onCheckedChange={(c) => setConsent500Sakhi(!!c)} className="mt-0.5" />
-                <label htmlFor="consent500" className="text-sm leading-tight">{L("consent500Sakhi", language)}</label>
+                <Checkbox id="consentServe50" checked={consentServeSakhi50} onCheckedChange={(c) => setConsentServeSakhi50(!!c)} className="mt-0.5" />
+                <label htmlFor="consentServe50" className="text-sm leading-tight">{L("consentServeSakhi50", language)}</label>
               </div>
             </CardContent>
           </Card>

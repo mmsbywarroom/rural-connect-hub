@@ -4444,7 +4444,7 @@ export async function registerRoutes(
         sakhiPhoto,
         declarationChecked,
       } = body;
-      const isMinimal = !!body.consent500Sakhi && !body.aadhaarFront;
+      const isMinimal = (!!body.consent500Sakhi || !!body.consentServeSakhi50) && !body.aadhaarFront;
       if (isMinimal) {
         if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified) {
           return res.status(400).json({ error: "Sakhi name and verified mobile required" });
@@ -4456,7 +4456,8 @@ export async function registerRoutes(
           sakhiName: String(sakhiName).trim(),
           mobileNumber: String(mobileNumber).trim(),
           mobileVerified: true,
-          consent500Sakhi: true,
+          consent500Sakhi: !!body.consent500Sakhi,
+          consentServeSakhi50: !!body.consentServeSakhi50,
           profileComplete: false,
           fatherHusbandName: null,
           aadhaarFront: null,
