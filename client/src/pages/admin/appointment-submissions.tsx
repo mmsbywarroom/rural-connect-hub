@@ -217,6 +217,17 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
 
+  const handleDownloadDocument = () => {
+    if (!appointment.documentPhoto) return;
+    const a = document.createElement("a");
+    a.href = appointment.documentPhoto;
+    a.download = "appointment-document.png";
+    a.target = "_blank";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const { data: detailData } = useQuery<{ appointment: Appointment; logs: AppointmentLog[] }>({
     queryKey: ["/api/appointment/appointments", appointment.id],
   });
@@ -275,13 +286,24 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
               {appointment.documentPhoto && (
                 <div>
                   <span className="text-xs text-muted-foreground">Document / Application</span>
+                <div className="mt-1 space-y-2">
                   <img
                     src={appointment.documentPhoto}
                     alt="Document"
-                    className="max-h-60 rounded-lg border border-slate-200 mt-1 cursor-pointer"
+                    className="max-h-60 rounded-lg border border-slate-200 cursor-pointer"
                     onClick={() => window.open(appointment.documentPhoto!, "_blank")}
                     data-testid="img-appointment-document"
                   />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={handleDownloadDocument}
+                    data-testid="button-download-appointment-document"
+                  >
+                    Download Document
+                  </Button>
+                </div>
                 </div>
               )}
               {appointment.audioNote && (

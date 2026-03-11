@@ -671,30 +671,58 @@ export default function DataExportPage() {
         <TabsContent value="mapped-volunteers" className="mt-4">
           <Card>
             <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle>Mapped Volunteers</CardTitle>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {selectedVolunteers.size > 0 && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>Mapped Volunteers</CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedVolunteers.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setBatchDeleteConfirm({ open: true, type: "volunteer", count: selectedVolunteers.size })}
+                        data-testid="button-batch-delete-volunteers"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete {selectedVolunteers.size} Selected
+                      </Button>
+                    )}
                     <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setBatchDeleteConfirm({ open: true, type: "volunteer", count: selectedVolunteers.size })}
-                      data-testid="button-batch-delete-volunteers"
+                      variant="outline"
+                      onClick={handleExportVolunteers}
+                      disabled={!mappedVolunteers?.length}
+                      data-testid="button-export-volunteers"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete {selectedVolunteers.size} Selected
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
                     </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={handleExportVolunteers}
-                    disabled={!mappedVolunteers?.length}
-                    data-testid="button-export-volunteers"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
+                  </div>
                 </div>
+                {mappedVolunteers && mappedVolunteers.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Total volunteers</p>
+                      <p className="text-sm text-slate-900">{mappedVolunteers.length}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Unique mobiles</p>
+                      <p className="text-sm text-slate-900">
+                        {new Set(mappedVolunteers.map(v => v.mobileNumber)).size}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">With Aadhaar attached</p>
+                      <p className="text-sm text-slate-900">
+                        {mappedVolunteers.filter(v => v.aadhaarPhoto || v.aadhaarPhotoBack || v.ocrAadhaarNumber).length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">With Voter ID attached</p>
+                      <p className="text-sm text-slate-900">
+                        {mappedVolunteers.filter(v => v.voterCardPhoto || v.voterCardPhotoBack || v.ocrVoterId).length}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -803,30 +831,58 @@ export default function DataExportPage() {
         <TabsContent value="supporters" className="mt-4">
           <Card>
             <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <CardTitle>Supporters</CardTitle>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {selectedSupporters.size > 0 && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>Supporters</CardTitle>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectedSupporters.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setBatchDeleteConfirm({ open: true, type: "supporter", count: selectedSupporters.size })}
+                        data-testid="button-batch-delete-supporters"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete {selectedSupporters.size} Selected
+                      </Button>
+                    )}
                     <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setBatchDeleteConfirm({ open: true, type: "supporter", count: selectedSupporters.size })}
-                      data-testid="button-batch-delete-supporters"
+                      variant="outline"
+                      onClick={handleExportSupporters}
+                      disabled={!supportersList?.length}
+                      data-testid="button-export-supporters"
                     >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete {selectedSupporters.size} Selected
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
                     </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={handleExportSupporters}
-                    disabled={!supportersList?.length}
-                    data-testid="button-export-supporters"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
+                  </div>
                 </div>
+                {supportersList && supportersList.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Total supporters</p>
+                      <p className="text-sm text-slate-900">{supportersList.length}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Unique mobiles</p>
+                      <p className="text-sm text-slate-900">
+                        {new Set(supportersList.map(s => s.mobileNumber)).size}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">With Aadhaar attached</p>
+                      <p className="text-sm text-slate-900">
+                        {supportersList.filter(s => s.aadhaarPhoto || s.aadhaarPhotoBack || s.ocrAadhaarNumber).length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">With Voter ID attached</p>
+                      <p className="text-sm text-slate-900">
+                        {supportersList.filter(s => s.voterCardPhoto || s.voterCardPhotoBack || s.ocrVoterId).length}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent>
