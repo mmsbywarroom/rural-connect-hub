@@ -743,35 +743,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           <div className="space-y-2.5">
-          {/* Mahila Samman Rashi through Punjab Gov – Sakhis see only this; others see both */}
-          {isMahilaSakhi && (
-          <Link href="/task/mahila-samman-punjab-gov">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 border-2 border-purple-100" data-testid="task-card-mahila-samman-punjab">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि (पंजाब सरकार)" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)" : "Mahila Samman Rashi through Punjab Gov"}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "Every woman ₹1,000/month; SC/ST ₹1,500/month"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          )}
           {/* Original Mahila Samman Rashi – only for non-Sakhi users */}
           {!isMahilaSakhi && (
           <Link href="/task/mahila-samman-rashi">
@@ -790,35 +761,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                       : language === "pa"
                       ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
                       : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          )}
-          {/* Punjab Gov task – for all users (Sakhi already saw it above; others see it here too) */}
-          {!isMahilaSakhi && (
-          <Link href="/task/mahila-samman-punjab-gov">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 border-2 border-purple-100" data-testid="task-card-mahila-samman-punjab">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि (पंजाब सरकार)" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)" : "Mahila Samman Rashi through Punjab Gov"}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "Every woman ₹1,000/month; SC/ST ₹1,500/month"}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
