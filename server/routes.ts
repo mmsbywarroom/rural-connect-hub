@@ -3040,8 +3040,61 @@ export async function registerRoutes(
       const allVillages = await storage.getVillages();
       const allVolunteers = await storage.getVolunteers();
       const allVisitors = await storage.getVisitors();
+      const allCscReports = await storage.getCscReports();
+      const allMappedVolunteers = await storage.getMappedVolunteers();
+      const allSupporters = await storage.getSupporters();
 
-      const uniqueUserIds = new Set(allSubmissions.map(s => s.appUserId));
+      type ActivityEvent = {
+        appUserId: string;
+        taskKey: string;
+        taskName: string;
+        createdAt: Date | null;
+      };
+
+      const events: ActivityEvent[] = [];
+
+      // Dynamic task submissions
+      for (const sub of allSubmissions) {
+        const task = allTasks.find(t => t.id === sub.taskConfigId);
+        events.push({
+          appUserId: sub.appUserId,
+          taskKey: sub.taskConfigId,
+          taskName: task?.name || "Unknown Task",
+          createdAt: sub.createdAt ? new Date(sub.createdAt) : null,
+        });
+      }
+
+      // CSC / Camp reports
+      for (const r of allCscReports) {
+        events.push({
+          appUserId: r.appUserId,
+          taskKey: "csc-report",
+          taskName: "CSC/Camp Report",
+          createdAt: r.createdAt ? new Date(r.createdAt) : null,
+        });
+      }
+
+      // Volunteer mapping activity (mapped volunteers)
+      for (const v of allMappedVolunteers) {
+        events.push({
+          appUserId: v.addedByUserId,
+          taskKey: "volunteer-mapping",
+          taskName: "Volunteer Mapping",
+          createdAt: v.createdAt ? new Date(v.createdAt) : null,
+        });
+      }
+
+      // Supporter mapping activity
+      for (const s of allSupporters) {
+        events.push({
+          appUserId: s.addedByUserId,
+          taskKey: "supporter-mapping",
+          taskName: "Supporter Mapping",
+          createdAt: s.createdAt ? new Date(s.createdAt) : null,
+        });
+      }
+
+      const uniqueUserIds = new Set(events.map(e => e.appUserId).filter(Boolean));
 
       const dailyTrend: Record<string, number> = {};
       const taskBreakdown: Record<string, { taskId: string; taskName: string; count: number }> = {};
@@ -3051,27 +3104,37 @@ export async function registerRoutes(
         taskBreakdown[task.id] = { taskId: task.id, taskName: task.name, count: 0 };
       }
 
-      for (const sub of allSubmissions) {
-        const dateKey = sub.createdAt ? new Date(sub.createdAt).toISOString().split("T")[0] : "unknown";
+      // Ensure fixed-task entries exist for analytics charts
+      const ensureTask = (taskKey: string, taskName: string) => {
+        if (!taskBreakdown[taskKey]) {
+          taskBreakdown[taskKey] = { taskId: taskKey, taskName, count: 0 };
+        }
+      };
+
+      ensureTask("csc-report", "CSC/Camp Report");
+      ensureTask("volunteer-mapping", "Volunteer Mapping");
+      ensureTask("supporter-mapping", "Supporter Mapping");
+
+      for (const ev of events) {
+        const dateKey = ev.createdAt ? ev.createdAt.toISOString().split("T")[0] : "unknown";
         dailyTrend[dateKey] = (dailyTrend[dateKey] || 0) + 1;
 
-        if (taskBreakdown[sub.taskConfigId]) {
-          taskBreakdown[sub.taskConfigId].count++;
-        }
+        ensureTask(ev.taskKey, ev.taskName);
+        taskBreakdown[ev.taskKey].count++;
 
-        if (!userSubmissionCount[sub.appUserId]) {
-          const user = allUsers.find(u => u.id === sub.appUserId);
-          userSubmissionCount[sub.appUserId] = {
-            userId: sub.appUserId,
+        if (!userSubmissionCount[ev.appUserId]) {
+          const user = allUsers.find(u => u.id === ev.appUserId);
+          userSubmissionCount[ev.appUserId] = {
+            userId: ev.appUserId,
             userName: user?.name || "Unknown",
             count: 0,
             lastActive: null,
           };
         }
-        userSubmissionCount[sub.appUserId].count++;
-        const subDate = sub.createdAt ? new Date(sub.createdAt).toISOString() : null;
-        if (subDate && (!userSubmissionCount[sub.appUserId].lastActive || subDate > userSubmissionCount[sub.appUserId].lastActive!)) {
-          userSubmissionCount[sub.appUserId].lastActive = subDate;
+        userSubmissionCount[ev.appUserId].count++;
+        const subDate = ev.createdAt ? ev.createdAt.toISOString() : null;
+        if (subDate && (!userSubmissionCount[ev.appUserId].lastActive || subDate > userSubmissionCount[ev.appUserId].lastActive!)) {
+          userSubmissionCount[ev.appUserId].lastActive = subDate;
         }
       }
 
@@ -3083,27 +3146,28 @@ export async function registerRoutes(
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
 
-      const recentSubmissions = allSubmissions
+      const recentSubmissions = events
+        .slice()
         .sort((a, b) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const dateA = a.createdAt ? a.createdAt.getTime() : 0;
+          const dateB = b.createdAt ? b.createdAt.getTime() : 0;
           return dateB - dateA;
         })
         .slice(0, 10)
-        .map(sub => {
-          const user = allUsers.find(u => u.id === sub.appUserId);
-          const task = allTasks.find(t => t.id === sub.taskConfigId);
+        .map(ev => {
+          const user = allUsers.find(u => u.id === ev.appUserId);
+          const taskFromConfig = allTasks.find(t => t.id === ev.taskKey);
           return {
-            id: sub.id,
+            id: `${ev.taskKey}-${ev.createdAt?.toISOString() ?? "na"}`,
             userName: user?.name || "Unknown",
-            taskName: task?.name || "Unknown",
-            createdAt: sub.createdAt,
+            taskName: taskFromConfig?.name || ev.taskName || "Unknown",
+            createdAt: ev.createdAt,
           };
         });
 
       res.json({
         summary: {
-          totalSubmissions: allSubmissions.length,
+          totalSubmissions: events.length,
           activeUsers: uniqueUserIds.size,
           totalUsers: allUsers.length,
           totalTasks: allTasks.length,
