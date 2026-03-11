@@ -10,4 +10,3 @@ LEFT JOIN app_users u ON u.mobile_number = ms.mobile_number
 WHERE ms.mobile_number IS NOT NULL
   AND ms.sakhi_name IS NOT NULL
   AND u.id IS NULL;
-

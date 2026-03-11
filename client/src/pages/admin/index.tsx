@@ -43,6 +43,7 @@ import AppointmentSubmissionsPage from "./appointment-submissions";
 import EventVenuesPage from "./event-venues";
 import TirthYatraAdminPage from "./tirth-yatra";
 import MahilaSammanAdminPage from "./mahila-samman";
+import MahilaSammanPunjabAdminPage from "./mahila-samman-punjab";
 import RoadReportsPage from "./road-reports";
 import UserTreePage from "./user-tree";
 import LoginPageSettingsPage from "./login-page-settings";
@@ -79,6 +80,7 @@ const allMenuItems = [
   { id: "event-venues", label: "Event Venues", icon: Building2, path: "/admin/event-venues", group: "Management" },
   { id: "tirth-yatra", label: "Tirth Yatra", icon: Users, path: "/admin/tirth-yatra", group: "Management" },
   { id: "mahila-samman", label: "Mahila Samman Rashi", icon: Users, path: "/admin/mahila-samman", group: "Management" },
+  { id: "mahila-samman-punjab", label: "Mahila Samman (Punjab Gov)", icon: Users, path: "/admin/mahila-samman-punjab", group: "Management" },
   { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Management" },
   { id: "villages", label: "Villages", icon: MapPin, path: "/admin/villages", group: "Master Data" },
   { id: "issues", label: "Issues", icon: AlertTriangle, path: "/admin/issues", group: "Master Data" },
@@ -401,6 +403,7 @@ export default function AdminPage() {
     if (currentPath.includes("appointments")) return "appointments";
     if (currentPath.includes("event-venues")) return "event-venues";
     if (currentPath.includes("tirth-yatra")) return "tirth-yatra";
+    if (currentPath.includes("mahila-samman-punjab")) return "mahila-samman-punjab";
     if (currentPath.includes("mahila-samman")) return "mahila-samman";
     if (currentPath.includes("gov-school")) return "gov-school";
     if (currentPath.includes("sunwai")) return "sunwai";
@@ -521,6 +524,7 @@ export default function AdminPage() {
             {activeSection === "event-venues" && <EventVenuesPage />}
             {activeSection === "tirth-yatra" && <TirthYatraAdminPage />}
             {activeSection === "mahila-samman" && <MahilaSammanAdminPage />}
+            {activeSection === "mahila-samman-punjab" && <MahilaSammanPunjabAdminPage />}
             {activeSection === "voter-registration" && <VoterRegistrationSubmissionsPage />}
             {activeSection === "form-builder" && <FormBuilderPage />}
             {activeSection === "villages" && <VillagesPage />}

@@ -29,6 +29,7 @@ import TaskAppointment from "./task-appointment";
 import TaskEventVenue from "./task-event-venue";
 import TaskTirthYatra from "./task-tirth-yatra";
 import TaskMahilaSamman from "./task-mahila-samman";
+import TaskMahilaSammanPunjabGov from "./task-mahila-samman-punjab-gov";
 import TaskRoad from "./task-road";
 import TaskVoterRegistration from "./task-voter-registration";
 import SurveyForm from "./survey-form";
@@ -575,6 +576,9 @@ export default function VolunteerPortal() {
     }
     if (location === "/task/mahila-samman-rashi" || location === "/app/task/mahila-samman-rashi") {
       return <TaskMahilaSamman user={user} />;
+    }
+    if (location === "/task/mahila-samman-punjab-gov" || location === "/app/task/mahila-samman-punjab-gov") {
+      return <TaskMahilaSammanPunjabGov user={user} />;
     }
     if (location === "/task/voter-registration" || location === "/app/task/voter-registration") {
       if (!profileComplete) return <ProfileGate />;

@@ -77,6 +77,8 @@ import {
   type TirthYatraRequest, type InsertTirthYatraRequest,
   mahilaSammanSubmissions,
   type MahilaSammanSubmission, type InsertMahilaSammanSubmission,
+  mahilaSammanPunjabSubmissions,
+  type MahilaSammanPunjabSubmission, type InsertMahilaSammanPunjabSubmission,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -419,6 +421,12 @@ export interface IStorage {
   getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
   getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]>;
   getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
+
+  createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission>;
+  updateMahilaSammanPunjabSubmission(id: string, data: Partial<InsertMahilaSammanPunjabSubmission>): Promise<MahilaSammanPunjabSubmission | undefined>;
+  getMahilaSammanPunjabSubmission(id: string): Promise<MahilaSammanPunjabSubmission | undefined>;
+  getMahilaSammanPunjabSubmissions(): Promise<MahilaSammanPunjabSubmission[]>;
+  getMahilaSammanPunjabSubmissionsByUser(appUserId: string): Promise<MahilaSammanPunjabSubmission[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1918,6 +1926,31 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(mahilaSammanSubmissions)
       .where(eq(mahilaSammanSubmissions.appUserId, appUserId))
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
+  }
+
+  async createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission> {
+    const [row] = await db.insert(mahilaSammanPunjabSubmissions).values(data).returning();
+    return row;
+  }
+
+  async updateMahilaSammanPunjabSubmission(id: string, data: Partial<InsertMahilaSammanPunjabSubmission>): Promise<MahilaSammanPunjabSubmission | undefined> {
+    const [row] = await db.update(mahilaSammanPunjabSubmissions).set({ ...data, updatedAt: new Date() }).where(eq(mahilaSammanPunjabSubmissions.id, id)).returning();
+    return row;
+  }
+
+  async getMahilaSammanPunjabSubmission(id: string): Promise<MahilaSammanPunjabSubmission | undefined> {
+    const [row] = await db.select().from(mahilaSammanPunjabSubmissions).where(eq(mahilaSammanPunjabSubmissions.id, id));
+    return row;
+  }
+
+  async getMahilaSammanPunjabSubmissions(): Promise<MahilaSammanPunjabSubmission[]> {
+    return db.select().from(mahilaSammanPunjabSubmissions).orderBy(desc(mahilaSammanPunjabSubmissions.createdAt));
+  }
+
+  async getMahilaSammanPunjabSubmissionsByUser(appUserId: string): Promise<MahilaSammanPunjabSubmission[]> {
+    return db.select().from(mahilaSammanPunjabSubmissions)
+      .where(eq(mahilaSammanPunjabSubmissions.appUserId, appUserId))
+      .orderBy(desc(mahilaSammanPunjabSubmissions.createdAt));
   }
 
   // Road Reports

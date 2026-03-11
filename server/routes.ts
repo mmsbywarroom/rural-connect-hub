@@ -4622,6 +4622,202 @@ export async function registerRoutes(
     }
   });
 
+  // ===== Mahila Samman Rashi through Punjab Gov (separate task) =====
+  app.post("/api/mahila-samman-punjab/send-otp", async (req, res) => {
+    try {
+      const { mobile } = req.body;
+      if (!mobile || !isIndianMobile(mobile)) {
+        return res.status(400).json({ error: "Valid 10-digit mobile number required" });
+      }
+      const normalizedMobile = normalizeMobile(mobile);
+      const otp = await storeOTP(`mahila_punjab_${normalizedMobile}`);
+      if (isSmsConfigured()) {
+        await sendOtpSms(normalizedMobile, otp);
+        return res.json({ success: true, maskedMobile: maskMobile(normalizedMobile) });
+      }
+      res.status(500).json({ error: "SMS not configured" });
+    } catch (error) {
+      console.error("Mahila Samman Punjab send OTP error:", error);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/mahila-samman-punjab/verify-otp", async (req, res) => {
+    try {
+      const { mobile, otp } = req.body;
+      const normalizedMobile = normalizeMobile(mobile || "");
+      const ok = await verifyOTP(`mahila_punjab_${normalizedMobile}`, otp);
+      if (!ok) return res.status(401).json({ error: "Invalid or expired OTP" });
+      res.json({ success: true, verified: true });
+    } catch (error) {
+      console.error("Mahila Samman Punjab verify OTP error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  app.get("/api/mahila-samman-punjab/voter-match", async (req, res) => {
+    try {
+      const voterId = (req.query.voterId as string) || "";
+      if (!voterId.trim()) {
+        return res.json({ match: null });
+      }
+      const row = await storage.getVoterMappingByVoterId(voterId);
+      if (!row) return res.json({ match: null });
+      res.json({
+        match: {
+          boothId: row.boothId,
+          name: row.name,
+          fatherName: row.fatherName,
+          villageName: row.villageName,
+        },
+      });
+    } catch (error) {
+      console.error("Mahila Samman Punjab voter match error:", error);
+      res.status(500).json({ error: "Failed to match voter" });
+    }
+  });
+
+  app.post("/api/mahila-samman-punjab/submit", async (req, res) => {
+    try {
+      const body = req.body as any;
+      const {
+        appUserId,
+        villageId,
+        villageName,
+        name,
+        mobileNumber,
+        mobileVerified,
+        fatherHusbandName,
+        aadhaarFront,
+        aadhaarBack,
+        ocrAadhaarName,
+        ocrAadhaarNumber,
+        ocrAadhaarDob,
+        ocrAadhaarGender,
+        ocrAadhaarAddress,
+        aadhaarVerifiedSameAsVoter,
+        ocrVoterId,
+        ocrVoterName,
+        voterMappingBoothId,
+        voterMappingName,
+        voterMappingFatherName,
+        voterMappingVillageName,
+        manualBoothId,
+        category,
+        sakhiPhoto,
+        declarationChecked,
+      } = body;
+      if (!appUserId || !name?.trim() || !mobileNumber?.trim() || !mobileVerified) {
+        return res.status(400).json({ error: "Name and verified mobile required" });
+      }
+      if (!fatherHusbandName?.trim()) {
+        return res.status(400).json({ error: "Father/Husband name required" });
+      }
+      if (!aadhaarFront || !aadhaarBack) {
+        return res.status(400).json({ error: "Aadhaar front and back required" });
+      }
+      if (!aadhaarVerifiedSameAsVoter) {
+        return res.status(400).json({ error: "Please verify Aadhaar same as Voter ID" });
+      }
+      if (!ocrVoterId?.trim()) {
+        return res.status(400).json({ error: "Voter ID from document required" });
+      }
+      const boothId = voterMappingBoothId || (manualBoothId && String(manualBoothId).trim()) || null;
+      if (!boothId) {
+        return res.status(400).json({ error: "Voter match or manual Booth ID required" });
+      }
+      if (!category || !["general", "obc", "sc", "st"].includes(String(category).toLowerCase())) {
+        return res.status(400).json({ error: "Category required (General, OBC, SC, ST)" });
+      }
+      if (!sakhiPhoto) {
+        return res.status(400).json({ error: "Sakhi live photo required" });
+      }
+      if (!declarationChecked) {
+        return res.status(400).json({ error: "Declaration must be checked" });
+      }
+      const payload = {
+        appUserId: String(appUserId),
+        villageId: villageId || null,
+        villageName: villageName || null,
+        name: String(name).trim(),
+        mobileNumber: String(mobileNumber).trim(),
+        mobileVerified: true,
+        fatherHusbandName: String(fatherHusbandName).trim(),
+        aadhaarFront: aadhaarFront || null,
+        aadhaarBack: aadhaarBack || null,
+        ocrAadhaarName: ocrAadhaarName?.trim() || null,
+        ocrAadhaarNumber: ocrAadhaarNumber?.trim() || null,
+        ocrAadhaarDob: ocrAadhaarDob?.trim() || null,
+        ocrAadhaarGender: ocrAadhaarGender?.trim() || null,
+        ocrAadhaarAddress: ocrAadhaarAddress?.trim() || null,
+        aadhaarVerifiedSameAsVoter: !!aadhaarVerifiedSameAsVoter,
+        ocrVoterId: (ocrVoterId && String(ocrVoterId).trim()) || null,
+        ocrVoterName: ocrVoterName?.trim() || null,
+        voterMappingBoothId: voterMappingBoothId || null,
+        voterMappingName: voterMappingName || null,
+        voterMappingFatherName: voterMappingFatherName || null,
+        voterMappingVillageName: voterMappingVillageName || null,
+        manualBoothId: manualBoothId ? String(manualBoothId).trim() : null,
+        category: String(category).toLowerCase(),
+        sakhiPhoto: sakhiPhoto || null,
+        declarationChecked: !!declarationChecked,
+        status: "pending",
+      };
+      const created = await storage.createMahilaSammanPunjabSubmission(payload as any);
+      res.json(created);
+    } catch (error) {
+      console.error("Mahila Samman Punjab submit error:", error);
+      res.status(400).json({ error: "Failed to submit" });
+    }
+  });
+
+  app.get("/api/mahila-samman-punjab/my/:appUserId", async (req, res) => {
+    try {
+      const list = await storage.getMahilaSammanPunjabSubmissionsByUser(req.params.appUserId);
+      res.json(list);
+    } catch (error) {
+      console.error("Mahila Samman Punjab my list error:", error);
+      res.status(500).json({ error: "Failed to fetch list" });
+    }
+  });
+
+  app.get("/api/admin/mahila-samman-punjab", async (_req, res) => {
+    try {
+      const list = await storage.getMahilaSammanPunjabSubmissions();
+      res.json(list);
+    } catch (error) {
+      console.error("Admin Mahila Samman Punjab list error:", error);
+      res.status(500).json({ error: "Failed to fetch list" });
+    }
+  });
+
+  app.get("/api/admin/mahila-samman-punjab/:id", async (req, res) => {
+    try {
+      const row = await storage.getMahilaSammanPunjabSubmission(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (error) {
+      console.error("Admin Mahila Samman Punjab get error:", error);
+      res.status(500).json({ error: "Not found" });
+    }
+  });
+
+  app.patch("/api/admin/mahila-samman-punjab/:id", async (req, res) => {
+    try {
+      const { status, adminNote } = req.body as any;
+      const existing = await storage.getMahilaSammanPunjabSubmission(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      const update: any = {};
+      if (status) update.status = status;
+      if (adminNote !== undefined) update.adminNote = adminNote;
+      const updated = await storage.updateMahilaSammanPunjabSubmission(req.params.id, update);
+      res.json(updated);
+    } catch (error) {
+      console.error("Admin Mahila Samman Punjab update error:", error);
+      res.status(500).json({ error: "Failed to update" });
+    }
+  });
+
   // ===== Voter Registration Routes =====
 
   app.post("/api/voter-registration/send-otp", async (req, res) => {
