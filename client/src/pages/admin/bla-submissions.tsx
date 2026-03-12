@@ -5,9 +5,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Download, Trash2 } from "lucide-react";
+import { Loader2, Download, Trash2, Eye } from "lucide-react";
 import type { BlaSubmission } from "@shared/schema";
 
 function escapeCSVField(value: string): string {
@@ -18,6 +26,8 @@ function escapeCSVField(value: string): string {
 export default function BlaSubmissionsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<BlaSubmission | null>(null);
+  const [editBooth, setEditBooth] = useState("");
 
   const { data, isLoading, refetch } = useQuery<BlaSubmission[]>({
     queryKey: ["/api/bla/submissions"],
@@ -103,6 +113,22 @@ export default function BlaSubmissionsPage() {
   };
 
   const totalByBooth = Object.entries(boothCounts).sort((a, b) => a[0].localeCompare(b[0]));
+
+  const updateBoothMutation = useMutation({
+    mutationFn: async ({ id, booth }: { id: string; booth: string }) => {
+      await apiRequest("PATCH", `/api/bla/submissions/${id}`, {
+        manualBoothId: booth.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Updated booth number" });
+      setSelected(null);
+      refetch();
+    },
+    onError: () => {
+      toast({ title: "Failed to update booth", variant: "destructive" });
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -197,6 +223,17 @@ export default function BlaSubmissionsPage() {
                         </TableCell>
                         <TableCell>
                           <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 mr-1"
+                            onClick={() => {
+                              setSelected(s);
+                              setEditBooth((s.manualBoothId || s.voterMappingBoothId || "").trim());
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-red-600"
@@ -214,6 +251,99 @@ export default function BlaSubmissionsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+        <DialogContent className="max-w-lg">
+          {selected && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Booth Level Agent details</DialogTitle>
+                <DialogDescription>
+                  View full details, download documents and update booth number if needed.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="font-semibold">BLO</p>
+                  <p>
+                    {selected.bloName} &middot; {selected.bloMobileNumber}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="font-semibold">Village</p>
+                    <p>{selected.villageName || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Booth (final)</p>
+                    <p>{(selected.voterMappingBoothId || selected.manualBoothId || "—").toString()}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="font-semibold">Address (from Aadhaar)</p>
+                  <p>{selected.ocrAadhaarAddress || "—"}</p>
+                </div>
+                <div>
+                  <p className="font-semibold">Voter Mapping</p>
+                  <p>
+                    Booth: {selected.voterMappingBoothId || "—"} | Name: {selected.voterMappingName || "—"} | Father&apos;s
+                    Name: {selected.voterMappingFatherName || "—"} | Village: {selected.voterMappingVillageName || "—"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {selected.aadhaarFront && (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={selected.aadhaarFront} target="_blank" rel="noreferrer" download={`aadhaar-front-${selected.id}.jpg`}>
+                        View / Download Aadhaar Front
+                      </a>
+                    </Button>
+                  )}
+                  {selected.aadhaarBack && (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={selected.aadhaarBack} target="_blank" rel="noreferrer" download={`aadhaar-back-${selected.id}.jpg`}>
+                        View / Download Aadhaar Back
+                      </a>
+                    </Button>
+                  )}
+                  {selected.voterCardImage && (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={selected.voterCardImage} target="_blank" rel="noreferrer" download={`voter-card-${selected.id}.jpg`}>
+                        View / Download Voter Card
+                      </a>
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold">Edit booth number (manual override)</p>
+                  <Input
+                    value={editBooth}
+                    onChange={(e) => setEditBooth(e.target.value)}
+                    placeholder="Booth number"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This value is used when mapping booth-wise BLAs. Leave empty to rely only on voter mapping booth.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelected(null)}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!selected) return;
+                    updateBoothMutation.mutate({ id: selected.id, booth: editBooth });
+                  }}
+                  disabled={updateBoothMutation.isPending}
+                >
+                  {updateBoothMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

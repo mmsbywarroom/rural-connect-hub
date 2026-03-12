@@ -64,6 +64,8 @@ export default function TaskBla({ user }: Props) {
     enabled: !!user.id,
   });
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/bla/send-otp", { mobileNumber: bloMobile });
@@ -117,16 +119,24 @@ export default function TaskBla({ user }: Props) {
         voterMappingVillageName: voterMatch?.villageName || null,
         manualBoothId: manualBoothId.trim() || null,
       };
+      if (editingId) {
+        const res = await apiRequest("PATCH", `/api/bla/submissions/${editingId}`, payload);
+        return res.json();
+      }
       const res = await apiRequest("POST", "/api/bla/submit", payload);
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "BLA saved" });
+      toast({ title: language === "hi" ? "BLA सहेजा गया" : language === "pa" ? "BLA ਸੰਭਾਲਿਆ ਗਿਆ" : "BLA saved" });
       setStep("description");
+      setEditingId(null);
       resetForm();
     },
     onError: () => {
-      toast({ title: "Failed to submit", variant: "destructive" });
+      toast({
+        title: language === "hi" ? "सबमिट असफल" : language === "pa" ? "ਸਬਮਿਟ ਅਸਫਲ" : "Failed to submit",
+        variant: "destructive",
+      });
     },
   });
 
@@ -150,6 +160,7 @@ export default function TaskBla({ user }: Props) {
     setOcrVoterName("");
     setVoterMatch(null);
     setManualBoothId("");
+    setEditingId(null);
   };
 
   const handleBack = () => {
@@ -225,13 +236,58 @@ export default function TaskBla({ user }: Props) {
     });
   };
 
-  const canSubmit =
-    bloName.trim() &&
-    bloVerified &&
-    aadhaarFront &&
-    aadhaarBack &&
-    ocrVoterId.trim() &&
-    (voterMatch?.boothId || manualBoothId.trim());
+  const fieldLabel = (key: "bloName" | "bloMobile" | "aadhaar" | "voterCard" | "booth"): string => {
+    if (language === "hi") {
+      switch (key) {
+        case "bloName": return "BLO नाम";
+        case "bloMobile": return "BLO मोबाइल (OTP)";
+        case "aadhaar": return "आधार (फ्रंट/बैक)";
+        case "voterCard": return "वोटर कार्ड";
+        case "booth": return "बूथ नंबर";
+      }
+    }
+    if (language === "pa") {
+      switch (key) {
+        case "bloName": return "BLO ਨਾਮ";
+        case "bloMobile": return "BLO ਮੋਬਾਈਲ (OTP)";
+        case "aadhaar": return "ਆਧਾਰ (ਅੱਗੇ/ਪਿੱਛੇ)";
+        case "voterCard": return "ਵੋਟਰ ਕਾਰਡ";
+        case "booth": return "ਬੂਥ ਨੰਬਰ";
+      }
+    }
+    switch (key) {
+      case "bloName": return "BLO Name";
+      case "bloMobile": return "BLO Mobile (OTP)";
+      case "aadhaar": return "Aadhaar (Front/Back)";
+      case "voterCard": return "Voter Card";
+      case "booth": return "Booth Number";
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const missing: string[] = [];
+    if (!bloName.trim()) missing.push(fieldLabel("bloName"));
+    if (!bloVerified) missing.push(fieldLabel("bloMobile"));
+    if (!aadhaarFront || !aadhaarBack) missing.push(fieldLabel("aadhaar"));
+    if (!ocrVoterId.trim()) missing.push(fieldLabel("voterCard"));
+    if (!(voterMatch?.boothId || manualBoothId.trim())) missing.push(fieldLabel("booth"));
+
+    if (missing.length) {
+      const title =
+        language === "hi"
+          ? "कृपया ये फ़ील्ड भरें"
+          : language === "pa"
+          ? "ਕਿਰਪਾ ਕਰਕੇ ਇਹ ਫੀਲਡ ਭਰੋ"
+          : "Please fill these fields";
+      toast({
+        title,
+        description: missing.join(", "),
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
 
   if (step === "description") {
     return (
@@ -246,52 +302,107 @@ export default function TaskBla({ user }: Props) {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Booth Level Agent (BLA)</h1>
+          <h1 className="text-lg font-semibold">
+            {language === "hi"
+              ? "Booth Level Agent (BLA)"
+              : language === "pa"
+              ? "Booth Level Agent (BLA)"
+              : "Booth Level Agent (BLA)"}
+          </h1>
         </header>
 
         <div className="p-4 space-y-4 flex-1">
           <Card>
             <CardContent className="p-4 space-y-2">
               <p className="text-sm text-slate-700">
-                Register Booth Level Agents (BLA) with Aadhaar and Voter Card verification. Voter ID will be matched with
-                Voter Mapping Work and booth will be highlighted.
+                {language === "hi"
+                  ? "Booth Level Agents (BLA) को Aadhaar और Voter Card से verify करके booth wise register करें। Voter ID voter mapping से match होगी।"
+                  : language === "pa"
+                  ? "Booth Level Agents (BLA) ਨੂੰ ਆਧਾਰ ਅਤੇ ਵੋਟਰ ਕਾਰਡ ਨਾਲ ਤਸਦੀਕ ਕਰਕੇ ਬੂਥ ਵਾਇਜ਼ ਰਜਿਸਟਰ ਕਰੋ। ਵੋਟਰ ID voter mapping ਨਾਲ ਮਿਲਾਈ ਜਾਵੇਗੀ।"
+                  : "Register Booth Level Agents (BLA) with Aadhaar and Voter Card verification. Voter ID will be matched with Voter Mapping Work and booth will be highlighted."}
               </p>
               <Button className="w-full mt-2" onClick={() => setStep("select_unit")} data-testid="button-new-bla">
-                Start BLA Form
+                {language === "hi" ? "BLA फॉर्म शुरू करें" : language === "pa" ? "BLA ਫਾਰਮ ਸ਼ੁਰੂ ਕਰੋ" : "Start BLA Form"}
               </Button>
             </CardContent>
           </Card>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Your BLA submissions
-              </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {language === "hi"
+                      ? "आपके BLA सबमिशन"
+                      : language === "pa"
+                      ? "ਤੁਹਾਡੇ BLA ਸਬਮਿਸ਼ਨ"
+                      : "Your BLA submissions"}
+                  </span>
               <Button size="icon" variant="outline" onClick={() => resetForm()} className="h-7 w-7">
                 <RefreshCw className="h-3 w-3" />
               </Button>
             </div>
             {mySubmissions && mySubmissions.length === 0 && (
-              <p className="text-xs text-slate-400">No submissions yet.</p>
+              <p className="text-xs text-slate-400">
+                {language === "hi" ? "अभी कोई सबमिशन नहीं।" : language === "pa" ? "ਹਾਲੇ ਕੋਈ ਸਬਮਿਸ਼ਨ ਨਹੀਂ।" : "No submissions yet."}
+              </p>
             )}
             {mySubmissions && mySubmissions.length > 0 && (
               <div className="space-y-2">
-                {mySubmissions.map((s) => (
+                {mySubmissions.map((s, idx) => (
                   <Card key={s.id}>
                     <CardContent className="p-3 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">
-                          {s.bloName} – {s.bloMobileNumber}
+                          {idx + 1}. {s.bloName} – {s.bloMobileNumber}
                         </p>
                         <p className="text-xs text-slate-500 truncate">
                           {s.villageName || "—"} {s.voterMappingBoothId ? `· Booth ${s.voterMappingBoothId}` : ""}
                         </p>
                       </div>
-                      {s.bloMobileVerified && (
-                        <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-                          <CheckCircle className="h-3 w-3" /> Verified
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {s.bloMobileVerified && (
+                          <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />{" "}
+                            {language === "hi" ? "सत्यापित" : language === "pa" ? "ਤਸਦੀਕਿਤ" : "Verified"}
+                          </Badge>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => {
+                            setEditingId(s.id);
+                            setSelectedVillageId(s.villageId || "");
+                            setSelectedVillageName(s.villageName || "");
+                            setBloName(s.bloName);
+                            setBloMobile(s.bloMobileNumber);
+                            setBloVerified(s.bloMobileVerified);
+                            setAadhaarFront(s.aadhaarFront || null);
+                            setAadhaarBack(s.aadhaarBack || null);
+                            setOcrAadhaarName(s.ocrAadhaarName || "");
+                            setOcrAadhaarNumber(s.ocrAadhaarNumber || "");
+                            setOcrAadhaarDob(s.ocrAadhaarDob || "");
+                            setOcrAadhaarGender(s.ocrAadhaarGender || "");
+                            setOcrAadhaarAddress(s.ocrAadhaarAddress || "");
+                            setVoterCardImage(s.voterCardImage || null);
+                            setOcrVoterId(s.ocrVoterId || "");
+                            setOcrVoterName(s.ocrVoterName || "");
+                            setVoterMatch(
+                              s.voterMappingBoothId
+                                ? {
+                                    boothId: s.voterMappingBoothId,
+                                    name: s.voterMappingName,
+                                    fatherName: s.voterMappingFatherName,
+                                    villageName: s.voterMappingVillageName,
+                                  }
+                                : null,
+                            );
+                            setManualBoothId(s.manualBoothId || "");
+                            setStep("form");
+                          }}
+                        >
+                          {language === "hi" ? "एडिट" : language === "pa" ? "ਸੰਪਾਦਨ" : "Edit"}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -316,7 +427,9 @@ export default function TaskBla({ user }: Props) {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Select Unit</h1>
+          <h1 className="text-lg font-semibold">
+            {language === "hi" ? "यूनिट चुनें" : language === "pa" ? "ਯੂਨਿਟ ਚੁਣੋ" : "Select Unit"}
+          </h1>
         </header>
         <div className="p-4">
           <UnitSelector
@@ -325,8 +438,20 @@ export default function TaskBla({ user }: Props) {
               setSelectedVillageName(unit.villageName);
               setStep("form");
             }}
-            title="Select Unit"
-            subtitle="Choose the village/ward for this BLA"
+            title={
+              language === "hi"
+                ? "यूनिट चुनें"
+                : language === "pa"
+                ? "ਯੂਨਿਟ ਚੁਣੋ"
+                : "Select Unit"
+            }
+            subtitle={
+              language === "hi"
+                ? "इस BLA के लिए गांव/वार्ड चुनें"
+                : language === "pa"
+                ? "ਇਸ BLA ਲਈ ਪਿੰਡ/ਵਾਰਡ ਚੁਣੋ"
+                : "Choose the village/ward for this BLA"
+            }
             defaultVillageId={user.mappedAreaId || undefined}
           />
         </div>
@@ -347,7 +472,13 @@ export default function TaskBla({ user }: Props) {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-lg font-semibold">Booth Level Agent (BLA)</h1>
+          <h1 className="text-lg font-semibold">
+            {language === "hi"
+              ? "Booth Level Agent (BLA)"
+              : language === "pa"
+              ? "Booth Level Agent (BLA)"
+              : "Booth Level Agent (BLA)"}
+          </h1>
           <p className="text-xs text-white/80 truncate">{selectedVillageName}</p>
         </div>
       </header>
@@ -356,7 +487,9 @@ export default function TaskBla({ user }: Props) {
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">BLO Name *</label>
+              <label className="text-sm font-medium text-slate-700">
+                {language === "hi" ? "BLO नाम *" : language === "pa" ? "BLO ਨਾਮ *" : "BLO Name *"}
+              </label>
               <Input
                 value={bloName}
                 onChange={(e) => setBloName(e.target.value)}
@@ -366,7 +499,13 @@ export default function TaskBla({ user }: Props) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">BLO Mobile (OTP Verify) *</label>
+              <label className="text-sm font-medium text-slate-700">
+                {language === "hi"
+                  ? "BLO मोबाइल (OTP सत्यापन) *"
+                  : language === "pa"
+                  ? "BLO ਮੋਬਾਈਲ (OTP ਤਸਦੀਕ) *"
+                  : "BLO Mobile (OTP Verify) *"}
+              </label>
               <div className="flex gap-2">
                 <Input
                   type="tel"
@@ -381,7 +520,7 @@ export default function TaskBla({ user }: Props) {
                       setBloOtp("");
                     }
                   }}
-                  placeholder="9876543210"
+                  placeholder={language === "hi" || language === "pa" ? "9876543210" : "9876543210"}
                   disabled={bloVerified}
                   data-testid="input-blo-mobile"
                 />
@@ -395,7 +534,7 @@ export default function TaskBla({ user }: Props) {
                     data-testid="button-send-blo-otp"
                   >
                     {sendOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4 mr-1" />}
-                    Send OTP
+                    {language === "hi" ? "OTP भेजें" : language === "pa" ? "OTP ਭੇਜੋ" : "Send OTP"}
                   </Button>
                 )}
                 {bloVerified && (
@@ -407,7 +546,11 @@ export default function TaskBla({ user }: Props) {
               {bloOtpSent && !bloVerified && (
                 <div className="space-y-2 pt-2 border-t border-indigo-200 bg-indigo-50 rounded-md p-3">
                   <p className="text-xs text-indigo-700">
-                    OTP sent to {bloMobile}
+                    {language === "hi"
+                      ? `OTP भेजा गया: ${bloMobile}`
+                      : language === "pa"
+                      ? `OTP ਭੇਜਿਆ ਗਿਆ: ${bloMobile}`
+                      : `OTP sent to ${bloMobile}`}
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -415,7 +558,13 @@ export default function TaskBla({ user }: Props) {
                       maxLength={4}
                       value={bloOtp}
                       onChange={(e) => setBloOtp(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      placeholder="Enter 4-digit OTP"
+                      placeholder={
+                        language === "hi"
+                          ? "4 अंकों का OTP डालें"
+                          : language === "pa"
+                          ? "4 ਅੰਕਾਂ ਦਾ OTP ਦਾਖਲ ਕਰੋ"
+                          : "Enter 4-digit OTP"
+                      }
                       data-testid="input-blo-otp"
                     />
                     <Button
@@ -425,7 +574,7 @@ export default function TaskBla({ user }: Props) {
                       data-testid="button-verify-blo-otp"
                     >
                       {verifyOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Verify
+                      {language === "hi" ? "सत्यापित करें" : language === "pa" ? "ਤਸਦੀਕ ਕਰੋ" : "Verify"}
                     </Button>
                   </div>
                 </div>
@@ -436,7 +585,13 @@ export default function TaskBla({ user }: Props) {
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">Aadhaar (Front & Back) with OCR *</p>
+            <p className="text-sm font-semibold text-slate-700">
+              {language === "hi"
+                ? "आधार (फ्रंट और बैक) OCR के साथ *"
+                : language === "pa"
+                ? "ਆਧਾਰ (ਅੱਗੇ ਅਤੇ ਪਿੱਛੇ) OCR ਨਾਲ *"
+                : "Aadhaar (Front & Back) with OCR *"}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <input
@@ -454,7 +609,19 @@ export default function TaskBla({ user }: Props) {
                   onClick={() => aadhaarFrontInputRef.current?.click()}
                 >
                   <Camera className="h-5 w-5 text-slate-500" />
-                  <span className="text-xs">{aadhaarFront ? "Front captured" : "Capture Front"}</span>
+                  <span className="text-xs">
+                    {aadhaarFront
+                      ? language === "hi"
+                        ? "फ्रंट कैप्चर हुआ"
+                        : language === "pa"
+                        ? "ਅੱਗਲਾ ਪਾਸਾ ਕੈਪਚਰ"
+                        : "Front captured"
+                      : language === "hi"
+                      ? "फ्रंट कैप्चर करें"
+                      : language === "pa"
+                      ? "ਅੱਗਲਾ ਪਾਸਾ ਕੈਪਚਰ ਕਰੋ"
+                      : "Capture Front"}
+                  </span>
                 </Button>
               </div>
               <div className="space-y-2">
@@ -473,13 +640,30 @@ export default function TaskBla({ user }: Props) {
                   onClick={() => aadhaarBackInputRef.current?.click()}
                 >
                   <Camera className="h-5 w-5 text-slate-500" />
-                  <span className="text-xs">{aadhaarBack ? "Back captured" : "Capture Back"}</span>
+                  <span className="text-xs">
+                    {aadhaarBack
+                      ? language === "hi"
+                        ? "बैक कैप्चर हुआ"
+                        : language === "pa"
+                        ? "ਪਿੱਛਲਾ ਪਾਸਾ ਕੈਪਚਰ"
+                        : "Back captured"
+                      : language === "hi"
+                      ? "बैक कैप्चर करें"
+                      : language === "pa"
+                      ? "ਪਿੱਛਲਾ ਪਾਸਾ ਕੈਪਚਰ ਕਰੋ"
+                      : "Capture Back"}
+                  </span>
                 </Button>
               </div>
             </div>
             {processingType && (processingType === "aadhaarFront" || processingType === "aadhaarBack") && (
               <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> Reading Aadhaar details…
+                <Loader2 className="h-3 w-3 animate-spin" />{" "}
+                {language === "hi"
+                  ? "आधार विवरण पढ़े जा रहे हैं…"
+                  : language === "pa"
+                  ? "ਆਧਾਰ ਵੇਰਵੇ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ…"
+                  : "Reading Aadhaar details…"}
               </p>
             )}
             {(ocrAadhaarName || ocrAadhaarNumber) && (
@@ -496,7 +680,13 @@ export default function TaskBla({ user }: Props) {
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">Voter Card with OCR & Booth Match *</p>
+            <p className="text-sm font-semibold text-slate-700">
+              {language === "hi"
+                ? "वोटर कार्ड OCR और बूथ मैच के साथ *"
+                : language === "pa"
+                ? "ਵੋਟਰ ਕਾਰਡ OCR ਅਤੇ ਬੂਥ ਮੈਚ ਨਾਲ *"
+                : "Voter Card with OCR & Booth Match *"}
+            </p>
             <input
               ref={voterCardInputRef}
               type="file"
@@ -512,11 +702,28 @@ export default function TaskBla({ user }: Props) {
               onClick={() => voterCardInputRef.current?.click()}
             >
               <Camera className="h-5 w-5 text-slate-500" />
-              <span className="text-xs">{voterCardImage ? "Voter card captured" : "Capture voter card"}</span>
+              <span className="text-xs">
+                {voterCardImage
+                  ? language === "hi"
+                    ? "वोटर कार्ड कैप्चर हुआ"
+                    : language === "pa"
+                    ? "ਵੋਟਰ ਕਾਰਡ ਕੈਪਚਰ ਕੀਤਾ ਗਿਆ"
+                    : "Voter card captured"
+                  : language === "hi"
+                  ? "वोटर कार्ड कैप्चर करें"
+                  : language === "pa"
+                  ? "ਵੋਟਰ ਕਾਰਡ ਕੈਪਚਰ ਕਰੋ"
+                  : "Capture voter card"}
+              </span>
             </Button>
             {processingType === "voterId" && (
               <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" /> Reading voter card…
+                <Loader2 className="h-3 w-3 animate-spin" />{" "}
+                {language === "hi"
+                  ? "वोटर कार्ड पढ़ा जा रहा है…"
+                  : language === "pa"
+                  ? "ਵੋਟਰ ਕਾਰਡ ਪੜ੍ਹਿਆ ਜਾ ਰਿਹਾ ਹੈ…"
+                  : "Reading voter card…"}
               </p>
             )}
             {(ocrVoterId || ocrVoterName) && (
@@ -527,22 +734,51 @@ export default function TaskBla({ user }: Props) {
             )}
             {voterMatch && (
               <div className="border rounded-md p-2 bg-green-50 text-xs text-slate-700 space-y-0.5">
-                <p className="font-semibold text-green-700">Matched in Voter Mapping</p>
+                <p className="font-semibold text-green-700">
+                  {language === "hi"
+                    ? "Voter Mapping में मैच मिला"
+                    : language === "pa"
+                    ? "Voter Mapping ਵਿੱਚ ਮੇਚ ਮਿਲਿਆ"
+                    : "Matched in Voter Mapping"}
+                </p>
                 <p>Booth: {voterMatch.boothId || "—"}</p>
-                <p>Name: {voterMatch.name || "—"}</p>
-                <p>Father&apos;s Name: {voterMatch.fatherName || "—"}</p>
-                <p>Village: {voterMatch.villageName || "—"}</p>
+                <p>
+                  {language === "hi" ? "नाम:" : language === "pa" ? "ਨਾਮ:" : "Name:"}{" "}
+                  {voterMatch.name || "—"}
+                </p>
+                <p>
+                  {language === "hi"
+                    ? "पिता/पति का नाम:"
+                    : language === "pa"
+                    ? "ਪਿਤਾ/ਪਤੀ ਦਾ ਨਾਮ:"
+                    : "Father's Name:"}{" "}
+                  {voterMatch.fatherName || "—"}
+                </p>
+                <p>
+                  {language === "hi" ? "गांव:" : language === "pa" ? "ਪਿੰਡ:" : "Village:"}{" "}
+                  {voterMatch.villageName || "—"}
+                </p>
               </div>
             )}
             {!voterMatch && !!ocrVoterId && (
               <div className="space-y-2">
                 <p className="text-xs text-red-600">
-                  Voter ID not found in Voter Mapping. Please enter Booth Number manually.
+                  {language === "hi"
+                    ? "Voter Mapping में Voter ID नहीं मिली। कृपया बूथ नंबर मैन्युअली डालें।"
+                    : language === "pa"
+                    ? "Voter Mapping ਵਿੱਚ ਵੋਟਰ ID ਨਹੀਂ ਮਿਲੀ। ਕਿਰਪਾ ਕਰਕੇ ਬੂਥ ਨੰਬਰ ਹੱਥੋਂ ਭਰੋ।"
+                    : "Voter ID not found in Voter Mapping. Please enter Booth Number manually."}
                 </p>
                 <Input
                   value={manualBoothId}
                   onChange={(e) => setManualBoothId(e.target.value)}
-                  placeholder="Enter Booth Number"
+                  placeholder={
+                    language === "hi"
+                      ? "बूथ नंबर दर्ज करें"
+                      : language === "pa"
+                      ? "ਬੂਥ ਨੰਬਰ ਦਰਜ ਕਰੋ"
+                      : "Enter Booth Number"
+                  }
                   data-testid="input-manual-booth"
                 />
               </div>
@@ -553,10 +789,7 @@ export default function TaskBla({ user }: Props) {
         <Button
           className="w-full"
           onClick={() => {
-            if (!canSubmit) {
-              toast({ title: "Please complete all required fields", variant: "destructive" });
-              return;
-            }
+            if (!validateForm()) return;
             submitMutation.mutate();
           }}
           disabled={submitMutation.isPending}
