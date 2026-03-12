@@ -209,7 +209,24 @@ export default function TaskBla({ user }: Props) {
   };
 
   const handleAadhaarBackChange = () => {
-    handleCaptureImage(aadhaarBackInputRef, setAadhaarBack, "aadhaarBack");
+    handleCaptureImage(aadhaarBackInputRef, setAadhaarBack, "aadhaarBack", (result) => {
+      if (!result) return;
+      if (result.address && !ocrAadhaarAddress.trim()) {
+        setOcrAadhaarAddress(result.address.trim());
+      }
+      if (result.name && !ocrAadhaarName.trim()) {
+        setOcrAadhaarName(result.name);
+      }
+      if (result.aadhaarNumber && !ocrAadhaarNumber.trim()) {
+        setOcrAadhaarNumber(result.aadhaarNumber);
+      }
+      if (result.dob && !ocrAadhaarDob.trim()) {
+        setOcrAadhaarDob(result.dob);
+      }
+      if (result.gender && !ocrAadhaarGender.trim()) {
+        setOcrAadhaarGender(result.gender);
+      }
+    });
   };
 
   const handleVoterCardChange = () => {
