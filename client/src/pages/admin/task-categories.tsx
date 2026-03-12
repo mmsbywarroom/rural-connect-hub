@@ -50,6 +50,7 @@ const FIXED_TASKS: { slug: string; name: string }[] = [
   { slug: "event-venue", name: "Event Venues" },
   { slug: "tirth-yatra", name: "Tirth Yatra" },
   { slug: "voter-registration", name: "Voter Registration" },
+  { slug: "bla", name: "Booth Level Agent (BLA)" },
 ];
 
 export default function TaskCategoriesPage() {
