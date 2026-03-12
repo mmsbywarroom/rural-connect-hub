@@ -413,9 +413,22 @@ export default function TaskReportsPage() {
                             <TableCell className="text-muted-foreground whitespace-nowrap">
                               {sub.createdAt ? new Date(sub.createdAt).toLocaleString() : "-"}
                             </TableCell>
-                            {reportData.fields.map((f) => (
-                              <TableCell key={f.fieldKey}>{String(sub[f.fieldKey] ?? "-")}</TableCell>
-                            ))}
+                            {reportData.fields.map((f) => {
+                              const rawValue = sub[f.fieldKey];
+                              if (f.fieldKey === "__whatsappConsent") {
+                                const consented = rawValue === "true";
+                                return (
+                                  <TableCell key={f.fieldKey}>
+                                    {consented ? "Yes" : "No"}
+                                  </TableCell>
+                                );
+                              }
+                              return (
+                                <TableCell key={f.fieldKey}>
+                                  {String(rawValue ?? "-")}
+                                </TableCell>
+                              );
+                            })}
                           </TableRow>
                         ))}
                       </TableBody>

@@ -159,6 +159,14 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
       });
       return;
     }
+    if (formValues.__whatsappConsent !== "true") {
+      toast({
+        title: t('required'),
+        description: "Please agree to receive updates on WhatsApp to submit this task.",
+        variant: "destructive",
+      });
+      return;
+    }
     submitMutation.mutate();
   };
 
@@ -499,6 +507,33 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
             </CardContent>
           </Card>
         ))}
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="whatsapp-consent"
+                checked={formValues.__whatsappConsent === "true"}
+                onCheckedChange={(checked) =>
+                  setValue("__whatsappConsent", checked ? "true" : "")
+                }
+                data-testid="checkbox-whatsapp-consent"
+              />
+              <div className="space-y-1">
+                <Label
+                  htmlFor="whatsapp-consent"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  I agree to receive updates on WhatsApp
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <p className="text-xs text-slate-500">
+                  This consent allows us to send WhatsApp updates related to this task to the
+                  provided mobile number.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t">

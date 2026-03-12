@@ -3209,12 +3209,21 @@ export async function registerRoutes(
       const allUsers = await storage.getAppUsers();
       const fields = await storage.getFormFields(taskId);
 
+      const allFields = [
+        ...fields,
+        {
+          fieldKey: "__whatsappConsent",
+          label: "WhatsApp Consent",
+          fieldType: "toggle",
+        } as any,
+      ];
+
       const userMap = new Map(allUsers.map(u => [u.id, u]));
 
       const userBreakdown: Record<string, { userId: string; userName: string; mobile: string; role: string; count: number; lastSubmission: string | null }> = {};
 
       const fieldValueCounts: Record<string, Record<string, number>> = {};
-      for (const field of fields) {
+      for (const field of allFields) {
         if (["dropdown", "radio", "multi_select", "toggle"].includes(field.fieldType)) {
           fieldValueCounts[field.fieldKey] = {};
         }
@@ -3283,11 +3292,11 @@ export async function registerRoutes(
         userBreakdown: Object.values(userBreakdown).sort((a, b) => b.count - a.count),
         fieldAnalytics: Object.entries(fieldValueCounts).map(([fieldKey, values]) => ({
           fieldKey,
-          fieldLabel: fields.find(f => f.fieldKey === fieldKey)?.label || fieldKey,
+          fieldLabel: allFields.find(f => f.fieldKey === fieldKey)?.label || fieldKey,
           values: Object.entries(values).map(([value, cnt]) => ({ value, count: cnt })).sort((a, b) => b.count - a.count),
         })),
         submissions: flatSubmissions,
-        fields: fields.map(f => ({ fieldKey: f.fieldKey, label: f.label, fieldType: f.fieldType })),
+        fields: allFields.map(f => ({ fieldKey: f.fieldKey, label: f.label, fieldType: f.fieldType })),
       });
     } catch (error) {
       console.error("Task report error:", error);
