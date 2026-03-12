@@ -437,6 +437,7 @@ export interface IStorage {
   createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
   getBlaSubmissions(): Promise<BlaSubmission[]>;
   getBlaSubmissionsByUser(appUserId: string): Promise<BlaSubmission[]>;
+  getBlaSubmission(id: string): Promise<BlaSubmission | undefined>;
   updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined>;
   deleteBlaSubmission(id: string): Promise<void>;
 }
@@ -1979,6 +1980,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(blaSubmissions)
       .where(eq(blaSubmissions.appUserId, appUserId))
       .orderBy(desc(blaSubmissions.createdAt));
+  }
+
+  async getBlaSubmission(id: string): Promise<BlaSubmission | undefined> {
+    const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, id));
+    return row;
   }
 
   async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {

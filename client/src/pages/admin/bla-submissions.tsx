@@ -23,6 +23,11 @@ function escapeCSVField(value: string): string {
   return `"${s}"`;
 }
 
+function flattenText(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.replace(/\s+/g, " ").trim();
+}
+
 export default function BlaSubmissionsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -91,34 +96,28 @@ export default function BlaSubmissionsPage() {
       "Aadhaar Address (OCR)",
       "Voter ID (OCR)",
       "Voter Name (OCR)",
-      "Has Aadhaar Front Image",
-      "Has Aadhaar Back Image",
-      "Has Voter Card Image",
       "Aadhaar Front Link",
       "Aadhaar Back Link",
       "Voter Card Link",
       "Created At",
     ];
     const rows = list.map((s) => [
-      s.bloName,
-      s.bloMobileNumber,
-      s.villageName ?? "",
-      s.voterMappingBoothId || s.manualBoothId || "",
-      s.voterMappingBoothId ?? "",
-      s.manualBoothId ?? "",
-      s.ocrAadhaarName ?? "",
-      s.ocrAadhaarNumber ?? "",
-      s.ocrAadhaarDob ?? "",
-      s.ocrAadhaarGender ?? "",
-      s.ocrAadhaarAddress ?? "",
-      s.ocrVoterId ?? "",
-      s.ocrVoterName ?? "",
-      s.aadhaarFront ? "YES" : "NO",
-      s.aadhaarBack ? "YES" : "NO",
-      s.voterCardImage ? "YES" : "NO",
-      s.aadhaarFront ?? "",
-      s.aadhaarBack ?? "",
-      s.voterCardImage ?? "",
+      flattenText(s.bloName),
+      flattenText(s.bloMobileNumber),
+      flattenText(s.villageName),
+      flattenText(s.voterMappingBoothId || s.manualBoothId || ""),
+      flattenText(s.voterMappingBoothId),
+      flattenText(s.manualBoothId),
+      flattenText(s.ocrAadhaarName),
+      flattenText(s.ocrAadhaarNumber),
+      flattenText(s.ocrAadhaarDob),
+      flattenText(s.ocrAadhaarGender),
+      flattenText(s.ocrAadhaarAddress),
+      flattenText(s.ocrVoterId),
+      flattenText(s.ocrVoterName),
+      s.aadhaarFront ? `/api/bla/submissions/${s.id}/aadhaar-front` : "",
+      s.aadhaarBack ? `/api/bla/submissions/${s.id}/aadhaar-back` : "",
+      s.voterCardImage ? `/api/bla/submissions/${s.id}/voter-card` : "",
       s.createdAt ? new Date(s.createdAt).toISOString() : "",
     ]);
     const csv = [

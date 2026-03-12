@@ -4492,6 +4492,20 @@ export async function registerRoutes(
 
   // ===== Booth Level Agent (BLA) Routes =====
 
+  function sendBase64Image(data: string, res: any) {
+    try {
+      const match = data.match(/^data:(.+);base64,(.*)$/);
+      const mime = match ? match[1] : "image/jpeg";
+      const base64 = match ? match[2] : data;
+      const buf = Buffer.from(base64, "base64");
+      res.setHeader("Content-Type", mime);
+      res.send(buf);
+    } catch (err: any) {
+      console.error("[BLA] Failed to send image:", err?.message || err);
+      res.status(400).json({ error: "Invalid image data" });
+    }
+  }
+
   // Send OTP for BLO mobile verification (BLA)
   app.post("/api/bla/send-otp", async (req, res) => {
     try {
@@ -4595,6 +4609,40 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[BLA] Delete error:", error.message);
       res.status(500).json({ error: "Failed to delete submission" });
+    }
+  });
+
+  // BLA document image links
+  app.get("/api/bla/submissions/:id/aadhaar-front", async (req, res) => {
+    try {
+      const sub = await storage.getBlaSubmission(req.params.id);
+      if (!sub || !sub.aadhaarFront) return res.status(404).json({ error: "Image not found" });
+      sendBase64Image(sub.aadhaarFront, res);
+    } catch (error: any) {
+      console.error("[BLA] Aadhaar front fetch error:", error.message);
+      res.status(500).json({ error: "Failed to fetch image" });
+    }
+  });
+
+  app.get("/api/bla/submissions/:id/aadhaar-back", async (req, res) => {
+    try {
+      const sub = await storage.getBlaSubmission(req.params.id);
+      if (!sub || !sub.aadhaarBack) return res.status(404).json({ error: "Image not found" });
+      sendBase64Image(sub.aadhaarBack, res);
+    } catch (error: any) {
+      console.error("[BLA] Aadhaar back fetch error:", error.message);
+      res.status(500).json({ error: "Failed to fetch image" });
+    }
+  });
+
+  app.get("/api/bla/submissions/:id/voter-card", async (req, res) => {
+    try {
+      const sub = await storage.getBlaSubmission(req.params.id);
+      if (!sub || !sub.voterCardImage) return res.status(404).json({ error: "Image not found" });
+      sendBase64Image(sub.voterCardImage, res);
+    } catch (error: any) {
+      console.error("[BLA] Voter card fetch error:", error.message);
+      res.status(500).json({ error: "Failed to fetch image" });
     }
   });
 
