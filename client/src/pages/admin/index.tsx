@@ -38,6 +38,7 @@ import BirthdayManagerPage from "./birthday-manager";
 import SunwaiSubmissionsPage from "./sunwai-submissions";
 import OutdoorAdSubmissionsPage from "./outdoor-ad-submissions";
 import NvyReportsPage from "./nvy-reports";
+import BlaSubmissionsPage from "./bla-submissions";
 import GovSchoolSubmissionsPage from "./gov-school-submissions";
 import AppointmentSubmissionsPage from "./appointment-submissions";
 import EventVenuesPage from "./event-venues";
@@ -73,6 +74,7 @@ const allMenuItems = [
   { id: "birthdays", label: "Birthday Manager", icon: Cake, path: "/admin/birthdays", group: "Management" },
   { id: "sunwai", label: "Sunwai (Complaints)", icon: Megaphone, path: "/admin/sunwai", group: "Management" },
   { id: "nvy", label: "Nasha Viruddh Yuddh", icon: ShieldAlert, path: "/admin/nvy", group: "Management" },
+  { id: "bla", label: "Booth Level Agents (BLA)", icon: Users, path: "/admin/bla", group: "Management" },
   { id: "road", label: "Road Reports", icon: Route, path: "/admin/road", group: "Management" },
   { id: "outdoor-ads", label: "Outdoor Ads", icon: Megaphone, path: "/admin/outdoor-ads", group: "Management" },
   { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Management" },
@@ -408,6 +410,7 @@ export default function AdminPage() {
     if (currentPath.includes("gov-school")) return "gov-school";
     if (currentPath.includes("sunwai")) return "sunwai";
     if (currentPath.includes("nvy")) return "nvy";
+    if (currentPath.includes("bla")) return "bla";
     if (currentPath.includes("road")) return "road";
     if (currentPath.includes("birthdays")) return "birthdays";
     if (currentPath.includes("surveys")) return "surveys";
@@ -517,6 +520,7 @@ export default function AdminPage() {
             {activeSection === "birthdays" && <BirthdayManagerPage />}
             {activeSection === "sunwai" && <SunwaiSubmissionsPage />}
             {activeSection === "nvy" && <NvyReportsPage />}
+            {activeSection === "bla" && <BlaSubmissionsPage />}
             {activeSection === "road" && <RoadReportsPage />}
             {activeSection === "outdoor-ads" && <OutdoorAdSubmissionsPage />}
             {activeSection === "gov-school" && <GovSchoolSubmissionsPage />}

@@ -32,6 +32,7 @@ import {
   insertAppointmentSchema,
   nvyReports, insertNvyReportSchema,
   roadReports, insertRoadReportSchema,
+  blaSubmissions, insertBlaSubmissionSchema,
   type InsertOfficeManager,
 } from "@shared/schema";
 
@@ -4486,6 +4487,114 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Mahila Samman voter match error:", error);
       res.status(500).json({ error: "Failed to match voter" });
+    }
+  });
+
+  // ===== Booth Level Agent (BLA) Routes =====
+
+  // Send OTP for BLO mobile verification (BLA)
+  app.post("/api/bla/send-otp", async (req, res) => {
+    try {
+      const { mobileNumber } = req.body;
+      if (!mobileNumber) {
+        return res.status(400).json({ error: "Mobile number is required" });
+      }
+      if (!isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const otp = await storeOTP(normalized);
+      if (isSmsConfigured()) {
+        try {
+          await sendOtpSms(normalized, otp);
+          console.log(`[BLA OTP] SMS sent to ${maskMobile(normalized)}`);
+        } catch (smsErr: any) {
+          console.error(`[BLA OTP] SMS failed:`, smsErr.message);
+        }
+      }
+      res.json({ success: true, masked: maskMobile(normalized) });
+    } catch (error: any) {
+      console.error("[BLA OTP] Error:", error.message);
+      res.status(500).json({ error: "Failed to send OTP" });
+    }
+  });
+
+  // Verify OTP (BLA)
+  app.post("/api/bla/verify-otp", async (req, res) => {
+    try {
+      const { mobileNumber, otp } = req.body;
+      if (!mobileNumber || !otp) {
+        return res.status(400).json({ error: "Mobile number and OTP are required" });
+      }
+      const normalized = normalizeMobile(mobileNumber);
+      const valid = await verifyOTP(normalized, otp);
+      if (!valid) {
+        return res.status(400).json({ error: "Invalid or expired OTP" });
+      }
+      res.json({ success: true, verified: true });
+    } catch (error: any) {
+      console.error("[BLA OTP] Verify error:", error.message);
+      res.status(500).json({ error: "Failed to verify OTP" });
+    }
+  });
+
+  // Create BLA submission
+  app.post("/api/bla/submit", async (req, res) => {
+    try {
+      const data = insertBlaSubmissionSchema.parse(req.body);
+      const submission = await storage.createBlaSubmission(data);
+      res.json(submission);
+    } catch (error: any) {
+      console.error("[BLA] Submit error:", error.message);
+      res.status(400).json({ error: "Invalid BLA submission data" });
+    }
+  });
+
+  // User's BLA submissions
+  app.get("/api/bla/my-submissions/:appUserId", async (req, res) => {
+    try {
+      const submissions = await storage.getBlaSubmissionsByUser(req.params.appUserId);
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("[BLA] My submissions error:", error.message);
+      res.status(500).json({ error: "Failed to fetch submissions" });
+    }
+  });
+
+  // Admin: all BLA submissions
+  app.get("/api/bla/submissions", async (req, res) => {
+    try {
+      const submissions = await storage.getBlaSubmissions();
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("[BLA] Admin list error:", error.message);
+      res.status(500).json({ error: "Failed to fetch BLA submissions" });
+    }
+  });
+
+  // Admin: update BLA submission
+  app.patch("/api/bla/submissions/:id", async (req, res) => {
+    try {
+      const updateData = req.body as Partial<InsertBlaSubmission>;
+      const updated = await storage.updateBlaSubmission(req.params.id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: "Submission not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[BLA] Update error:", error.message);
+      res.status(400).json({ error: "Failed to update submission" });
+    }
+  });
+
+  // Admin: delete BLA submission
+  app.delete("/api/bla/submissions/:id", async (req, res) => {
+    try {
+      await storage.deleteBlaSubmission(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[BLA] Delete error:", error.message);
+      res.status(500).json({ error: "Failed to delete submission" });
     }
   });
 

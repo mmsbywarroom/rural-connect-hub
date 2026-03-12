@@ -1335,6 +1335,45 @@ export const insertMahilaSammanPunjabSubmissionSchema = createInsertSchema(mahil
 export type InsertMahilaSammanPunjabSubmission = z.infer<typeof insertMahilaSammanPunjabSubmissionSchema>;
 export type MahilaSammanPunjabSubmission = typeof mahilaSammanPunjabSubmissions.$inferSelect;
 
+// Booth Level Agent (BLA) Submissions
+export const blaSubmissions = pgTable("bla_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  villageId: varchar("village_id"),
+  villageName: text("village_name"),
+  bloName: text("blo_name").notNull(),
+  bloMobileNumber: text("blo_mobile_number").notNull(),
+  bloMobileVerified: boolean("blo_mobile_verified").default(false),
+  // Aadhaar documents + OCR
+  aadhaarFront: text("aadhaar_front"),
+  aadhaarBack: text("aadhaar_back"),
+  ocrAadhaarName: text("ocr_aadhaar_name"),
+  ocrAadhaarNumber: text("ocr_aadhaar_number"),
+  ocrAadhaarDob: text("ocr_aadhaar_dob"),
+  ocrAadhaarGender: text("ocr_aadhaar_gender"),
+  ocrAadhaarAddress: text("ocr_aadhaar_address"),
+  // Voter card + OCR
+  voterCardImage: text("voter_card_image"),
+  ocrVoterId: text("ocr_voter_id"),
+  ocrVoterName: text("ocr_voter_name"),
+  // Voter mapping match / booth details
+  voterMappingBoothId: text("voter_mapping_booth_id"),
+  voterMappingName: text("voter_mapping_name"),
+  voterMappingFatherName: text("voter_mapping_father_name"),
+  voterMappingVillageName: text("voter_mapping_village_name"),
+  manualBoothId: text("manual_booth_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBlaSubmissionSchema = createInsertSchema(blaSubmissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBlaSubmission = z.infer<typeof insertBlaSubmissionSchema>;
+export type BlaSubmission = typeof blaSubmissions.$inferSelect;
+
+
 // Road Repair Reports
 export const roadReports = pgTable("road_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

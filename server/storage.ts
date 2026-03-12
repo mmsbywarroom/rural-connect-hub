@@ -80,6 +80,11 @@ import {
   mahilaSammanPunjabSubmissions,
   type MahilaSammanPunjabSubmission, type InsertMahilaSammanPunjabSubmission,
 } from "@shared/schema";
+import {
+  blaSubmissions,
+  type BlaSubmission,
+  type InsertBlaSubmission,
+} from "@shared/schema";
 
 export interface IStorage {
   // Admin Roles
@@ -427,6 +432,13 @@ export interface IStorage {
   getMahilaSammanPunjabSubmission(id: string): Promise<MahilaSammanPunjabSubmission | undefined>;
   getMahilaSammanPunjabSubmissions(): Promise<MahilaSammanPunjabSubmission[]>;
   getMahilaSammanPunjabSubmissionsByUser(appUserId: string): Promise<MahilaSammanPunjabSubmission[]>;
+
+  // BLA Submissions
+  createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
+  getBlaSubmissions(): Promise<BlaSubmission[]>;
+  getBlaSubmissionsByUser(appUserId: string): Promise<BlaSubmission[]>;
+  updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined>;
+  deleteBlaSubmission(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1951,6 +1963,31 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(mahilaSammanPunjabSubmissions)
       .where(eq(mahilaSammanPunjabSubmissions.appUserId, appUserId))
       .orderBy(desc(mahilaSammanPunjabSubmissions.createdAt));
+  }
+
+  // BLA Submissions
+  async createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission> {
+    const [row] = await db.insert(blaSubmissions).values(data).returning();
+    return row;
+  }
+
+  async getBlaSubmissions(): Promise<BlaSubmission[]> {
+    return db.select().from(blaSubmissions).orderBy(desc(blaSubmissions.createdAt));
+  }
+
+  async getBlaSubmissionsByUser(appUserId: string): Promise<BlaSubmission[]> {
+    return db.select().from(blaSubmissions)
+      .where(eq(blaSubmissions.appUserId, appUserId))
+      .orderBy(desc(blaSubmissions.createdAt));
+  }
+
+  async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {
+    const [row] = await db.update(blaSubmissions).set(data).where(eq(blaSubmissions.id, id)).returning();
+    return row;
+  }
+
+  async deleteBlaSubmission(id: string): Promise<void> {
+    await db.delete(blaSubmissions).where(eq(blaSubmissions.id, id));
   }
 
   // Road Reports
