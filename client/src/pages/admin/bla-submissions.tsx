@@ -84,8 +84,19 @@ export default function BlaSubmissionsPage() {
       "Booth (final)",
       "Booth (mapped)",
       "Booth (manual)",
-      "Voter ID",
-      "Voter Name",
+      "Aadhaar Name (OCR)",
+      "Aadhaar Number (OCR)",
+      "Aadhaar DOB (OCR)",
+      "Aadhaar Gender (OCR)",
+      "Aadhaar Address (OCR)",
+      "Voter ID (OCR)",
+      "Voter Name (OCR)",
+      "Has Aadhaar Front Image",
+      "Has Aadhaar Back Image",
+      "Has Voter Card Image",
+      "Aadhaar Front Link",
+      "Aadhaar Back Link",
+      "Voter Card Link",
       "Created At",
     ];
     const rows = list.map((s) => [
@@ -95,8 +106,19 @@ export default function BlaSubmissionsPage() {
       s.voterMappingBoothId || s.manualBoothId || "",
       s.voterMappingBoothId ?? "",
       s.manualBoothId ?? "",
+      s.ocrAadhaarName ?? "",
+      s.ocrAadhaarNumber ?? "",
+      s.ocrAadhaarDob ?? "",
+      s.ocrAadhaarGender ?? "",
+      s.ocrAadhaarAddress ?? "",
       s.ocrVoterId ?? "",
       s.ocrVoterName ?? "",
+      s.aadhaarFront ? "YES" : "NO",
+      s.aadhaarBack ? "YES" : "NO",
+      s.voterCardImage ? "YES" : "NO",
+      s.aadhaarFront ?? "",
+      s.aadhaarBack ?? "",
+      s.voterCardImage ?? "",
       s.createdAt ? new Date(s.createdAt).toISOString() : "",
     ]);
     const csv = [
@@ -280,14 +302,28 @@ export default function BlaSubmissionsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="font-semibold">Address (from Aadhaar)</p>
-                  <p>{selected.ocrAadhaarAddress || "—"}</p>
+                  <p className="font-semibold">Aadhaar (OCR data)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Name: {selected.ocrAadhaarName || "—"} &middot; Aadhaar: {selected.ocrAadhaarNumber || "—"} &middot; DOB:{" "}
+                    {selected.ocrAadhaarDob || "—"} &middot; Gender: {selected.ocrAadhaarGender || "—"}
+                  </p>
+                  <p className="mt-1">
+                    <span className="font-semibold">Address (from Aadhaar)</span>
+                    <br />
+                    {selected.ocrAadhaarAddress || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-semibold">Voter Card (OCR data)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Voter ID: {selected.ocrVoterId || "—"} &middot; Name: {selected.ocrVoterName || "—"}
+                  </p>
                 </div>
                 <div>
                   <p className="font-semibold">Voter Mapping</p>
                   <p>
-                    Booth: {selected.voterMappingBoothId || "—"} | Name: {selected.voterMappingName || "—"} | Father&apos;s
-                    Name: {selected.voterMappingFatherName || "—"} | Village: {selected.voterMappingVillageName || "—"}
+                    Booth: {selected.voterMappingBoothId || "—"} | Name: {selected.voterMappingName || "—"} | Father&apos;s Name:{" "}
+                    {selected.voterMappingFatherName || "—"} | Village: {selected.voterMappingVillageName || "—"}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
