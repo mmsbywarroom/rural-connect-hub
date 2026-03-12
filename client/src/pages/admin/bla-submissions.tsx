@@ -23,11 +23,6 @@ function escapeCSVField(value: string): string {
   return `"${s}"`;
 }
 
-function flattenText(value: string | null | undefined): string {
-  if (!value) return "";
-  return value.replace(/\s+/g, " ").trim();
-}
-
 export default function BlaSubmissionsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -89,35 +84,19 @@ export default function BlaSubmissionsPage() {
       "Booth (final)",
       "Booth (mapped)",
       "Booth (manual)",
-      "Aadhaar Name (OCR)",
-      "Aadhaar Number (OCR)",
-      "Aadhaar DOB (OCR)",
-      "Aadhaar Gender (OCR)",
-      "Aadhaar Address (OCR)",
-      "Voter ID (OCR)",
-      "Voter Name (OCR)",
-      "Aadhaar Front Link",
-      "Aadhaar Back Link",
-      "Voter Card Link",
+      "Voter ID",
+      "Voter Name",
       "Created At",
     ];
     const rows = list.map((s) => [
-      flattenText(s.bloName),
-      flattenText(s.bloMobileNumber),
-      flattenText(s.villageName),
-      flattenText(s.voterMappingBoothId || s.manualBoothId || ""),
-      flattenText(s.voterMappingBoothId),
-      flattenText(s.manualBoothId),
-      flattenText(s.ocrAadhaarName),
-      flattenText(s.ocrAadhaarNumber),
-      flattenText(s.ocrAadhaarDob),
-      flattenText(s.ocrAadhaarGender),
-      flattenText(s.ocrAadhaarAddress),
-      flattenText(s.ocrVoterId),
-      flattenText(s.ocrVoterName),
-      s.aadhaarFront ? `/api/bla/submissions/${s.id}/aadhaar-front` : "",
-      s.aadhaarBack ? `/api/bla/submissions/${s.id}/aadhaar-back` : "",
-      s.voterCardImage ? `/api/bla/submissions/${s.id}/voter-card` : "",
+      s.bloName,
+      s.bloMobileNumber,
+      s.villageName ?? "",
+      s.voterMappingBoothId || s.manualBoothId || "",
+      s.voterMappingBoothId ?? "",
+      s.manualBoothId ?? "",
+      s.ocrVoterId ?? "",
+      s.ocrVoterName ?? "",
       s.createdAt ? new Date(s.createdAt).toISOString() : "",
     ]);
     const csv = [
