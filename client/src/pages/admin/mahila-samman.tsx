@@ -56,8 +56,11 @@ function printToPdf(title: string, htmlContent: string) {
   <style>
     body { font-family: system-ui, sans-serif; padding: 20px; color: #1e293b; }
     h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    h2 { font-size: 1.1rem; margin: 20px 0 10px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+    h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
     .meta { font-size: 0.875rem; color: #64748b; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .section { margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-bottom: 8px; }
     th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
     th { background: #f1f5f9; font-weight: 600; }
     .stat-block { margin-bottom: 16px; }
@@ -185,7 +188,55 @@ export default function MahilaSammanAdminPage() {
               </CardContent>
             </Card>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 flex-wrap">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                const summaryHtml = `
+                  <div class="section">
+                    <h2>1. Summary</h2>
+                    <div class="stat-block">
+                      <div class="stat-row">
+                        <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
+                        <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
+                        <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+                const boothRows = stats.boothWise.map((r) => `<tr><td>${r.boothId}</td><td>${r.count}</td></tr>`).join("");
+                const boothHtml = stats.boothWise.length > 0 ? `
+                  <div class="section">
+                    <h2>2. Booth-wise Sakhi count</h2>
+                    <p class="meta">Count = number of Sakhi mapped to this booth. Booths with count &gt; 0 at top.</p>
+                    <table><thead><tr><th>Booth Number</th><th>Count</th></tr></thead><tbody>${boothRows}</tbody></table>
+                  </div>
+                ` : "";
+                const sakhiRows = stats.sakhiVoterListDetails.map(
+                  (r) =>
+                    `<tr><td>${escapeHtml(r.sakhiName)}</td><td>${escapeHtml(r.mobileNumber)}</td><td>${escapeHtml(r.voterId || "—")}</td><td>${r.voterMappingSlNo ?? "—"}</td><td>${escapeHtml(r.boothId ?? "—")}</td></tr>`
+                ).join("");
+                const sakhiHtml = stats.sakhiVoterListDetails.length > 0 ? `
+                  <div class="section">
+                    <h2>3. Sakhi – Voter list number (details)</h2>
+                    <p class="meta">Voter list Sr No from voter mapping.</p>
+                    <table><thead><tr><th>Sakhi Name</th><th>Mobile</th><th>Voter ID</th><th>Voter list Sr No</th><th>Booth</th></tr></thead><tbody>${sakhiRows}</tbody></table>
+                  </div>
+                ` : "";
+                const html = `
+                  <h1>Mahila Samman Rashi – Full Report</h1>
+                  <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
+                  ${summaryHtml}
+                  ${boothHtml}
+                  ${sakhiHtml}
+                `;
+                printToPdf("Mahila Samman Full Report", html);
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download PDF (All)
+            </Button>
             <Button
               variant="outline"
               size="sm"

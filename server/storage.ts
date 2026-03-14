@@ -1981,7 +1981,9 @@ export class DatabaseStorage implements IStorage {
         boothMap.set(bid, (boothMap.get(bid) ?? 0) + 1);
       }
     }
-    const boothWise = Array.from(boothMap.entries()).map(([boothId, count]) => ({ boothId, count })).sort((a, b) => a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
+    const boothWise = Array.from(boothMap.entries())
+      .map(([boothId, count]) => ({ boothId, count }))
+      .sort((a, b) => b.count - a.count || a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
     const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
     for (const s of all) {
       const voterId = (s.ocrVoterId || "").trim() || null;
