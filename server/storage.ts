@@ -426,6 +426,16 @@ export interface IStorage {
   getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
   getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]>;
   getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
+  getMahilaSammanStats(): Promise<{
+    total: number;
+    pending: number;
+    accepted: number;
+    rejected: number;
+    closed: number;
+    voterIdMapped: number;
+    boothWise: { boothId: string; count: number }[];
+    sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[];
+  }>;
 
   createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission>;
   updateMahilaSammanPunjabSubmission(id: string, data: Partial<InsertMahilaSammanPunjabSubmission>): Promise<MahilaSammanPunjabSubmission | undefined>;
@@ -1938,6 +1948,57 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(mahilaSammanSubmissions)
       .where(eq(mahilaSammanSubmissions.appUserId, appUserId))
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
+  }
+
+  async getMahilaSammanStats(): Promise<{
+    total: number;
+    pending: number;
+    accepted: number;
+    rejected: number;
+    closed: number;
+    voterIdMapped: number;
+    boothWise: { boothId: string; count: number }[];
+    sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[];
+  }> {
+    const all = await db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
+    const total = all.length;
+    const pending = all.filter((s) => (s.status || "pending") === "pending").length;
+    const accepted = all.filter((s) => s.status === "accepted").length;
+    const rejected = all.filter((s) => s.status === "rejected").length;
+    const closed = all.filter((s) => s.status === "closed").length;
+    const voterIdMapped = all.filter((s) => (s.voterMappingBoothId || "").trim() !== "").length;
+    const boothMap = new Map<string, number>();
+    for (const s of all) {
+      const bid = (s.voterMappingBoothId || "").trim();
+      if (bid) {
+        boothMap.set(bid, (boothMap.get(bid) ?? 0) + 1);
+      }
+    }
+    const boothWise = Array.from(boothMap.entries()).map(([boothId, count]) => ({ boothId, count })).sort((a, b) => a.boothId.localeCompare(b.boothId));
+    const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
+    for (const s of all) {
+      const voterId = (s.ocrVoterId || "").trim() || null;
+      let voterListSrno: string | null = null;
+      let voterMappingSlNo: number | null = null;
+      let boothId: string | null = (s.voterMappingBoothId || "").trim() || null;
+      if (voterId) {
+        const vlist = await this.getVoterByVcardId(voterId);
+        if (vlist?.srno) voterListSrno = vlist.srno;
+        const mapping = await this.getVoterMappingByVoterId(voterId);
+        if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
+        if (mapping?.boothId && !boothId) boothId = mapping.boothId;
+      }
+      sakhiVoterListDetails.push({
+        submissionId: s.id,
+        sakhiName: s.sakhiName || "",
+        mobileNumber: s.mobileNumber || "",
+        voterId,
+        voterListSrno,
+        voterMappingSlNo,
+        boothId,
+      });
+    }
+    return { total, pending, accepted, rejected, closed, voterIdMapped, boothWise, sakhiVoterListDetails };
   }
 
   async createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission> {

@@ -6,9 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Calendar, Eye, Download, FileText } from "lucide-react";
+import { Loader2, Users, Calendar, Download, FileText, BarChart3, MapPin, ListOrdered } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MahilaSammanSubmission } from "@shared/schema";
+
+export interface MahilaSammanStats {
+  total: number;
+  pending: number;
+  accepted: number;
+  rejected: number;
+  closed: number;
+  voterIdMapped: number;
+  boothWise: { boothId: string; count: number }[];
+  sakhiVoterListDetails: {
+    submissionId: string;
+    sakhiName: string;
+    mobileNumber: string;
+    voterId: string | null;
+    voterListSrno: string | null;
+    voterMappingSlNo: number | null;
+    boothId: string | null;
+  }[];
+}
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 border border-amber-200",
@@ -54,6 +73,9 @@ export default function MahilaSammanAdminPage() {
   const { data: list = [], isLoading } = useQuery<MahilaSammanSubmission[]>({
     queryKey: ["/api/admin/mahila-samman"],
   });
+  const { data: stats, isLoading: statsLoading } = useQuery<MahilaSammanStats>({
+    queryKey: ["/api/admin/mahila-samman/stats"],
+  });
   const [selected, setSelected] = useState<MahilaSammanSubmission | null>(null);
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
@@ -67,6 +89,7 @@ export default function MahilaSammanAdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman/stats"] });
       setSelected(null);
     },
   });
@@ -90,6 +113,128 @@ export default function MahilaSammanAdminPage() {
         </h1>
         <CardDescription>Review submissions. Every woman ₹1,000/month; SC/ST women ₹1,500/month.</CardDescription>
       </div>
+
+      {/* Summary stats */}
+      {statsLoading ? (
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        </div>
+      ) : stats && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            <Card className="bg-slate-50">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total</p>
+                <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-amber-50 border-amber-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Pending</p>
+                <p className="text-2xl font-bold text-amber-800">{stats.pending}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-emerald-50 border-emerald-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Accepted</p>
+                <p className="text-2xl font-bold text-emerald-800">{stats.accepted}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-red-700 uppercase tracking-wide">Rejected</p>
+                <p className="text-2xl font-bold text-red-800">{stats.rejected}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-100 border-slate-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Closed</p>
+                <p className="text-2xl font-bold text-slate-700">{stats.closed}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Voter ID Mapped</p>
+                <p className="text-2xl font-bold text-blue-800">{stats.voterIdMapped}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Booth-wise count */}
+          {stats.boothWise.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Booth-wise count (jinke booth map ho chuka hai)
+                </CardTitle>
+                <CardDescription>Har booth number pe kitne Sakhi mapped hain.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-slate-600">
+                        <th className="py-2 pr-4 font-medium">Booth Number</th>
+                        <th className="py-2 font-medium">Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.boothWise.map((row) => (
+                        <tr key={row.boothId} className="border-b border-slate-100">
+                          <td className="py-2 pr-4 font-mono">{row.boothId}</td>
+                          <td className="py-2 font-semibold">{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sakhi – Voter list number details */}
+          {stats.sakhiVoterListDetails.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Sakhi – Voter list me number (details)
+                </CardTitle>
+                <CardDescription>Jo Sakhi add hue hain, unka voter list / mapping serial number.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b">
+                      <tr className="text-left text-slate-600">
+                        <th className="py-2 pr-2 font-medium">Sakhi Name</th>
+                        <th className="py-2 pr-2 font-medium">Mobile</th>
+                        <th className="py-2 pr-2 font-medium">Voter ID</th>
+                        <th className="py-2 pr-2 font-medium">Voter list Sr No</th>
+                        <th className="py-2 pr-2 font-medium">Mapping Sl No</th>
+                        <th className="py-2 font-medium">Booth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.sakhiVoterListDetails.map((row) => (
+                        <tr key={row.submissionId} className="border-b border-slate-100">
+                          <td className="py-2 pr-2">{row.sakhiName}</td>
+                          <td className="py-2 pr-2">{row.mobileNumber}</td>
+                          <td className="py-2 pr-2 font-mono text-xs">{row.voterId || "—"}</td>
+                          <td className="py-2 pr-2 font-mono">{row.voterListSrno ?? "—"}</td>
+                          <td className="py-2 pr-2 font-mono">{row.voterMappingSlNo ?? "—"}</td>
+                          <td className="py-2 font-mono text-xs">{row.boothId ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
 
       <Card>
         <CardHeader className="pb-2">

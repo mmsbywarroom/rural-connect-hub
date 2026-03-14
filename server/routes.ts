@@ -4767,6 +4767,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/mahila-samman/stats", async (_req, res) => {
+    try {
+      const stats = await storage.getMahilaSammanStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Admin Mahila Samman stats error:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   app.get("/api/admin/mahila-samman", async (_req, res) => {
     try {
       const list = await storage.getMahilaSammanSubmissions();
