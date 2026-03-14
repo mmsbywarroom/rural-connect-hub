@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Calendar, Download, FileText, BarChart3, MapPin, ListOrdered } from "lucide-react";
+import { Loader2, Users, Calendar, Download, FileText, MapPin, ListOrdered } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MahilaSammanSubmission } from "@shared/schema";
 
@@ -35,6 +35,50 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 border border-red-200",
   closed: "bg-slate-100 text-slate-700 border border-slate-200",
 };
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function printToPdf(title: string, htmlContent: string) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${title}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; color: #1e293b; }
+    h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    .meta { font-size: 0.875rem; color: #64748b; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+    th { background: #f1f5f9; font-weight: 600; }
+    .stat-block { margin-bottom: 16px; }
+    .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+    .stat-item { padding: 8px 12px; background: #f8fafc; border-radius: 6px; min-width: 120px; }
+    .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+    .stat-value { font-size: 1.25rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+  ${htmlContent}
+</body>
+</html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => {
+    win.print();
+    win.close();
+  }, 300);
+}
 
 function DocLink({ src, label }: { src: string | null | undefined; label: string }) {
   const [viewOpen, setViewOpen] = useState(false);
@@ -130,16 +174,39 @@ export default function MahilaSammanAdminPage() {
             </Card>
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Voter ID hai</p>
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Has Voter ID</p>
                 <p className="text-2xl font-bold text-blue-800">{stats.voterIdMapped}</p>
               </CardContent>
             </Card>
             <Card className="bg-amber-50 border-amber-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Voter ID nahi</p>
+                <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">No Voter ID</p>
                 <p className="text-2xl font-bold text-amber-800">{stats.total - stats.voterIdMapped}</p>
               </CardContent>
             </Card>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const html = `
+                  <h1>Mahila Samman Rashi – Summary</h1>
+                  <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
+                  <div class="stat-block">
+                    <div class="stat-row">
+                      <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
+                      <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
+                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                    </div>
+                  </div>
+                `;
+                printToPdf("Mahila Samman Summary", html);
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download PDF (Summary)
+            </Button>
           </div>
 
           {/* Booth-wise count */}
@@ -148,11 +215,30 @@ export default function MahilaSammanAdminPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Booth-wise count (voter mapping se saare unique booth)
+                  Booth-wise Sakhi count (all unique booths from voter mapping)
                 </CardTitle>
-                <CardDescription>Voter mapping work se saare booth numbers. Count 0 = jis booth pe abhi Sakhi add nahi hua.</CardDescription>
+                <p className="text-xs font-medium text-slate-700 mt-1">Count = number of Sakhi mapped to this booth.</p>
+                <CardDescription>All booth numbers from voter mapping. Count 0 = booth where no Sakhi has been added yet.</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex justify-end mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rows = stats.boothWise.map((r) => `<tr><td>${r.boothId}</td><td>${r.count}</td></tr>`).join("");
+                      const html = `
+                        <h1>Booth-wise Sakhi count</h1>
+                        <p class="meta">Count = number of Sakhi mapped to this booth. Generated on ${new Date().toLocaleString("en-IN")}</p>
+                        <table><thead><tr><th>Booth Number</th><th>Count</th></tr></thead><tbody>${rows}</tbody></table>
+                      `;
+                      printToPdf("Mahila Samman Booth-wise Count", html);
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download PDF
+                  </Button>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -181,11 +267,32 @@ export default function MahilaSammanAdminPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <ListOrdered className="h-4 w-4" />
-                  Sakhi – Voter list me number (details)
+                  Sakhi – Voter list number (details)
                 </CardTitle>
-                <CardDescription>Jo Sakhi add hue hain. Voter list Sr No voter mapping se liya gaya hai.</CardDescription>
+                <CardDescription>All added Sakhi. Voter list Sr No is from voter mapping.</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex justify-end mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rows = stats.sakhiVoterListDetails.map(
+                        (r) =>
+                          `<tr><td>${escapeHtml(r.sakhiName)}</td><td>${escapeHtml(r.mobileNumber)}</td><td>${escapeHtml(r.voterId || "—")}</td><td>${r.voterMappingSlNo ?? "—"}</td><td>${escapeHtml(r.boothId ?? "—")}</td></tr>`
+                      ).join("");
+                      const html = `
+                        <h1>Sakhi – Voter list number (details)</h1>
+                        <p class="meta">Voter list Sr No from voter mapping. Generated on ${new Date().toLocaleString("en-IN")}</p>
+                        <table><thead><tr><th>Sakhi Name</th><th>Mobile</th><th>Voter ID</th><th>Voter list Sr No</th><th>Booth</th></tr></thead><tbody>${rows}</tbody></table>
+                      `;
+                      printToPdf("Mahila Samman Sakhi Voter List Details", html);
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download PDF
+                  </Button>
+                </div>
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white border-b">
