@@ -1967,14 +1967,21 @@ export class DatabaseStorage implements IStorage {
     const rejected = all.filter((s) => s.status === "rejected").length;
     const closed = all.filter((s) => s.status === "closed").length;
     const voterIdMapped = all.filter((s) => (s.voterMappingBoothId || "").trim() !== "").length;
+    // Unique booth IDs from voter mapping work (sab booths dikhane ke liye)
+    const mappingRows = await db.select({ boothId: voterMappingMaster.boothId }).from(voterMappingMaster);
+    const uniqueBoothIds = [...new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))];
     const boothMap = new Map<string, number>();
+    for (const bid of uniqueBoothIds) {
+      boothMap.set(bid, 0);
+    }
     for (const s of all) {
       const bid = (s.voterMappingBoothId || "").trim();
       if (bid) {
+        if (!boothMap.has(bid)) boothMap.set(bid, 0);
         boothMap.set(bid, (boothMap.get(bid) ?? 0) + 1);
       }
     }
-    const boothWise = Array.from(boothMap.entries()).map(([boothId, count]) => ({ boothId, count })).sort((a, b) => a.boothId.localeCompare(b.boothId));
+    const boothWise = Array.from(boothMap.entries()).map(([boothId, count]) => ({ boothId, count })).sort((a, b) => a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
     const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
     for (const s of all) {
       const voterId = (s.ocrVoterId || "").trim() || null;

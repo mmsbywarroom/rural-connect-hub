@@ -121,41 +121,23 @@ export default function MahilaSammanAdminPage() {
         </div>
       ) : stats && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card className="bg-slate-50">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total</p>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Sakhi</p>
                 <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50 border-amber-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Pending</p>
-                <p className="text-2xl font-bold text-amber-800">{stats.pending}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-emerald-50 border-emerald-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">Accepted</p>
-                <p className="text-2xl font-bold text-emerald-800">{stats.accepted}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-red-50 border-red-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-red-700 uppercase tracking-wide">Rejected</p>
-                <p className="text-2xl font-bold text-red-800">{stats.rejected}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-100 border-slate-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Closed</p>
-                <p className="text-2xl font-bold text-slate-700">{stats.closed}</p>
               </CardContent>
             </Card>
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Voter ID Mapped</p>
+                <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Voter ID hai</p>
                 <p className="text-2xl font-bold text-blue-800">{stats.voterIdMapped}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-amber-50 border-amber-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">Voter ID nahi</p>
+                <p className="text-2xl font-bold text-amber-800">{stats.total - stats.voterIdMapped}</p>
               </CardContent>
             </Card>
           </div>
@@ -166,9 +148,9 @@ export default function MahilaSammanAdminPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Booth-wise count (jinke booth map ho chuka hai)
+                  Booth-wise count (voter mapping se saare unique booth)
                 </CardTitle>
-                <CardDescription>Har booth number pe kitne Sakhi mapped hain.</CardDescription>
+                <CardDescription>Voter mapping work se saare booth numbers. Count 0 = jis booth pe abhi Sakhi add nahi hua.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -201,7 +183,7 @@ export default function MahilaSammanAdminPage() {
                   <ListOrdered className="h-4 w-4" />
                   Sakhi – Voter list me number (details)
                 </CardTitle>
-                <CardDescription>Jo Sakhi add hue hain, unka voter list / mapping serial number.</CardDescription>
+                <CardDescription>Jo Sakhi add hue hain. Voter list Sr No voter mapping se liya gaya hai.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -212,7 +194,6 @@ export default function MahilaSammanAdminPage() {
                         <th className="py-2 pr-2 font-medium">Mobile</th>
                         <th className="py-2 pr-2 font-medium">Voter ID</th>
                         <th className="py-2 pr-2 font-medium">Voter list Sr No</th>
-                        <th className="py-2 pr-2 font-medium">Mapping Sl No</th>
                         <th className="py-2 font-medium">Booth</th>
                       </tr>
                     </thead>
@@ -222,7 +203,6 @@ export default function MahilaSammanAdminPage() {
                           <td className="py-2 pr-2">{row.sakhiName}</td>
                           <td className="py-2 pr-2">{row.mobileNumber}</td>
                           <td className="py-2 pr-2 font-mono text-xs">{row.voterId || "—"}</td>
-                          <td className="py-2 pr-2 font-mono">{row.voterListSrno ?? "—"}</td>
                           <td className="py-2 pr-2 font-mono">{row.voterMappingSlNo ?? "—"}</td>
                           <td className="py-2 font-mono text-xs">{row.boothId ?? "—"}</td>
                         </tr>
