@@ -34,6 +34,7 @@ export interface MahilaSammanStats {
   boothsMoreThanOneSakhi: number;
   boothsZeroSakhis: number;
   boothsTenSakhis: number;
+  boothsExactlyOneSakhi: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -123,6 +124,8 @@ function DocLink({ src, label }: { src: string | null | undefined; label: string
   );
 }
 
+type BoothFilter = "gt1" | "zero" | "tenPlus" | "exactlyOne" | "";
+
 export default function MahilaSammanAdminPage() {
   const { data: list = [], isLoading } = useQuery<MahilaSammanSubmission[]>({
     queryKey: ["/api/admin/mahila-samman"],
@@ -134,6 +137,20 @@ export default function MahilaSammanAdminPage() {
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
   const [search, setSearch] = useState("");
+  const [boothFilter, setBoothFilter] = useState<BoothFilter>("");
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!selected) return;
+      const res = await apiRequest("DELETE", `/api/admin/mahila-samman/${selected.id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman/stats"] });
+      setSelected(null);
+    },
+  });
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -207,7 +224,11 @@ export default function MahilaSammanAdminPage() {
 
           {/* Extended stats as requested */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("gt1")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Voter Card Uploaded Sakhis
@@ -215,7 +236,11 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.voterCardUploadedSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("zero")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Aadhaar Uploaded Sakhis
@@ -223,7 +248,11 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.aadhaarUploadedSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("tenPlus")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Booth Number Known Sakhis
@@ -231,7 +260,11 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.boothKnownSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("exactlyOne")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Booths with &gt; 1 Sakhi
@@ -258,6 +291,14 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Booths with exactly 1 Sakhi
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsExactlyOneSakhi}</p>
+              </CardContent>
+            </Card>
           </div>
           <div className="flex justify-end gap-2 flex-wrap">
             <Button
@@ -281,6 +322,9 @@ export default function MahilaSammanAdminPage() {
                         <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
                         <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
                         <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
+                      </div>
+                      <div class="stat-row">
+                        <div class="stat-item"><div class="stat-label">Booths with exactly 1 Sakhi</div><div class="stat-value">${stats.boothsExactlyOneSakhi}</div></div>
                       </div>
                     </div>
                   </div>
@@ -349,16 +393,24 @@ export default function MahilaSammanAdminPage() {
             </Button>
           </div>
 
-          {/* Booth-wise count */}
-          {stats.boothWise.length > 0 && (
+          {/* Booth-wise count (shown only when a filter card is clicked) */}
+          {boothFilter && stats.boothWise.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
-                  Booth-wise Sakhi count (all unique booths from voter mapping)
+                  Booth-wise Sakhi count –{" "}
+                  {boothFilter === "gt1"
+                    ? "booths with more than 1 Sakhi"
+                    : boothFilter === "zero"
+                    ? "booths with 0 Sakhis"
+                    : boothFilter === "tenPlus"
+                    ? "booths with 10+ Sakhis"
+                    : "booths with exactly 1 Sakhi"}
                 </CardTitle>
-                <p className="text-xs font-medium text-slate-700 mt-1">Count = number of Sakhi mapped to this booth.</p>
-                <CardDescription>All booth numbers from voter mapping. Count 0 = booth where no Sakhi has been added yet.</CardDescription>
+                <p className="text-xs font-medium text-slate-700 mt-1">
+                  Count = number of Sakhis mapped to each booth. Click a summary card above to change this filter.
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-end mb-2">
@@ -366,10 +418,31 @@ export default function MahilaSammanAdminPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const rows = stats.boothWise.map((r) => `<tr><td>${r.boothId}</td><td>${r.count}</td></tr>`).join("");
+                      const rows = stats.boothWise
+                        .filter((r) =>
+                          boothFilter === "gt1"
+                            ? r.count > 1
+                            : boothFilter === "zero"
+                            ? r.count === 0
+                            : boothFilter === "tenPlus"
+                            ? r.count >= 10
+                            : r.count === 1
+                        )
+                        .map((r) => `<tr><td>${r.boothId}</td><td>${r.count}</td></tr>`)
+                        .join("");
                       const html = `
                         <h1>Booth-wise Sakhi count</h1>
-                        <p class="meta">Count = number of Sakhi mapped to this booth. Generated on ${new Date().toLocaleString("en-IN")}</p>
+                        <p class="meta">
+                          Count = number of Sakhi mapped to this booth. Filter: ${
+                            boothFilter === "gt1"
+                              ? "booths with more than 1 Sakhi"
+                              : boothFilter === "zero"
+                              ? "booths with 0 Sakhis"
+                              : boothFilter === "tenPlus"
+                              ? "booths with 10+ Sakhis"
+                              : "booths with exactly 1 Sakhi"
+                          }. Generated on ${new Date().toLocaleString("en-IN")}
+                        </p>
                         <table><thead><tr><th>Booth Number</th><th>Count</th></tr></thead><tbody>${rows}</tbody></table>
                       `;
                       printToPdf("Mahila Samman Booth-wise Count", html);
@@ -388,12 +461,22 @@ export default function MahilaSammanAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.boothWise.map((row) => (
-                        <tr key={row.boothId} className="border-b border-slate-100">
-                          <td className="py-2 pr-4 font-mono">{row.boothId}</td>
-                          <td className="py-2 font-semibold">{row.count}</td>
-                        </tr>
-                      ))}
+                      {stats.boothWise
+                        .filter((row) =>
+                          boothFilter === "gt1"
+                            ? row.count > 1
+                            : boothFilter === "zero"
+                            ? row.count === 0
+                            : boothFilter === "tenPlus"
+                            ? row.count >= 10
+                            : row.count === 1
+                        )
+                        .map((row) => (
+                          <tr key={row.boothId} className="border-b border-slate-100">
+                            <td className="py-2 pr-4 font-mono">{row.boothId}</td>
+                            <td className="py-2 font-semibold">{row.count}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -613,12 +696,27 @@ export default function MahilaSammanAdminPage() {
                   <p className="text-xs font-semibold text-slate-700 mb-1">Admin note</p>
                   <Textarea rows={3} value={adminNote} onChange={(e) => setAdminNote(e.target.value)} />
                 </div>
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => setSelected(null)}>Cancel</Button>
-                  <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                    {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                    Save
+                <div className="flex justify-between items-center gap-2 pt-1">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => {
+                      if (!selected) return;
+                      const ok = window.confirm("Are you sure you want to delete this submission?");
+                      if (ok) deleteMutation.mutate();
+                    }}
+                  >
+                    {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                    Delete
                   </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setSelected(null)}>Cancel</Button>
+                    <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                      {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

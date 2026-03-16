@@ -27,6 +27,7 @@ interface MahilaSammanStats {
   boothsMoreThanOneSakhi: number;
   boothsZeroSakhis: number;
   boothsTenSakhis: number;
+   boothsExactlyOneSakhi: number;
 }
 
 interface Props {
@@ -500,6 +501,12 @@ export default function TaskMahilaSamman({ user }: Props) {
                       Booths with 10+ Sakhis
                     </p>
                     <p className="text-lg font-semibold text-slate-900">{stats.boothsTenSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50 col-span-2">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Booths with exactly 1 Sakhi
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.boothsExactlyOneSakhi}</p>
                   </div>
                 </div>
               </CardContent>

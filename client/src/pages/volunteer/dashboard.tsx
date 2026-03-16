@@ -28,6 +28,7 @@ interface MahilaSammanStats {
   boothsMoreThanOneSakhi: number;
   boothsZeroSakhis: number;
   boothsTenSakhis: number;
+  boothsExactlyOneSakhi: number;
 }
 
 const visitFormSchema = z.object({
@@ -277,6 +278,12 @@ export default function VolunteerDashboardPage() {
                     Booths with 10+ Sakhis
                   </p>
                   <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothsTenSakhis}</p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Booths with exactly 1 Sakhi
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothsExactlyOneSakhi}</p>
                 </div>
               </div>
             </CardContent>

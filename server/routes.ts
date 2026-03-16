@@ -4825,6 +4825,16 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/admin/mahila-samman/:id", async (req, res) => {
+    try {
+      await storage.deleteMahilaSammanSubmission(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin Mahila Samman delete error:", error);
+      res.status(500).json({ error: "Failed to delete" });
+    }
+  });
+
   // ===== Mahila Samman Rashi through Punjab Gov (separate task) =====
   app.post("/api/mahila-samman-punjab/send-otp", async (req, res) => {
     try {

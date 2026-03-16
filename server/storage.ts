@@ -426,6 +426,7 @@ export interface IStorage {
   getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
   getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]>;
   getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
+  deleteMahilaSammanSubmission(id: string): Promise<void>;
   getMahilaSammanStats(): Promise<{
     total: number;
     pending: number;
@@ -1965,6 +1966,10 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
   }
 
+  async deleteMahilaSammanSubmission(id: string): Promise<void> {
+    await db.delete(mahilaSammanSubmissions).where(eq(mahilaSammanSubmissions.id, id));
+  }
+
   async getMahilaSammanStats(): Promise<{
     total: number;
     pending: number;
@@ -1989,6 +1994,7 @@ export class DatabaseStorage implements IStorage {
     boothsMoreThanOneSakhi: number;
     boothsZeroSakhis: number;
     boothsTenSakhis: number;
+    boothsExactlyOneSakhi: number;
   }> {
     const all = await db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
     const total = all.length;
@@ -2029,6 +2035,7 @@ export class DatabaseStorage implements IStorage {
     const boothsZeroSakhis = boothWise.filter((b) => b.count === 0).length;
     // Business requirement: boothsTenSakhis = booths with 10 or more Sakhis
     const boothsTenSakhis = boothWise.filter((b) => b.count >= 10).length;
+    const boothsExactlyOneSakhi = boothWise.filter((b) => b.count === 1).length;
     const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
     for (const s of all) {
       const voterId = (s.ocrVoterId || "").trim() || null;
@@ -2068,6 +2075,7 @@ export class DatabaseStorage implements IStorage {
       boothsMoreThanOneSakhi,
       boothsZeroSakhis,
       boothsTenSakhis,
+      boothsExactlyOneSakhi,
     };
   }
 
