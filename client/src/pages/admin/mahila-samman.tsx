@@ -224,11 +224,7 @@ export default function MahilaSammanAdminPage() {
 
           {/* Extended stats as requested */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("gt1")}
-            >
+            <Card>
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Voter Card Uploaded Sakhis
@@ -236,11 +232,7 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.voterCardUploadedSakhis}</p>
               </CardContent>
             </Card>
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("zero")}
-            >
+            <Card>
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Aadhaar Uploaded Sakhis
@@ -251,7 +243,7 @@ export default function MahilaSammanAdminPage() {
             <Card
               role="button"
               className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("tenPlus")}
+              onClick={() => setBoothFilter("mapped")}
             >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
@@ -263,7 +255,7 @@ export default function MahilaSammanAdminPage() {
             <Card
               role="button"
               className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("exactlyOne")}
+              onClick={() => setBoothFilter("gt1")}
             >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">

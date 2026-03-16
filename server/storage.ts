@@ -2031,7 +2031,7 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => b.count - a.count || a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
 
     // Derived booth-level counts
-    const boothsMoreThanOneSakhi = boothWise.filter((b) => b.count > 1).length;
+    const boothsMoreThanOneSakhi = boothWise.filter((b) => b.count > 1 && b.count < 10).length;
     const boothsZeroSakhis = boothWise.filter((b) => b.count === 0).length;
     // Business requirement: boothsTenSakhis = booths with 10 or more Sakhis
     const boothsTenSakhis = boothWise.filter((b) => b.count >= 10).length;
