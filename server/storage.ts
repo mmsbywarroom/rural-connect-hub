@@ -2027,8 +2027,8 @@ export class DatabaseStorage implements IStorage {
     // Derived booth-level counts
     const boothsMoreThanOneSakhi = boothWise.filter((b) => b.count > 1).length;
     const boothsZeroSakhis = boothWise.filter((b) => b.count === 0).length;
-    // Business requirement: boothsTenSakhis = booths with more than 10 Sakhis
-    const boothsTenSakhis = boothWise.filter((b) => b.count > 10).length;
+    // Business requirement: boothsTenSakhis = booths with 10 or more Sakhis
+    const boothsTenSakhis = boothWise.filter((b) => b.count >= 10).length;
     const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
     for (const s of all) {
       const voterId = (s.ocrVoterId || "").trim() || null;

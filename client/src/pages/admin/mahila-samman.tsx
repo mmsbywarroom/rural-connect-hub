@@ -253,7 +253,7 @@ export default function MahilaSammanAdminPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booths with &gt; 10 Sakhis
+                  Booths with 10+ Sakhis
                 </p>
                 <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
               </CardContent>
@@ -282,7 +282,7 @@ export default function MahilaSammanAdminPage() {
                       <div class="stat-row">
                         <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
                         <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Booths with &gt; 10 Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                       </div>
                     </div>
                   </div>

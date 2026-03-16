@@ -14,9 +14,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, MapPin, Plus, Clock, User, Key, LogOut } from "lucide-react";
+import { ArrowLeft, MapPin, Plus, Clock, User, Key, LogOut, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { Village, VolunteerVisit } from "@shared/schema";
+
+interface MahilaSammanStats {
+  total: number;
+  voterIdMapped: number;
+  otpVerifiedSakhis: number;
+  voterCardUploadedSakhis: number;
+  aadhaarUploadedSakhis: number;
+  boothKnownSakhis: number;
+  boothsMoreThanOneSakhi: number;
+  boothsZeroSakhis: number;
+  boothsTenSakhis: number;
+}
 
 const visitFormSchema = z.object({
   villageId: z.string().min(1, "Please select a village"),
@@ -71,6 +83,10 @@ export default function VolunteerDashboardPage() {
   const { data: visits, isLoading: visitsLoading } = useQuery<VolunteerVisit[]>({
     queryKey: [`/api/volunteer-visits/${volunteerId}`],
     enabled: !!volunteerId,
+  });
+
+  const { data: mahilaStats } = useQuery<MahilaSammanStats>({
+    queryKey: ["/api/admin/mahila-samman/stats"],
   });
 
   const createVisit = useMutation({
@@ -186,7 +202,87 @@ export default function VolunteerDashboardPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {mahilaStats && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Mahila Samman Rashi – Summary
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Total Sakhis and booth-wise distribution based on Mahila Samman Rashi submissions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-500 tracking-wide uppercase">Total Sakhi</p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.total}</p>
+                </div>
+                <div className="p-3 rounded-md bg-blue-50 border border-blue-100">
+                  <p className="text-[0.65rem] font-medium text-blue-700 tracking-wide uppercase">Has Voter ID</p>
+                  <p className="text-xl font-semibold text-blue-900">{mahilaStats.voterIdMapped}</p>
+                </div>
+                <div className="p-3 rounded-md bg-amber-50 border border-amber-100">
+                  <p className="text-[0.65rem] font-medium text-amber-700 tracking-wide uppercase">No Voter ID</p>
+                  <p className="text-xl font-semibold text-amber-900">
+                    {mahilaStats.total - mahilaStats.voterIdMapped}
+                  </p>
+                </div>
+                <div className="p-3 rounded-md bg-emerald-50 border border-emerald-100">
+                  <p className="text-[0.65rem] font-medium text-emerald-700 tracking-wide uppercase">
+                    OTP Verified Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-emerald-900">{mahilaStats.otpVerifiedSakhis}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Voter Card Uploaded Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.voterCardUploadedSakhis}</p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Aadhaar Uploaded Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.aadhaarUploadedSakhis}</p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Booth Number Known Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothKnownSakhis}</p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Booths with &gt; 1 Sakhi
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothsMoreThanOneSakhi}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Booths with 0 Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothsZeroSakhis}</p>
+                </div>
+                <div className="p-3 rounded-md bg-slate-50">
+                  <p className="text-[0.65rem] font-medium text-slate-600 tracking-wide uppercase">
+                    Booths with 10+ Sakhis
+                  </p>
+                  <p className="text-xl font-semibold text-slate-900">{mahilaStats.boothsTenSakhis}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid md:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
