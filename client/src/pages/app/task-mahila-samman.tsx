@@ -171,7 +171,7 @@ export default function TaskMahilaSamman({ user }: Props) {
   });
 
   const { data: stats } = useQuery<MahilaSammanStats>({
-    queryKey: ["/api/admin/mahila-samman/stats"],
+    queryKey: ["/api/mahila-samman/stats"],
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingId, setViewingId] = useState<string | null>(null);

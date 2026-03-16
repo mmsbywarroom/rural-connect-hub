@@ -86,7 +86,7 @@ export default function VolunteerDashboardPage() {
   });
 
   const { data: mahilaStats } = useQuery<MahilaSammanStats>({
-    queryKey: ["/api/admin/mahila-samman/stats"],
+    queryKey: ["/api/mahila-samman/stats"],
   });
 
   const createVisit = useMutation({

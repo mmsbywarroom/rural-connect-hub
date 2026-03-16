@@ -336,6 +336,9 @@ export default function MahilaSammanAdminPage() {
                       <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                     </div>
+                    <div class="stat-row">
+                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                    </div>
                   </div>
                 `;
                 printToPdf("Mahila Samman Summary", html);
