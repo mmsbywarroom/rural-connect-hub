@@ -27,6 +27,13 @@ export interface MahilaSammanStats {
     voterMappingSlNo: number | null;
     boothId: string | null;
   }[];
+  otpVerifiedSakhis: number;
+  voterCardUploadedSakhis: number;
+  aadhaarUploadedSakhis: number;
+  boothKnownSakhis: number;
+  boothsMoreThanOneSakhi: number;
+  boothsZeroSakhis: number;
+  boothsTenSakhis: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -158,7 +165,10 @@ export default function MahilaSammanAdminPage() {
           <Users className="h-6 w-6 text-primary" />
           Mahila Samman Rashi
         </h1>
-        <CardDescription>Review submissions. Every woman ₹1,000/month; SC/ST women ₹1,500/month.</CardDescription>
+        <CardDescription>
+          Review submissions. Every woman ₹1,000/month; SC/ST women ₹1,500/month. Below summary shows OTP verified
+          Sakhis, document uploads, and booth-wise distribution.
+        </CardDescription>
       </div>
 
       {/* Summary stats */}
@@ -168,7 +178,7 @@ export default function MahilaSammanAdminPage() {
         </div>
       ) : stats && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <Card className="bg-slate-50">
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Sakhi</p>
@@ -187,6 +197,77 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-amber-800">{stats.total - stats.voterIdMapped}</p>
               </CardContent>
             </Card>
+            <Card className="bg-emerald-50 border-emerald-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">OTP Verified Sakhis</p>
+                <p className="text-2xl font-bold text-emerald-800">{stats.otpVerifiedSakhis}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Extended stats as requested */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Voter Card Uploaded Sakhis
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.voterCardUploadedSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Aadhaar Uploaded Sakhis
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.aadhaarUploadedSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Booth Number Known Sakhis
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothKnownSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Booths with &gt; 1 Sakhi
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsMoreThanOneSakhi}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Booths with 0 Sakhis
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsZeroSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Booths with 10 Sakhis
+                </p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+                  Pending / Accepted / Rejected
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {stats.pending} pending · {stats.accepted} accepted · {stats.rejected} rejected
+                </p>
+              </CardContent>
+            </Card>
           </div>
           <div className="flex justify-end gap-2 flex-wrap">
             <Button
@@ -199,8 +280,19 @@ export default function MahilaSammanAdminPage() {
                     <div class="stat-block">
                       <div class="stat-row">
                         <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
+                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                         <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
                         <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                      </div>
+                      <div class="stat-row">
+                        <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Aadhaar Uploaded</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
+                      </div>
+                      <div class="stat-row">
+                        <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
+                        <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Booths with 10 Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                       </div>
                     </div>
                   </div>
@@ -247,8 +339,13 @@ export default function MahilaSammanAdminPage() {
                   <div class="stat-block">
                     <div class="stat-row">
                       <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
+                      <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
-                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                    </div>
+                    <div class="stat-row">
+                      <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Aadhaar Uploaded</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
                     </div>
                   </div>
                 `;

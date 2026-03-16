@@ -434,7 +434,22 @@ export interface IStorage {
     closed: number;
     voterIdMapped: number;
     boothWise: { boothId: string; count: number }[];
-    sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[];
+    sakhiVoterListDetails: {
+      submissionId: string;
+      sakhiName: string;
+      mobileNumber: string;
+      voterId: string | null;
+      voterListSrno: string | null;
+      voterMappingSlNo: number | null;
+      boothId: string | null;
+    }[];
+    otpVerifiedSakhis: number;
+    voterCardUploadedSakhis: number;
+    aadhaarUploadedSakhis: number;
+    boothKnownSakhis: number;
+    boothsMoreThanOneSakhi: number;
+    boothsZeroSakhis: number;
+    boothsTenSakhis: number;
   }>;
 
   createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission>;
@@ -1958,7 +1973,22 @@ export class DatabaseStorage implements IStorage {
     closed: number;
     voterIdMapped: number;
     boothWise: { boothId: string; count: number }[];
-    sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[];
+    sakhiVoterListDetails: {
+      submissionId: string;
+      sakhiName: string;
+      mobileNumber: string;
+      voterId: string | null;
+      voterListSrno: string | null;
+      voterMappingSlNo: number | null;
+      boothId: string | null;
+    }[];
+    otpVerifiedSakhis: number;
+    voterCardUploadedSakhis: number;
+    aadhaarUploadedSakhis: number;
+    boothKnownSakhis: number;
+    boothsMoreThanOneSakhi: number;
+    boothsZeroSakhis: number;
+    boothsTenSakhis: number;
   }> {
     const all = await db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
     const total = all.length;
@@ -1967,6 +1997,15 @@ export class DatabaseStorage implements IStorage {
     const rejected = all.filter((s) => s.status === "rejected").length;
     const closed = all.filter((s) => s.status === "closed").length;
     const voterIdMapped = all.filter((s) => (s.voterMappingBoothId || "").trim() !== "").length;
+
+    // New high-level Sakhi stats
+    const otpVerifiedSakhis = all.filter((s) => !!s.mobileVerified).length;
+    // Treat presence of OCR voter ID as proxy for voter card uploaded
+    const voterCardUploadedSakhis = all.filter((s) => !!(s.ocrVoterId && String(s.ocrVoterId).trim())).length;
+    // Aadhaar uploaded when both front and back images are present
+    const aadhaarUploadedSakhis = all.filter((s) => !!s.aadhaarFront && !!s.aadhaarBack).length;
+    // Booth number known if voter mapping booth id is present
+    const boothKnownSakhis = voterIdMapped;
     // Unique booth IDs from voter mapping work (sab booths dikhane ke liye)
     const mappingRows = await db.select({ boothId: voterMappingMaster.boothId }).from(voterMappingMaster);
     const uniqueBoothIds = [...new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))];
@@ -1984,6 +2023,11 @@ export class DatabaseStorage implements IStorage {
     const boothWise = Array.from(boothMap.entries())
       .map(([boothId, count]) => ({ boothId, count }))
       .sort((a, b) => b.count - a.count || a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
+
+    // Derived booth-level counts
+    const boothsMoreThanOneSakhi = boothWise.filter((b) => b.count > 1).length;
+    const boothsZeroSakhis = boothWise.filter((b) => b.count === 0).length;
+    const boothsTenSakhis = boothWise.filter((b) => b.count === 10).length;
     const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
     for (const s of all) {
       const voterId = (s.ocrVoterId || "").trim() || null;
@@ -2007,7 +2051,23 @@ export class DatabaseStorage implements IStorage {
         boothId,
       });
     }
-    return { total, pending, accepted, rejected, closed, voterIdMapped, boothWise, sakhiVoterListDetails };
+    return {
+      total,
+      pending,
+      accepted,
+      rejected,
+      closed,
+      voterIdMapped,
+      boothWise,
+      sakhiVoterListDetails,
+      otpVerifiedSakhis,
+      voterCardUploadedSakhis,
+      aadhaarUploadedSakhis,
+      boothKnownSakhis,
+      boothsMoreThanOneSakhi,
+      boothsZeroSakhis,
+      boothsTenSakhis,
+    };
   }
 
   async createMahilaSammanPunjabSubmission(data: InsertMahilaSammanPunjabSubmission): Promise<MahilaSammanPunjabSubmission> {
