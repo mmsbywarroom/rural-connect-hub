@@ -12,10 +12,22 @@ import { useOcr, type OcrResult } from "@/hooks/use-ocr";
 import { compressImage } from "@/lib/image-compress";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
-import { ArrowLeft, ChevronRight, ChevronLeft, Loader2, Camera, Upload, Phone, User, FileCheck } from "lucide-react";
+import { ArrowLeft, ChevronRight, ChevronLeft, Loader2, Camera, Upload, Phone, User, FileCheck, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import { UnitSelector } from "@/components/unit-selector";
 import type { AppUser, MahilaSammanSubmission } from "@shared/schema";
+
+interface MahilaSammanStats {
+  total: number;
+  voterIdMapped: number;
+  otpVerifiedSakhis: number;
+  voterCardUploadedSakhis: number;
+  aadhaarUploadedSakhis: number;
+  boothKnownSakhis: number;
+  boothsMoreThanOneSakhi: number;
+  boothsZeroSakhis: number;
+  boothsTenSakhis: number;
+}
 
 interface Props {
   user: AppUser;
@@ -156,6 +168,10 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const { data: myList = [] } = useQuery<MahilaSammanSubmission[]>({
     queryKey: ["/api/mahila-samman/my", user.id],
+  });
+
+  const { data: stats } = useQuery<MahilaSammanStats>({
+    queryKey: ["/api/admin/mahila-samman/stats"],
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingId, setViewingId] = useState<string | null>(null);
@@ -417,7 +433,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           </Button>
           <h1 className="font-semibold text-base">{L("title", language)}</h1>
         </header>
-        <main className="px-4 py-6">
+        <main className="px-4 py-6 space-y-4">
           <Card>
             <CardContent className="p-4">
               <p className="text-slate-700 text-sm leading-relaxed">{L("desc", language)}</p>
@@ -426,6 +442,69 @@ export default function TaskMahilaSamman({ user }: Props) {
               </Button>
             </CardContent>
           </Card>
+
+          {stats && (
+            <Card className="border-slate-200 bg-white">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                      Mahila Samman Rashi – Summary
+                    </p>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Based on all Sakhis added so far
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-2 rounded-md bg-emerald-50">
+                    <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-wide">
+                      OTP Verified Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-emerald-900">{stats.otpVerifiedSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Voter Card Uploaded Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.voterCardUploadedSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Aadhaar Uploaded Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.aadhaarUploadedSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Booth Number Known Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.boothKnownSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Booths with &gt; 1 Sakhi
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.boothsMoreThanOneSakhi}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Booths with 0 Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.boothsZeroSakhis}</p>
+                  </div>
+                  <div className="p-2 rounded-md bg-slate-50 col-span-2">
+                    <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wide">
+                      Booths with 10+ Sakhis
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">{stats.boothsTenSakhis}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </main>
       </div>
     );

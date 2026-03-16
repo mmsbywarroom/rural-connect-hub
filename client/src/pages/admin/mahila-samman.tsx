@@ -269,9 +269,7 @@ export default function MahilaSammanAdminPage() {
                     <h2>1. Summary</h2>
                     <div class="stat-block">
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
                         <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
                         <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
                       </div>
                       <div class="stat-row">
@@ -328,14 +326,15 @@ export default function MahilaSammanAdminPage() {
                   <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
                   <div class="stat-block">
                     <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Total Sakhi</div><div class="stat-value">${stats.total}</div></div>
                       <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
-                    </div>
-                    <div class="stat-row">
                       <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Aadhaar Uploaded</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                    </div>
+                    <div class="stat-row">
                       <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
+                      <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                     </div>
                   </div>
                 `;
