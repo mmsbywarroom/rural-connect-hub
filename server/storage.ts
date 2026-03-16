@@ -2012,8 +2012,9 @@ export class DatabaseStorage implements IStorage {
     const aadhaarUploadedSakhis = all.filter((s) => !!s.aadhaarFront && !!s.aadhaarBack).length;
     // Booth number known if voter mapping booth id is present
     const boothKnownSakhis = voterIdMapped;
+
     // Unique booth IDs from voter mapping work (sab booths dikhane ke liye)
-    const mappingRows = await db.select({ boothId: voterMappingMaster.boothId }).from(voterMappingMaster);
+    const mappingRows = await db.select().from(voterMappingMaster);
     const uniqueBoothIds = [...new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))];
     const boothMap = new Map<string, number>();
     for (const bid of uniqueBoothIds) {
@@ -2036,19 +2037,61 @@ export class DatabaseStorage implements IStorage {
     // Business requirement: boothsTenSakhis = booths with 10 or more Sakhis
     const boothsTenSakhis = boothWise.filter((b) => b.count >= 10).length;
     const boothsExactlyOneSakhi = boothWise.filter((b) => b.count === 1).length;
-    const sakhiVoterListDetails: { submissionId: string; sakhiName: string; mobileNumber: string; voterId: string | null; voterListSrno: string | null; voterMappingSlNo: number | null; boothId: string | null }[] = [];
+
+    // Preload voter list & mapping data in bulk to avoid per-row queries
+    const voterIds = Array.from(
+      new Set(
+        all
+          .map((s) => (s.ocrVoterId || "").trim())
+          .filter((id) => id !== "")
+      )
+    );
+
+    const voterListRows =
+      voterIds.length > 0
+        ? await db.select().from(voterList).where(inArray(voterList.vcardId, voterIds))
+        : [];
+
+    const voterListById = new Map<string, VoterListRecord>();
+    for (const row of voterListRows) {
+      if (row.vcardId) {
+        voterListById.set((row.vcardId || "").trim(), row);
+      }
+    }
+
+    const mappingByVoterId = new Map<string, VoterMappingMaster>();
+    for (const row of mappingRows) {
+      if (row.voterId) {
+        mappingByVoterId.set((row.voterId || "").trim().toLowerCase(), row);
+      }
+    }
+
+    const sakhiVoterListDetails: {
+      submissionId: string;
+      sakhiName: string;
+      mobileNumber: string;
+      voterId: string | null;
+      voterListSrno: string | null;
+      voterMappingSlNo: number | null;
+      boothId: string | null;
+    }[] = [];
+
     for (const s of all) {
-      const voterId = (s.ocrVoterId || "").trim() || null;
+      const voterIdRaw = (s.ocrVoterId || "").trim();
+      const voterId = voterIdRaw || null;
       let voterListSrno: string | null = null;
       let voterMappingSlNo: number | null = null;
       let boothId: string | null = (s.voterMappingBoothId || "").trim() || null;
+
       if (voterId) {
-        const vlist = await this.getVoterByVcardId(voterId);
+        const vlist = voterListById.get(voterId);
         if (vlist?.srno) voterListSrno = vlist.srno;
-        const mapping = await this.getVoterMappingByVoterId(voterId);
+
+        const mapping = mappingByVoterId.get(voterId.toLowerCase());
         if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
         if (mapping?.boothId && !boothId) boothId = mapping.boothId;
       }
+
       sakhiVoterListDetails.push({
         submissionId: s.id,
         sakhiName: s.sakhiName || "",
@@ -2059,6 +2102,7 @@ export class DatabaseStorage implements IStorage {
         boothId,
       });
     }
+
     return {
       total,
       pending,
