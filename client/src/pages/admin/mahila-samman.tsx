@@ -267,7 +267,11 @@ export default function MahilaSammanAdminPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("zero")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Booths with 0 Sakhis
@@ -275,7 +279,11 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.boothsZeroSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("tenPlus")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Booths with 10+ Sakhis
@@ -283,7 +291,11 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("exactlyOne")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
                   Booths with exactly 1 Sakhi
@@ -392,8 +404,10 @@ export default function MahilaSammanAdminPage() {
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
                   Booth-wise Sakhi count –{" "}
-                  {boothFilter === "gt1"
-                    ? "booths with more than 1 Sakhi"
+                  {boothFilter === "mapped"
+                    ? "booths with at least 1 Sakhi"
+                    : boothFilter === "gt1"
+                    ? "booths with more than 1 Sakhi (2–9)"
                     : boothFilter === "zero"
                     ? "booths with 0 Sakhis"
                     : boothFilter === "tenPlus"
@@ -412,8 +426,10 @@ export default function MahilaSammanAdminPage() {
                     onClick={() => {
                       const rows = stats.boothWise
                         .filter((r) =>
-                          boothFilter === "gt1"
-                            ? r.count > 1
+                          boothFilter === "mapped"
+                            ? r.count > 0
+                            : boothFilter === "gt1"
+                            ? r.count > 1 && r.count < 10
                             : boothFilter === "zero"
                             ? r.count === 0
                             : boothFilter === "tenPlus"
@@ -426,8 +442,10 @@ export default function MahilaSammanAdminPage() {
                         <h1>Booth-wise Sakhi count</h1>
                         <p class="meta">
                           Count = number of Sakhi mapped to this booth. Filter: ${
-                            boothFilter === "gt1"
-                              ? "booths with more than 1 Sakhi"
+                            boothFilter === "mapped"
+                              ? "booths with at least 1 Sakhi"
+                              : boothFilter === "gt1"
+                              ? "booths with more than 1 Sakhi (2–9)"
                               : boothFilter === "zero"
                               ? "booths with 0 Sakhis"
                               : boothFilter === "tenPlus"
@@ -455,8 +473,10 @@ export default function MahilaSammanAdminPage() {
                     <tbody>
                       {stats.boothWise
                         .filter((row) =>
-                          boothFilter === "gt1"
-                            ? row.count > 1
+                          boothFilter === "mapped"
+                            ? row.count > 0
+                            : boothFilter === "gt1"
+                            ? row.count > 1 && row.count < 10
                             : boothFilter === "zero"
                             ? row.count === 0
                             : boothFilter === "tenPlus"
