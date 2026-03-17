@@ -343,6 +343,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           aadhaarVerifiedSameAsVoter,
           ocrVoterId: ocrVoterId.trim() || null,
           ocrVoterName: ocrVoterName.trim() || null,
+          voterCard: voterIdImage,
           voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
           voterMappingName: voterMatch?.name || null,
           voterMappingFatherName: voterMatch?.fatherName || null,

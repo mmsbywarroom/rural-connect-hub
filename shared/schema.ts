@@ -1271,6 +1271,7 @@ export const mahilaSammanSubmissions = pgTable("mahila_samman_submissions", {
   aadhaarVerifiedSameAsVoter: boolean("aadhaar_verified_same_as_voter").default(false),
   ocrVoterId: text("ocr_voter_id"),
   ocrVoterName: text("ocr_voter_name"),
+  voterCard: text("voter_card"),
   voterMappingBoothId: text("voter_mapping_booth_id"),
   voterMappingName: text("voter_mapping_name"),
   voterMappingFatherName: text("voter_mapping_father_name"),

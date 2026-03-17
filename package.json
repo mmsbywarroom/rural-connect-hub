@@ -5,11 +5,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development NODE_TLS_REJECT_UNAUTHORIZED=0 tsx server/index.ts",
-    "build": "tsx script/build.ts",
-    "start": "NODE_ENV=production node dist/index.cjs",
-    "check": "tsc",
-    "db:push": "drizzle-kit push",
-    "chat:init": "tsx script/init-chat-group.ts"
+  "build": "tsx script/build.ts",
+  "start": "NODE_ENV=production node dist/index.cjs",
+  "postinstall": "npm run build",
+  "check": "tsc",
+  "db:push": "drizzle-kit push",
+  "chat:init": "tsx script/init-chat-group.ts"
   },
   "dependencies": {
     "@google-cloud/translate": "^9.3.0",

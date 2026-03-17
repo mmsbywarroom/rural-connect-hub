@@ -4619,6 +4619,7 @@ export async function registerRoutes(
         aadhaarVerifiedSameAsVoter,
         ocrVoterId,
         ocrVoterName,
+        voterCard,
         voterMappingBoothId,
         voterMappingName,
         voterMappingFatherName,
@@ -4716,6 +4717,7 @@ export async function registerRoutes(
         aadhaarVerifiedSameAsVoter: !!aadhaarVerifiedSameAsVoter,
         ocrVoterId: (ocrVoterId && String(ocrVoterId).trim()) || null,
         ocrVoterName: ocrVoterName || null,
+        voterCard: voterCard || null,
         voterMappingBoothId: voterMappingBoothId || null,
         voterMappingName: voterMappingName || null,
         voterMappingFatherName: voterMappingFatherName || null,
@@ -4753,7 +4755,7 @@ export async function registerRoutes(
       const update: any = {};
       const keys = ["villageId", "villageName", "sakhiName", "mobileNumber", "fatherHusbandName", "aadhaarFront", "aadhaarBack",
         "ocrAadhaarName", "ocrAadhaarNumber", "ocrAadhaarDob", "ocrAadhaarGender", "ocrAadhaarAddress", "aadhaarVerifiedSameAsVoter",
-        "ocrVoterId", "ocrVoterName", "voterMappingBoothId", "voterMappingName", "voterMappingFatherName", "voterMappingVillageName",
+        "ocrVoterId", "ocrVoterName", "voterCard", "voterMappingBoothId", "voterMappingName", "voterMappingFatherName", "voterMappingVillageName",
         "sakhiPhoto", "declarationChecked"];
       for (const k of keys) {
         if (body[k] !== undefined) update[k] = body[k];

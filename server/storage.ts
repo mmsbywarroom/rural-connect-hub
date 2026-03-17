@@ -2006,8 +2006,8 @@ export class DatabaseStorage implements IStorage {
 
     // New high-level Sakhi stats
     const otpVerifiedSakhis = all.filter((s) => !!s.mobileVerified).length;
-    // Treat presence of OCR voter ID as proxy for voter card uploaded
-    const voterCardUploadedSakhis = all.filter((s) => !!(s.ocrVoterId && String(s.ocrVoterId).trim())).length;
+    // Voter card uploaded when voterCard image/url is present
+    const voterCardUploadedSakhis = all.filter((s) => !!s.voterCard && String(s.voterCard).trim()).length;
     // Aadhaar uploaded when both front and back images are present
     const aadhaarUploadedSakhis = all.filter((s) => !!s.aadhaarFront && !!s.aadhaarBack).length;
     // Booth number known if voter mapping booth id is present

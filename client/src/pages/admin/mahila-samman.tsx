@@ -670,7 +670,22 @@ export default function MahilaSammanAdminPage() {
 
               <div>
                 <p className="font-semibold text-slate-700 mb-1">Voter ID & Match</p>
-                <p className="text-xs text-slate-600">Voter ID: {selected.ocrVoterId || "—"} | Name: {selected.ocrVoterName || "—"}</p>
+                <p className="text-xs text-slate-600">
+                  Voter ID:{" "}
+                  {selected.ocrVoterId ? (
+                    <a
+                      href={`https://voters.eci.gov.in/search?epic=${encodeURIComponent(selected.ocrVoterId)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {selected.ocrVoterId}
+                    </a>
+                  ) : (
+                    "—"
+                  )}{" "}
+                  | Name: {selected.ocrVoterName || "—"}
+                </p>
                 <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
                   <span className="text-slate-600">Booth ID:</span><span>{selected.voterMappingBoothId || "—"}</span>
                   <span className="text-slate-600">Name:</span><span>{selected.voterMappingName || "—"}</span>
@@ -685,6 +700,7 @@ export default function MahilaSammanAdminPage() {
                   Documents
                 </p>
                 <div className="space-y-1.5 text-sm">
+                  <div><DocLink src={selected.voterCard} label="Voter Card" /></div>
                   <div><DocLink src={selected.aadhaarFront} label="Aadhaar Front" /></div>
                   <div><DocLink src={selected.aadhaarBack} label="Aadhaar Back" /></div>
                   <div><DocLink src={selected.sakhiPhoto} label="Sakhi Live Photo" /></div>
