@@ -62,20 +62,23 @@ function printToPdf(title: string, htmlContent: string) {
   <meta charset="utf-8">
   <title>${title}</title>
   <style>
-    body { font-family: system-ui, sans-serif; padding: 20px; color: #1e293b; }
-    h1 { font-size: 1.25rem; margin-bottom: 8px; }
-    h2 { font-size: 1.1rem; margin: 20px 0 10px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px 28px; color: #0f172a; background: #f8fafc; }
+    h1 { font-size: 1.4rem; margin-bottom: 6px; color: #0f172a; }
+    h2 { font-size: 1.1rem; margin: 18px 0 10px; padding-top: 10px; border-top: 1px solid #e2e8f0; color: #0f172a; }
     h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
-    .meta { font-size: 0.875rem; color: #64748b; margin-bottom: 16px; }
+    .meta { font-size: 0.85rem; color: #64748b; margin-bottom: 14px; }
     .section { margin-bottom: 24px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-bottom: 8px; }
-    th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
-    th { background: #f1f5f9; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 6px; background: #ffffff; border-radius: 6px; overflow: hidden; border: 1px solid #e2e8f0; }
+    th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #0f172a; color: #f9fafb; font-weight: 600; font-size: 0.8rem; letter-spacing: 0.03em; text-transform: uppercase; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    tr:last-child td { border-bottom: none; }
     .stat-block { margin-bottom: 16px; }
-    .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
-    .stat-item { padding: 8px 12px; background: #f8fafc; border-radius: 6px; min-width: 120px; }
-    .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
-    .stat-value { font-size: 1.25rem; font-weight: 700; }
+    .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+    .stat-item { padding: 8px 12px; background: linear-gradient(135deg,#eff6ff,#e0f2fe); border-radius: 8px; min-width: 150px; border: 1px solid #bfdbfe; }
+    .stat-label { font-size: 0.70rem; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .stat-value { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
   </style>
 </head>
 <body>
@@ -314,8 +317,9 @@ export default function MahilaSammanAdminPage() {
                     <h2>1. Summary</h2>
                     <div class="stat-block">
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
                         <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                       </div>
                       <div class="stat-row">
                         <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
@@ -373,6 +377,10 @@ export default function MahilaSammanAdminPage() {
                   <h1>Mahila Samman Rashi – Summary</h1>
                   <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
                   <div class="stat-block">
+                    <div class="stat-row">
+                      <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
+                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                    </div>
                     <div class="stat-row">
                       <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
