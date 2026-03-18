@@ -310,7 +310,7 @@ export default function MahilaSammanAdminPage() {
             <Card className="bg-indigo-50 border-indigo-200">
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">
-                  Clusters with OTP verified Sakhi (>=1)
+                  Clusters with OTP verified Sakhi (at least 1)
                 </p>
                 <p className="text-2xl font-bold text-indigo-800">{stats.otpVerifiedUniqueClusters}</p>
               </CardContent>
