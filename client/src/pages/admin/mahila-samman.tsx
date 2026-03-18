@@ -37,6 +37,8 @@ export interface MahilaSammanStats {
     clusterNo: number;
     serialStart: number;
     serialEnd: number;
+    mappedSakhiCount: number;
+    otpVerifiedSakhiCount: number;
   }[];
   clusterWiseSakhiCounts: {
     boothId: string;
@@ -587,6 +589,8 @@ export default function MahilaSammanAdminPage() {
                         <th className="py-2 pr-2 font-medium">Booth</th>
                         <th className="py-2 pr-2 font-medium">Cluster #</th>
                         <th className="py-2 font-medium">Serial Range</th>
+                        <th className="py-2 pr-2 font-medium text-right">Mapped Sakhi</th>
+                        <th className="py-2 font-medium text-right pr-2">OTP Verified</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -597,6 +601,8 @@ export default function MahilaSammanAdminPage() {
                           <td className="py-2 font-mono text-xs">
                             {c.serialStart} - {c.serialEnd}
                           </td>
+                          <td className="py-2 pr-2 font-semibold text-right">{c.mappedSakhiCount}</td>
+                          <td className="py-2 pr-2 font-semibold text-right">{c.otpVerifiedSakhiCount}</td>
                         </tr>
                       ))}
                     </tbody>
