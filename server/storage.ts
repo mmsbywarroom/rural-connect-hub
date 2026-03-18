@@ -2002,6 +2002,16 @@ export class DatabaseStorage implements IStorage {
     clusterTotal: number;
     otpVerifiedUniqueClusters: number;
     clusterCoveragePercent: number;
+    coveredClusters: {
+      boothId: string;
+      clusterNo: number;
+      serialStart: number;
+      serialEnd: number;
+      // How many sakhi records map to this cluster (by voter id)
+      mappedSakhiCount: number;
+      // How many OTP verified sakhi records map to this cluster
+      otpSakhiCount: number;
+    }[];
     uncoveredClusters: {
       boothId: string;
       clusterNo: number;
@@ -2229,6 +2239,21 @@ export class DatabaseStorage implements IStorage {
         };
       });
 
+    const coveredClusters = clusterList
+      .filter((c) => coveredClusterKeys.has(`${c.boothId}-${c.clusterNo}`))
+      .map((c) => {
+        const key = `${c.boothId}-${c.clusterNo}`;
+        return {
+          boothId: c.boothId,
+          clusterNo: c.clusterNo,
+          serialStart: c.serialStart,
+          serialEnd: c.serialEnd,
+          mappedSakhiCount: mappedClusterCounts.get(key) ?? 0,
+          otpSakhiCount: coveredClusterCounts.get(key) ?? 0,
+        };
+      })
+      .sort((a, b) => b.otpSakhiCount - a.otpSakhiCount || a.boothId.localeCompare(b.boothId, undefined, { numeric: true }) || a.clusterNo - b.clusterNo);
+
     const clusterWiseSakhiCounts = clusterList
       .map((c) => {
         const key = `${c.boothId}-${c.clusterNo}`;
@@ -2254,6 +2279,7 @@ export class DatabaseStorage implements IStorage {
       clusterTotal,
       otpVerifiedUniqueClusters,
       clusterCoveragePercent,
+      coveredClusters,
       uncoveredClusters,
       clusterWiseSakhiCounts,
       voterCardUploadedSakhis,

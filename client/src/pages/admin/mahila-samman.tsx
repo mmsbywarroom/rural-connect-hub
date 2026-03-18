@@ -32,6 +32,14 @@ export interface MahilaSammanStats {
   clusterTotal: number;
   otpVerifiedUniqueClusters: number;
   clusterCoveragePercent: number;
+  coveredClusters: {
+    boothId: string;
+    clusterNo: number;
+    serialStart: number;
+    serialEnd: number;
+    mappedSakhiCount: number;
+    otpSakhiCount: number;
+  }[];
   uncoveredClusters: {
     boothId: string;
     clusterNo: number;
@@ -174,6 +182,8 @@ export default function MahilaSammanAdminPage() {
   const [boothFilter, setBoothFilter] = useState<BoothFilter>("");
   const [uncoveredClusterFilter, setUncoveredClusterFilter] = useState<UncoveredClusterFilter>("");
   const [uncoveredClusterSearch, setUncoveredClusterSearch] = useState("");
+  const [coveredClusterFilter, setCoveredClusterFilter] = useState<UncoveredClusterFilter>("");
+  const [coveredClusterSearch, setCoveredClusterSearch] = useState("");
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -559,6 +569,110 @@ export default function MahilaSammanAdminPage() {
                           <tr key={row.boothId} className="border-b border-slate-100">
                             <td className="py-2 pr-4 font-mono">{row.boothId}</td>
                             <td className="py-2 font-semibold">{row.count}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cluster-wise coverage (covered clusters list) */}
+          {stats.coveredClusters && stats.coveredClusters.length > 0 && (
+            <Card className="border-emerald-100">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Covered Clusters (OTP verified)
+                </CardTitle>
+                <CardDescription>
+                  Clusters where at least one OTP verified Sakhi is mapped (cluster = 100 voters per booth).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stats.coveredClusters && stats.coveredClusters.length > 0 && (
+                  <div className="flex justify-end mb-2 gap-2 flex-wrap">
+                    <Button
+                      variant={coveredClusterFilter === "" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCoveredClusterFilter("")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={coveredClusterFilter === "mapped" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCoveredClusterFilter("mapped")}
+                    >
+                      Mapped &gt; 0
+                    </Button>
+                    <Button
+                      variant={coveredClusterFilter === "zero" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCoveredClusterFilter("zero")}
+                    >
+                      Mapped = 0
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end mb-2 gap-2 flex-wrap">
+                  <Input
+                    value={coveredClusterSearch}
+                    onChange={(e) => setCoveredClusterSearch(e.target.value)}
+                    placeholder="Search booth or cluster"
+                    className="max-w-xs"
+                  />
+                </div>
+
+                <div className="text-xs text-slate-600 mb-2">
+                  Total covered clusters:{" "}
+                  <span className="font-semibold">{stats.coveredClusters.length}</span>
+                </div>
+
+                <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b">
+                      <tr className="text-left text-slate-600">
+                        <th className="py-2 pr-2 font-medium">Booth</th>
+                        <th className="py-2 pr-2 font-medium">Cluster #</th>
+                        <th className="py-2 font-medium">Serial Range</th>
+                        <th className="py-2 font-medium text-right pr-2">OTP Sakhi Count</th>
+                        <th className="py-2 font-medium text-right pr-2">Mapped Sakhi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.coveredClusters
+                        .filter((c) => {
+                          const matchesMapped =
+                            coveredClusterFilter === "mapped"
+                              ? c.mappedSakhiCount > 0
+                              : coveredClusterFilter === "zero"
+                                ? c.mappedSakhiCount === 0
+                                : true;
+
+                          const q = coveredClusterSearch.trim();
+                          if (!q) return matchesMapped;
+
+                          const qNum = Number(q);
+                          const matchesBooth = (c.boothId || "").toLowerCase().includes(q.toLowerCase());
+                          const matchesCluster =
+                            Number.isFinite(qNum) && qNum > 0
+                              ? c.clusterNo === qNum
+                              : String(c.clusterNo).includes(q);
+
+                          return matchesMapped && (matchesBooth || matchesCluster);
+                        })
+                        .map((c) => (
+                          <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
+                            <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
+                            <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
+                            <td className="py-2 font-mono text-xs">
+                              {c.serialStart} - {c.serialEnd}
+                            </td>
+                            <td className="py-2 pr-2 font-semibold text-right">{c.otpSakhiCount}</td>
+                            <td className="py-2 pr-2 font-semibold text-right">{c.mappedSakhiCount}</td>
                           </tr>
                         ))}
                     </tbody>
