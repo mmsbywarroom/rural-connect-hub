@@ -242,11 +242,11 @@ export default function MahilaSammanAdminPage() {
         </div>
       ) : stats && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <Card className="bg-slate-50">
+          <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-4 gap-3">
+            <Card className="bg-emerald-50 border-emerald-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Sakhi</p>
-                <p className="text-2xl font-bold text-slate-800">{stats.total}</p>
+                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">OTP Verified Sakhis</p>
+                <p className="text-2xl font-bold text-emerald-800">{stats.otpVerifiedSakhis}</p>
               </CardContent>
             </Card>
             <Card className="bg-blue-50 border-blue-200">
@@ -261,39 +261,37 @@ export default function MahilaSammanAdminPage() {
                 <p className="text-2xl font-bold text-amber-800">{stats.total - stats.voterIdMapped}</p>
               </CardContent>
             </Card>
-            <Card className="bg-emerald-50 border-emerald-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">OTP Verified Sakhis</p>
-                <p className="text-2xl font-bold text-emerald-800">{stats.otpVerifiedSakhis}</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-indigo-50 border-indigo-200">
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Cluster Coverage (OTP)</p>
-                <p className="text-2xl font-bold text-indigo-800">{stats.clusterCoveragePercent}%</p>
-                <p className="text-xs font-medium text-indigo-700 mt-1">
-                  {stats.otpVerifiedUniqueClusters} / {stats.clusterTotal} clusters covered
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Extended stats as requested */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Card>
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Voter Card Uploaded Sakhis
-                </p>
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Aadhaar Uploaded Sakhis</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.aadhaarUploadedSakhis}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Voter Card Uploaded Sakhis</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.voterCardUploadedSakhis}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-indigo-300"
+              onClick={() => setBoothFilter("tenPlus")}
+            >
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Aadhaar Uploaded Sakhis
-                </p>
-                <p className="text-2xl font-bold text-slate-900">{stats.aadhaarUploadedSakhis}</p>
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Booths with 10+ Sakhis</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card
+              role="button"
+              className="cursor-pointer hover:border-slate-300"
+              onClick={() => setBoothFilter("zero")}
+            >
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Booths with 0 Sakhis</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.boothsZeroSakhis}</p>
               </CardContent>
             </Card>
             <Card
@@ -302,61 +300,39 @@ export default function MahilaSammanAdminPage() {
               onClick={() => setBoothFilter("mapped")}
             >
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booth Number Known Sakhis
-                </p>
+                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Booth Number Known Sakhis</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.boothKnownSakhis}</p>
-              </CardContent>
-            </Card>
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("gt1")}
-            >
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booths with &gt; 1 Sakhi
-                </p>
-                <p className="text-2xl font-bold text-slate-900">{stats.boothsMoreThanOneSakhi}</p>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("zero")}
-            >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 mt-3">
+            <Card className="bg-indigo-50 border-indigo-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booths with 0 Sakhis
+                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">
+                  Clusters with OTP verified Sakhi (>=1)
                 </p>
-                <p className="text-2xl font-bold text-slate-900">{stats.boothsZeroSakhis}</p>
+                <p className="text-2xl font-bold text-indigo-800">{stats.otpVerifiedUniqueClusters}</p>
               </CardContent>
             </Card>
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("tenPlus")}
-            >
+            <Card className="bg-slate-50 border-slate-200">
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booths with 10+ Sakhis
+                  Clusters with 0 OTP verified Sakhi
                 </p>
-                <p className="text-2xl font-bold text-slate-900">{stats.boothsTenSakhis}</p>
+                <p className="text-2xl font-bold text-slate-900">{stats.clusterTotal - stats.otpVerifiedUniqueClusters}</p>
               </CardContent>
             </Card>
-            <Card
-              role="button"
-              className="cursor-pointer hover:border-slate-300"
-              onClick={() => setBoothFilter("exactlyOne")}
-            >
+          </div>
+
+          <div className="mt-3">
+            <Card className="bg-indigo-50 border-indigo-200">
               <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-                  Booths with exactly 1 Sakhi
+                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Cluster Coverage (OTP)</p>
+                <p className="text-2xl font-bold text-indigo-800">{stats.clusterCoveragePercent}%</p>
+                <p className="text-xs font-medium text-indigo-700 mt-1">
+                  {stats.otpVerifiedUniqueClusters} / {stats.clusterTotal} clusters covered
                 </p>
-                <p className="text-2xl font-bold text-slate-900">{stats.boothsExactlyOneSakhi}</p>
               </CardContent>
             </Card>
           </div>
@@ -370,22 +346,23 @@ export default function MahilaSammanAdminPage() {
                     <h2>1. Summary</h2>
                     <div class="stat-block">
                       <div class="stat-row">
+                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                         <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
                         <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
-                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                       </div>
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Aadhaar Uploaded</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Aadhaar Uploaded Sakhis</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                        <div class="stat-item"><div class="stat-label">Voter Card Uploaded Sakhis</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
                         <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
                       </div>
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
                         <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
                         <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                       </div>
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Booths with exactly 1 Sakhi</div><div class="stat-value">${stats.boothsExactlyOneSakhi}</div></div>
+                        <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (>=1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
+                        <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
+                        <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
                       </div>
                     </div>
                   </div>
@@ -452,23 +429,23 @@ export default function MahilaSammanAdminPage() {
                   <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
                   <div class="stat-block">
                     <div class="stat-row">
+                      <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
                       <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
                     </div>
                     <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Voter Card Uploaded</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Aadhaar Uploaded</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Aadhaar Uploaded Sakhis</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Voter Card Uploaded Sakhis</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
+                      <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
                     </div>
                     <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Booths &gt; 1 Sakhi</div><div class="stat-value">${stats.boothsMoreThanOneSakhi}</div></div>
                       <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
                       <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                     </div>
                     <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Booths with exactly 1 Sakhi</div><div class="stat-value">${stats.boothsExactlyOneSakhi}</div></div>
-                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
+                      <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (>=1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
+                      <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
+                      <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
                     </div>
                   </div>
                 `;
