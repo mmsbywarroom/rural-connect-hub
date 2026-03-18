@@ -2008,8 +2008,7 @@ export class DatabaseStorage implements IStorage {
       serialStart: number;
       serialEnd: number;
       // Counts are "how many sakhis map to this cluster by voter id"
-      mappedSakhiCount: number;
-      otpVerifiedSakhiCount: number;
+      mappedSakhiCount: number; // 0/1 unique cluster mapped coverage
     }[];
     clusterWiseSakhiCounts: {
       boothId: string;
@@ -2124,12 +2123,11 @@ export class DatabaseStorage implements IStorage {
       boothId: string | null;
     }[] = [];
 
-    // OTP verified unique cluster coverage + per-cluster OTP-verified sakhi counts
+    // Unique cluster coverage:
+    // - mappedClusterKeys: cluster has at least one sakhi whose voter id matches booth+serial cluster
+    // - coveredClusterKeys: above but also OTP verified (mobileVerified)
     const coveredClusterKeys = new Set<string>();
-    // OTP verified sakhi count per booth-cluster
-    const clusterSakhiCount = new Map<string, number>();
-    // All mapped sakhi count per booth-cluster (regardless of otp verification)
-    const clusterMappedSakhiCount = new Map<string, number>();
+    const mappedClusterKeys = new Set<string>();
 
     for (const s of all) {
       const voterIdRaw = (s.ocrVoterId || "").trim();
@@ -2152,10 +2150,9 @@ export class DatabaseStorage implements IStorage {
           if (bid) {
             const clusterNo = Math.floor((mapping.slNo - 1) / 100) + 1;
             const key = `${bid}-${clusterNo}`;
-            clusterMappedSakhiCount.set(key, (clusterMappedSakhiCount.get(key) ?? 0) + 1);
+            mappedClusterKeys.add(key);
             if (s.mobileVerified) {
               coveredClusterKeys.add(key);
-              clusterSakhiCount.set(key, (clusterSakhiCount.get(key) ?? 0) + 1);
             }
           }
         }
@@ -2218,15 +2215,14 @@ export class DatabaseStorage implements IStorage {
           clusterNo: c.clusterNo,
           serialStart: c.serialStart,
           serialEnd: c.serialEnd,
-          mappedSakhiCount: clusterMappedSakhiCount.get(key) ?? 0,
-          otpVerifiedSakhiCount: clusterSakhiCount.get(key) ?? 0,
+          mappedSakhiCount: mappedClusterKeys.has(key) ? 1 : 0,
         };
       });
 
     const clusterWiseSakhiCounts = clusterList
       .map((c) => {
         const key = `${c.boothId}-${c.clusterNo}`;
-        return { ...c, sakhiCount: clusterSakhiCount.get(key) ?? 0 };
+        return { ...c, sakhiCount: coveredClusterKeys.has(key) ? 1 : 0 };
       })
       .sort(
         (a, b) =>
