@@ -1976,10 +1976,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMahilaSammanSubmission(id: string): Promise<void> {
-    await db
-      .update(mahilaSammanSubmissions)
-      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
-      .where(eq(mahilaSammanSubmissions.id, id));
+    await db.delete(mahilaSammanSubmissions).where(eq(mahilaSammanSubmissions.id, id));
   }
 
   async getMahilaSammanStats(): Promise<{

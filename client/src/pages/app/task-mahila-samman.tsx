@@ -476,20 +476,6 @@ export default function TaskMahilaSamman({ user }: Props) {
     },
   });
 
-  const undeleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("POST", `/api/mahila-samman/my/${id}/undelete`, { appUserId: user.id });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mahila-samman/my", user.id] });
-      toast({ title: "Restored" });
-    },
-    onError: () => {
-      toast({ title: "Failed to restore", variant: "destructive" });
-    },
-  });
-
   const handleSubmitClick = () => {
     // Show warning whenever submitting WITHOUT Aadhaar.
     // (Voter ID is still required by validation; this popup is only for UX.)
@@ -635,40 +621,27 @@ export default function TaskMahilaSamman({ user }: Props) {
                     <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
                     <div className="flex gap-1 flex-shrink-0">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
-                      {!s.isDeleted ? (
-                        <>
-                          {s.status === "pending" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => {
-                                setEditingId(s.id);
-                                setStep("form");
-                              }}
-                            >
-                              {L("edit", language)}
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => deleteMutation.mutate(s.id)}
-                          >
-                            {L("delete", language)}
-                          </Button>
-                        </>
-                      ) : (
+                      {s.status === "pending" && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           className="h-7 text-xs"
-                          onClick={() => undeleteMutation.mutate(s.id)}
+                          onClick={() => {
+                            setEditingId(s.id);
+                            setStep("form");
+                          }}
                         >
-                          {L("undelete", language)}
+                          {L("edit", language)}
                         </Button>
                       )}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => deleteMutation.mutate(s.id)}
+                      >
+                        {L("delete", language)}
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -691,14 +664,7 @@ export default function TaskMahilaSamman({ user }: Props) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <p className="font-semibold text-slate-600 text-xs">{L("sakhiName", language)}</p>
-                      <p className="text-slate-800">
-                        {sub.sakhiName}
-                        {sub.isDeleted ? (
-                          <span className="ml-1 text-[10px] text-red-600 border border-red-200 rounded px-1 py-0.5">
-                            {L("deleted", language)}
-                          </span>
-                        ) : null}
-                      </p>
+                      <p className="text-slate-800">{sub.sakhiName}</p>
                     </div>
                     <div>
                       <p className="font-semibold text-slate-600 text-xs">{L("mobile", language)}</p>
@@ -714,7 +680,7 @@ export default function TaskMahilaSamman({ user }: Props) {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2 border-t flex-wrap">
-                    {!sub.isDeleted && sub.status === "pending" && (
+                    {sub.status === "pending" && (
                       <Button
                         size="sm"
                         onClick={() => {
@@ -726,30 +692,16 @@ export default function TaskMahilaSamman({ user }: Props) {
                         {L("edit", language)}
                       </Button>
                     )}
-                    {!sub.isDeleted && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          deleteMutation.mutate(sub.id);
-                          setViewingId(null);
-                        }}
-                      >
-                        {L("delete", language)}
-                      </Button>
-                    )}
-                    {sub.isDeleted && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          undeleteMutation.mutate(sub.id);
-                          setViewingId(null);
-                        }}
-                      >
-                        {L("undelete", language)}
-                      </Button>
-                    )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        deleteMutation.mutate(sub.id);
+                        setViewingId(null);
+                      }}
+                    >
+                      {L("delete", language)}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
                   </div>
                 </div>
@@ -1069,7 +1021,7 @@ export default function TaskMahilaSamman({ user }: Props) {
                 </div>
                 {sub.declarationChecked && <p className="text-xs text-slate-600">Declaration: Yes</p>}
                 <div className="flex justify-end gap-2 pt-2 border-t flex-wrap">
-                  {!sub.isDeleted && sub.status === "pending" && (
+                  {sub.status === "pending" && (
                     <Button
                       size="sm"
                       onClick={() => {
@@ -1080,30 +1032,16 @@ export default function TaskMahilaSamman({ user }: Props) {
                       {L("edit", language)}
                     </Button>
                   )}
-                  {!sub.isDeleted && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        deleteMutation.mutate(sub.id);
-                        setViewingId(null);
-                      }}
-                    >
-                      {L("delete", language)}
-                    </Button>
-                  )}
-                  {sub.isDeleted && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        undeleteMutation.mutate(sub.id);
-                        setViewingId(null);
-                      }}
-                    >
-                      {L("undelete", language)}
-                    </Button>
-                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      deleteMutation.mutate(sub.id);
+                      setViewingId(null);
+                    }}
+                  >
+                    {L("delete", language)}
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>
                     {L("close", language)}
                   </Button>

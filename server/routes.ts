@@ -4851,11 +4851,8 @@ export async function registerRoutes(
 
   app.delete("/api/admin/mahila-samman/:id", async (req, res) => {
     try {
-      await storage.updateMahilaSammanSubmission(req.params.id, {
-        isDeleted: true,
-        deletedAt: new Date(),
-      } as any);
-      res.json({ success: true, softDeleted: true });
+      await storage.deleteMahilaSammanSubmission(req.params.id);
+      res.json({ success: true });
     } catch (error) {
       console.error("Admin Mahila Samman delete error:", error);
       res.status(500).json({ error: "Failed to delete" });
@@ -4869,32 +4866,11 @@ export async function registerRoutes(
       const existing = await storage.getMahilaSammanSubmission(id);
       if (!existing) return res.status(404).json({ error: "Not found" });
       if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
-      const updated = await storage.updateMahilaSammanSubmission(id, {
-        isDeleted: true,
-        deletedAt: new Date(),
-      } as any);
-      res.json(updated);
+      await storage.deleteMahilaSammanSubmission(id);
+      res.json({ success: true });
     } catch (error) {
       console.error("Mahila Samman soft delete error:", error);
       res.status(500).json({ error: "Failed to delete" });
-    }
-  });
-
-  app.post("/api/mahila-samman/my/:id/undelete", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const body = req.body as any;
-      const existing = await storage.getMahilaSammanSubmission(id);
-      if (!existing) return res.status(404).json({ error: "Not found" });
-      if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
-      const updated = await storage.updateMahilaSammanSubmission(id, {
-        isDeleted: false,
-        deletedAt: null,
-      } as any);
-      res.json(updated);
-    } catch (error) {
-      console.error("Mahila Samman undelete error:", error);
-      res.status(500).json({ error: "Failed to undelete" });
     }
   });
 
