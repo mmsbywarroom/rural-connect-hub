@@ -52,6 +52,18 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function printToPdf(title: string, htmlContent: string) {
   const win = window.open("", "_blank");
   if (!win) return;
@@ -368,6 +380,27 @@ export default function MahilaSammanAdminPage() {
             >
               <Download className="h-4 w-4 mr-1" />
               Download PDF (All)
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!stats) return;
+                const rows = stats.sakhiVoterListDetails;
+                const header = ["Sakhi Name","Mobile Number","Booth ID","Voter ID","Voter list Sr No"].join(",");
+                const csvLines = rows.map(r => [
+                  `"${(r.sakhiName || "").replace(/"/g, '""')}"`,
+                  `"${(r.mobileNumber || "").replace(/"/g, '""')}"`,
+                  `"${(r.boothId || "").replace(/"/g, '""')}"`,
+                  `"${(r.voterId || "").replace(/"/g, '""')}"`,
+                  `"${(r.voterMappingSlNo != null ? String(r.voterMappingSlNo) : r.voterListSrno || "").replace(/"/g, '""')}"`,
+                ].join(","));
+                const csv = [header, ...csvLines].join("\n");
+                downloadCsv(csv, `mahila_samman_sakhis_${new Date().toISOString().slice(0,10)}.csv`);
+              }}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download CSV (Sakhis)
             </Button>
             <Button
               variant="outline"
