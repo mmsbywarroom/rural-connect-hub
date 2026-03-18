@@ -184,6 +184,7 @@ export default function MahilaSammanAdminPage() {
   const [uncoveredClusterSearch, setUncoveredClusterSearch] = useState("");
   const [coveredClusterFilter, setCoveredClusterFilter] = useState<UncoveredClusterFilter>("");
   const [coveredClusterSearch, setCoveredClusterSearch] = useState("");
+  const [clusterWiseSearch, setClusterWiseSearch] = useState("");
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -864,6 +865,77 @@ export default function MahilaSammanAdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Input
+                      value={clusterWiseSearch}
+                      onChange={(e) => setClusterWiseSearch(e.target.value)}
+                      placeholder="Search booth or cluster"
+                      className="max-w-xs"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const q = clusterWiseSearch.trim();
+                        const rows = stats.clusterWiseSakhiCounts.filter((c) => {
+                          if (!q) return true;
+                          const qLower = q.toLowerCase();
+                          const qNum = Number(q);
+                          const matchesBooth = (c.boothId || "").toLowerCase().includes(qLower);
+                          const matchesCluster =
+                            Number.isFinite(qNum) && qNum > 0 ? c.clusterNo === qNum : String(c.clusterNo).includes(q);
+                          return matchesBooth || matchesCluster;
+                        });
+
+                        const csv = [
+                          ["Booth", "Cluster", "Serial Range", "OTP Sakhi Count"].join(","),
+                          ...rows.map((r) => [r.boothId, r.clusterNo, `${r.serialStart} - ${r.serialEnd}`, r.sakhiCount].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")),
+                        ].join("\n");
+                        downloadCsv(csv, `mahila_samman_cluster_wise_${new Date().toISOString().slice(0, 10)}.csv`);
+                      }}
+                    >
+                      Download CSV (Filtered)
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const q = clusterWiseSearch.trim();
+                        const rows = stats.clusterWiseSakhiCounts.filter((c) => {
+                          if (!q) return true;
+                          const qLower = q.toLowerCase();
+                          const qNum = Number(q);
+                          const matchesBooth = (c.boothId || "").toLowerCase().includes(qLower);
+                          const matchesCluster =
+                            Number.isFinite(qNum) && qNum > 0 ? c.clusterNo === qNum : String(c.clusterNo).includes(q);
+                          return matchesBooth || matchesCluster;
+                        });
+
+                        const tr = rows
+                          .map(
+                            (r) =>
+                              `<tr><td>${escapeHtml(r.boothId)}</td><td>${r.clusterNo}</td><td>${r.serialStart} - ${r.serialEnd}</td><td>${r.sakhiCount}</td></tr>`
+                          )
+                          .join("");
+
+                        const html = `
+                          <h1>Mahila Samman - Cluster-wise Sakhi count (OTP verified)</h1>
+                          <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}${clusterWiseSearch.trim() ? ` | Filter: ${escapeHtml(clusterWiseSearch.trim())}` : ""}</p>
+                          <table>
+                            <thead><tr><th>Booth</th><th>Cluster</th><th>Serial Range</th><th>OTP Sakhi Count</th></tr></thead>
+                            <tbody>${tr}</tbody>
+                          </table>
+                        `;
+                        printToPdf("Mahila Samman Cluster-wise Sakhi Count", html);
+                      }}
+                    >
+                      Download PDF (Filtered)
+                    </Button>
+                  </div>
+                </div>
                 <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white border-b">
@@ -875,16 +947,27 @@ export default function MahilaSammanAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.clusterWiseSakhiCounts.map((c) => (
-                        <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
-                          <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
-                          <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
-                          <td className="py-2 font-mono text-xs">
-                            {c.serialStart} - {c.serialEnd}
-                          </td>
-                          <td className="py-2 pr-2 font-semibold text-right">{c.sakhiCount}</td>
-                        </tr>
-                      ))}
+                      {stats.clusterWiseSakhiCounts
+                        .filter((c) => {
+                          const q = clusterWiseSearch.trim();
+                          if (!q) return true;
+                          const qLower = q.toLowerCase();
+                          const qNum = Number(q);
+                          const matchesBooth = (c.boothId || "").toLowerCase().includes(qLower);
+                          const matchesCluster =
+                            Number.isFinite(qNum) && qNum > 0 ? c.clusterNo === qNum : String(c.clusterNo).includes(q);
+                          return matchesBooth || matchesCluster;
+                        })
+                        .map((c) => (
+                          <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
+                            <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
+                            <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
+                            <td className="py-2 font-mono text-xs">
+                              {c.serialStart} - {c.serialEnd}
+                            </td>
+                            <td className="py-2 pr-2 font-semibold text-right">{c.sakhiCount}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
