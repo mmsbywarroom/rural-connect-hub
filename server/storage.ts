@@ -1997,6 +1997,16 @@ export class DatabaseStorage implements IStorage {
       boothId: string | null;
     }[];
     otpVerifiedSakhis: number;
+    // Booth clustering coverage (100 voters per cluster, calculated per booth)
+    clusterTotal: number;
+    otpVerifiedUniqueClusters: number;
+    clusterCoveragePercent: number;
+    uncoveredClusters: {
+      boothId: string;
+      clusterNo: number;
+      serialStart: number;
+      serialEnd: number;
+    }[];
     voterCardUploadedSakhis: number;
     aadhaarUploadedSakhis: number;
     boothKnownSakhis: number;
@@ -2028,7 +2038,21 @@ export class DatabaseStorage implements IStorage {
 
     // Unique booth IDs from voter mapping work (sab booths dikhane ke liye)
     const mappingRows = await db.select().from(voterMappingMaster);
-    const uniqueBoothIds = [...new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))];
+    const uniqueBoothIds = Array.from(
+      new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))
+    );
+
+    // Total clusters + uncovered clusters need "max voters serial" per booth.
+    // Here we assume voter_mapping_master.slNo is a booth-wise serial, and clusters are 100 per group.
+    const boothMaxSlNo = new Map<string, number>();
+    for (const row of mappingRows) {
+      const bid = (row.boothId || "").trim();
+      if (!bid) continue;
+      if (row.slNo == null) continue;
+      const existing = boothMaxSlNo.get(bid) ?? 0;
+      boothMaxSlNo.set(bid, Math.max(existing, row.slNo));
+    }
+
     const boothMap = new Map<string, number>();
     for (const bid of uniqueBoothIds) {
       boothMap.set(bid, 0);
@@ -2089,6 +2113,9 @@ export class DatabaseStorage implements IStorage {
       boothId: string | null;
     }[] = [];
 
+    // OTP verified unique cluster coverage
+    const coveredClusterKeys = new Set<string>();
+
     for (const s of all) {
       const voterIdRaw = (s.ocrVoterId || "").trim();
       const voterId = voterIdRaw || null;
@@ -2102,6 +2129,17 @@ export class DatabaseStorage implements IStorage {
 
         const mapping = mappingByVoterId.get(voterId.toLowerCase());
         if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
+
+        // Cluster coverage calculation (only OTP verified + mapped cluster)
+        // clusterNo = floor((slNo-1)/100)+1
+        if (s.mobileVerified && mapping?.slNo != null && mapping.boothId) {
+          const bid = (mapping.boothId || "").trim();
+          if (bid) {
+            const clusterNo = Math.floor((mapping.slNo - 1) / 100) + 1;
+            coveredClusterKeys.add(`${bid}-${clusterNo}`);
+          }
+        }
+
         if (mapping?.boothId && !boothId) boothId = mapping.boothId;
       }
 
@@ -2116,6 +2154,33 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
+    // Cluster totals + uncovered clusters list
+    let clusterTotal = 0;
+    const uncoveredClusters: {
+      boothId: string;
+      clusterNo: number;
+      serialStart: number;
+      serialEnd: number;
+    }[] = [];
+
+    for (const [bid, maxSlNo] of Array.from(boothMaxSlNo.entries())) {
+      const boothClusters = Math.ceil((maxSlNo || 0) / 100);
+      if (!boothClusters || boothClusters <= 0) continue;
+      clusterTotal += boothClusters;
+
+      for (let clusterNo = 1; clusterNo <= boothClusters; clusterNo++) {
+        const key = `${bid}-${clusterNo}`;
+        if (!coveredClusterKeys.has(key)) {
+          const serialStart = (clusterNo - 1) * 100 + 1;
+          const serialEnd = Math.min(clusterNo * 100, maxSlNo);
+          uncoveredClusters.push({ boothId: bid, clusterNo, serialStart, serialEnd });
+        }
+      }
+    }
+
+    const otpVerifiedUniqueClusters = coveredClusterKeys.size;
+    const clusterCoveragePercent = clusterTotal > 0 ? Math.round(((otpVerifiedUniqueClusters / clusterTotal) * 100) * 100) / 100 : 0;
+
     return {
       total,
       pending,
@@ -2126,6 +2191,10 @@ export class DatabaseStorage implements IStorage {
       boothWise,
       sakhiVoterListDetails,
       otpVerifiedSakhis,
+      clusterTotal,
+      otpVerifiedUniqueClusters,
+      clusterCoveragePercent,
+      uncoveredClusters,
       voterCardUploadedSakhis,
       aadhaarUploadedSakhis,
       boothKnownSakhis,

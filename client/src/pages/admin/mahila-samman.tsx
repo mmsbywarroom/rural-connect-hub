@@ -28,6 +28,16 @@ export interface MahilaSammanStats {
     boothId: string | null;
   }[];
   otpVerifiedSakhis: number;
+  // Booth clustering coverage (100 voters per cluster, calculated per booth)
+  clusterTotal: number;
+  otpVerifiedUniqueClusters: number;
+  clusterCoveragePercent: number;
+  uncoveredClusters: {
+    boothId: string;
+    clusterNo: number;
+    serialStart: number;
+    serialEnd: number;
+  }[];
   voterCardUploadedSakhis: number;
   aadhaarUploadedSakhis: number;
   boothKnownSakhis: number;
@@ -233,6 +243,15 @@ export default function MahilaSammanAdminPage() {
               <CardContent className="pt-4 pb-3 px-3">
                 <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide">OTP Verified Sakhis</p>
                 <p className="text-2xl font-bold text-emerald-800">{stats.otpVerifiedSakhis}</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-indigo-50 border-indigo-200">
+              <CardContent className="pt-4 pb-3 px-3">
+                <p className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Cluster Coverage (OTP)</p>
+                <p className="text-2xl font-bold text-indigo-800">{stats.clusterCoveragePercent}%</p>
+                <p className="text-xs font-medium text-indigo-700 mt-1">
+                  {stats.otpVerifiedUniqueClusters} / {stats.clusterTotal} clusters covered
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -531,6 +550,48 @@ export default function MahilaSammanAdminPage() {
                             <td className="py-2 font-semibold">{row.count}</td>
                           </tr>
                         ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cluster-wise coverage (uncovered clusters list) */}
+          {stats.uncoveredClusters && stats.uncoveredClusters.length > 0 && (
+            <Card className="border-indigo-100">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Uncovered Clusters (OTP verified)
+                </CardTitle>
+                <CardDescription>
+                  Cluster = 100 voters per booth, based on voter mapping serial number. Coverage uses only OTP verified Sakhis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xs text-slate-600 mb-2">
+                  Total uncovered clusters: <span className="font-semibold">{stats.uncoveredClusters.length}</span>
+                </div>
+                <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b">
+                      <tr className="text-left text-slate-600">
+                        <th className="py-2 pr-2 font-medium">Booth</th>
+                        <th className="py-2 pr-2 font-medium">Cluster #</th>
+                        <th className="py-2 font-medium">Serial Range</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.uncoveredClusters.map((c) => (
+                        <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
+                          <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
+                          <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
+                          <td className="py-2 font-mono text-xs">
+                            {c.serialStart} - {c.serialEnd}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
