@@ -1282,12 +1282,16 @@ export const mahilaSammanSubmissions = pgTable("mahila_samman_submissions", {
   adminNote: text("admin_note"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  isDeleted: boolean("is_deleted").default(false),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const insertMahilaSammanSubmissionSchema = createInsertSchema(mahilaSammanSubmissions).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export type InsertMahilaSammanSubmission = z.infer<typeof insertMahilaSammanSubmissionSchema>;

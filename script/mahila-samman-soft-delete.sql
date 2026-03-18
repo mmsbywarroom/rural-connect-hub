@@ -1,0 +1,4 @@
+ALTER TABLE mahila_samman_submissions
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+

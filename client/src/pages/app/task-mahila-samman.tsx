@@ -114,6 +114,29 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
     pa: "ਮੈਂ ਸਖੀ ਵਜੋਂ ਸੇਵਾ ਕਰਨ ਲਈ ਤਿਆਰ ਹਾਂ ਅਤੇ ਸਰਗਰਮੀ ਨਾਲ ਇਹ ਯਕੀਨੀ ਬਣਾਵਾਂਗੀ ਕਿ ਘੱਟੋ-ਘੱਟ 50 ਔਰਤਾਂ ਨੂੰ ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ ਦਾ ਲਾਭ ਮਿਲੇ।",
   },
   profileIncomplete: { en: "Profile incomplete", hi: "प्रोफाइल अधूरी", pa: "ਪ੍ਰੋਫਾਈਲ ਅਧੂਰੀ" },
+  delete: { en: "Delete", hi: "हटाएं", pa: "ਹਟਾਓ" },
+  undelete: { en: "Restore", hi: "वापस लाएं", pa: "ਵਾਪਸ ਲਿਆਓ" },
+  deleted: { en: "Deleted", hi: "हटाया गया", pa: "ਹਟਾਇਆ ਗਿਆ" },
+  docsOptionalTitle: {
+    en: "Submit without Aadhaar?",
+    hi: "बिना आधार अपलोड किए जमा करें?",
+    pa: "ਆਧਾਰ ਬਿਨਾਂ ਅਪਲੋਡ ਕੀਤੇ ਭੇਜੋ?",
+  },
+  docsOptionalBody: {
+    en: "Aadhaar upload is optional. Your Voter ID and Sakhi live photo are required for submission.",
+    hi: "आधार अपलोड वैकल्पिक है। जमा करने के लिए वोटर आईडी और सखी की लाइव फोटो जरूरी है।",
+    pa: "ਆਧਾਰ ਅਪਲੋਡ ਵਿਕਲਪਿਕ ਹੈ। ਜਮ੍ਹਾਂ ਕਰਨ ਲਈ ਵੋਟਰ ਆਈਡੀ ਅਤੇ ਸਖੀ ਦੀ ਲਾਈਵ ਫੋਟੋ ਜ਼ਰੂਰੀ ਹੈ।",
+  },
+  docsOptionalContinue: {
+    en: "Yes, submit without Aadhaar",
+    hi: "हाँ, बिना आधार के जमा करें",
+    pa: "ਹਾਂ, ਆਧਾਰ ਬਿਨਾਂ ਭੇਜੋ",
+  },
+  docsOptionalCancel: {
+    en: "No, I will upload Aadhaar",
+    hi: "नहीं, मैं आधार अपलोड करूंगा/करूंगी",
+    pa: "ਨਹੀਂ, ਮੈਂ ਆਧਾਰ ਅਪਲੋਡ ਕਰਾਂਗਾ/ਕਰਾਂਗੀ",
+  },
 };
 
 function L(key: string, lang: string): string {
@@ -178,6 +201,7 @@ export default function TaskMahilaSamman({ user }: Props) {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
+  const [showMinimalConfirm, setShowMinimalConfirm] = useState(false);
 
   const editSubmission = editingId ? myList.find((s) => s.id === editingId) : null;
   useEffect(() => {
@@ -354,16 +378,34 @@ export default function TaskMahilaSamman({ user }: Props) {
         const res = await apiRequest("PATCH", `/api/mahila-samman/my/${editingId}`, { ...payload, appUserId: user.id });
         return res.json();
       }
-      const minimalPayload = {
+      const payload = {
         appUserId: user.id,
         villageId: selectedVillageId || null,
         villageName: selectedVillageName || null,
         sakhiName: sakhiName.trim(),
         mobileNumber: mobileNumber.trim(),
-        mobileVerified: true,
-        consentServeSakhi50: true,
+        mobileVerified,
+        fatherHusbandName: fatherHusbandName.trim(),
+        consentServeSakhi50,
+        aadhaarFront,
+        aadhaarBack,
+        ocrAadhaarName: ocrAadhaarName.trim() || null,
+        ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
+        ocrAadhaarDob: ocrAadhaarDob.trim() || null,
+        ocrAadhaarGender: ocrAadhaarGender.trim() || null,
+        ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
+        aadhaarVerifiedSameAsVoter,
+        ocrVoterId: ocrVoterId.trim() || null,
+        ocrVoterName: ocrVoterName.trim() || null,
+        voterCard: voterIdImage,
+        voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
+        voterMappingName: voterMatch?.name || null,
+        voterMappingFatherName: voterMatch?.fatherName || null,
+        voterMappingVillageName: voterMatch?.villageName || null,
+        sakhiPhoto,
+        declarationChecked,
       };
-      const res = await apiRequest("POST", "/api/mahila-samman/submit", minimalPayload);
+      const res = await apiRequest("POST", "/api/mahila-samman/submit", payload);
       return res.json();
     },
     onSuccess: (data) => {
@@ -406,18 +448,56 @@ export default function TaskMahilaSamman({ user }: Props) {
 
   const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
   const canSubmitMinimal = !!(sakhiName.trim() && mobileVerified && consentServeSakhi50);
+  const hasAnyAadhaar = !!(aadhaarFront || aadhaarBack);
   const canSubmitFull =
-    sakhiName.trim() &&
+    !!sakhiName.trim() &&
     mobileVerified &&
-    fatherHusbandName.trim() &&
-    aadhaarFront &&
-    aadhaarBack &&
-    aadhaarVerifiedSameAsVoter &&
-    ocrVoterId.trim() &&
+    !!fatherHusbandName.trim() &&
+    // Aadhaar is optional, but if user uploaded any Aadhaar doc then both sides + verified checkbox are required.
+    (!hasAnyAadhaar || (!!aadhaarFront && !!aadhaarBack && aadhaarVerifiedSameAsVoter)) &&
+    // Voter ID must stay required.
+    !!ocrVoterId.trim() &&
     hasVoterBooth &&
-    sakhiPhoto &&
+    !!sakhiPhoto &&
     declarationChecked;
-  const canSubmit = editingId ? canSubmitFull : canSubmitMinimal;
+  const canSubmit = canSubmitFull;
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/mahila-samman/my/${id}/delete`, { appUserId: user.id });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mahila-samman/my", user.id] });
+      toast({ title: "Deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete", variant: "destructive" });
+    },
+  });
+
+  const undeleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/mahila-samman/my/${id}/undelete`, { appUserId: user.id });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mahila-samman/my", user.id] });
+      toast({ title: "Restored" });
+    },
+    onError: () => {
+      toast({ title: "Failed to restore", variant: "destructive" });
+    },
+  });
+
+  const handleSubmitClick = () => {
+    // Show warning only when creating a new Sakhi WITHOUT Aadhaar (Voter ID is still required).
+    if (!editingId && !hasAnyAadhaar && !showMinimalConfirm) {
+      setShowMinimalConfirm(true);
+      return;
+    }
+    submitMutation.mutate();
+  };
 
   const goPrev = () => {
     if (step === "form") setStep("unit");
@@ -581,7 +661,14 @@ export default function TaskMahilaSamman({ user }: Props) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <p className="font-semibold text-slate-600 text-xs">{L("sakhiName", language)}</p>
-                      <p className="text-slate-800">{sub.sakhiName}</p>
+                      <p className="text-slate-800">
+                        {sub.sakhiName}
+                        {sub.isDeleted ? (
+                          <span className="ml-1 text-[10px] text-red-600 border border-red-200 rounded px-1 py-0.5">
+                            {L("deleted", language)}
+                          </span>
+                        ) : null}
+                      </p>
                     </div>
                     <div>
                       <p className="font-semibold text-slate-600 text-xs">{L("mobile", language)}</p>
@@ -639,7 +726,7 @@ export default function TaskMahilaSamman({ user }: Props) {
     );
   }
 
-  const isSimpleForm = !editingId;
+  const isSimpleForm = false;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24">
@@ -684,6 +771,21 @@ export default function TaskMahilaSamman({ user }: Props) {
           </Card>
         ) : (
           <>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="consentServe50Full"
+                    checked={consentServeSakhi50}
+                    onCheckedChange={(c) => setConsentServeSakhi50(!!c)}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="consentServe50Full" className="text-sm leading-tight">
+                    {L("consentServeSakhi50", language)}
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
         <Card>
           <CardContent className="p-4">
             <label className="block text-xs font-medium text-slate-600 mb-1">{L("fatherHusband", language)}</label>
@@ -766,7 +868,16 @@ export default function TaskMahilaSamman({ user }: Props) {
             {(ocrVoterId && !voterMatch) && (
               <div className="border rounded-lg p-3 bg-amber-50 border-amber-200">
                 <p className="text-xs font-semibold text-slate-700 mb-2">{L("matchNotFound", language)}</p>
-                <Input value={manualBoothId} onChange={(e) => setManualBoothId(e.target.value)} placeholder={L("boothId", language)} />
+                <Input
+                  value={manualBoothId}
+                  onChange={(e) => {
+                    const onlyDigits = e.target.value.replace(/\D/g, "");
+                    setManualBoothId(onlyDigits);
+                  }}
+                  inputMode="numeric"
+                  pattern="\d*"
+                  placeholder={L("boothId", language)}
+                />
               </div>
             )}
           </CardContent>
@@ -822,7 +933,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           </>
         )}
 
-        <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={!canSubmit || submitMutation.isPending}>
+        <Button className="w-full" onClick={handleSubmitClick} disabled={!canSubmit || submitMutation.isPending}>
           {submitMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}{L("submit", language)}
         </Button>
       </main>
@@ -897,15 +1008,76 @@ export default function TaskMahilaSamman({ user }: Props) {
                   </div>
                 </div>
                 {sub.declarationChecked && <p className="text-xs text-slate-600">Declaration: Yes</p>}
-                <div className="flex justify-end gap-2 pt-2 border-t">
-                  {sub.status === "pending" && (
-                    <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); }}>{L("edit", language)}</Button>
+                <div className="flex justify-end gap-2 pt-2 border-t flex-wrap">
+                  {!sub.isDeleted && sub.status === "pending" && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditingId(viewingId);
+                        setViewingId(null);
+                      }}
+                    >
+                      {L("edit", language)}
+                    </Button>
                   )}
-                  <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
+                  {!sub.isDeleted && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        deleteMutation.mutate(sub.id);
+                        setViewingId(null);
+                      }}
+                    >
+                      {L("delete", language)}
+                    </Button>
+                  )}
+                  {sub.isDeleted && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        undeleteMutation.mutate(sub.id);
+                        setViewingId(null);
+                      }}
+                    >
+                      {L("undelete", language)}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>
+                    {L("close", language)}
+                  </Button>
                 </div>
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMinimalConfirm} onOpenChange={(open) => setShowMinimalConfirm(open)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{L("docsOptionalTitle", language)}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-700 mb-4">{L("docsOptionalBody", language)}</p>
+          <div className="flex flex-col gap-2">
+            <Button
+              className="w-full"
+              onClick={() => {
+                setShowMinimalConfirm(false);
+                submitMutation.mutate();
+              }}
+            >
+              {L("docsOptionalContinue", language)}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowMinimalConfirm(false)}
+            >
+              {L("docsOptionalCancel", language)}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

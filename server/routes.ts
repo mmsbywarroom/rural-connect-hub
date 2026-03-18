@@ -4627,7 +4627,9 @@ export async function registerRoutes(
         sakhiPhoto,
         declarationChecked,
       } = body;
-      const isMinimal = !!body.consentServeSakhi50 && !body.aadhaarFront;
+      // Minimal nomination: consent selected + no Aadhaar + no father/husband filled (so we treat it as incomplete profile).
+      // This prevents Aadhaar-optional full submissions from being mistaken as "minimal".
+      const isMinimal = !!body.consentServeSakhi50 && !body.aadhaarFront && !body.aadhaarBack && !fatherHusbandName?.trim();
       if (isMinimal) {
         if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified) {
           return res.status(400).json({ error: "Sakhi name and verified mobile required" });
@@ -4683,21 +4685,40 @@ export async function registerRoutes(
       if (!appUserId || !sakhiName?.trim() || !mobileNumber?.trim() || !mobileVerified || !fatherHusbandName?.trim()) {
         return res.status(400).json({ error: "Sakhi name, verified mobile, and father/husband name required" });
       }
-      if (!aadhaarFront || !aadhaarBack) {
-        return res.status(400).json({ error: "Aadhaar front and back required" });
+      // Full nomination:
+      // - Aadhaar is optional
+      // - Voter ID must remain required
+      // - Sakhi live photo + declaration must remain required
+
+      // If Aadhaar upload is started, require both sides + verified checkbox.
+      const hasAnyAadhaar = !!aadhaarFront || !!aadhaarBack;
+      if (hasAnyAadhaar) {
+        if (!aadhaarFront || !aadhaarBack) {
+          return res.status(400).json({ error: "Aadhaar front and back required" });
+        }
+        if (!aadhaarVerifiedSameAsVoter) {
+          return res.status(400).json({ error: "Please verify Aadhaar same as Voter ID" });
+        }
       }
-      if (!aadhaarVerifiedSameAsVoter) {
-        return res.status(400).json({ error: "Please verify Aadhaar same as Voter ID" });
-      }
+
+      // Voter ID card must remain required for full nomination.
       if (!ocrVoterId?.trim()) {
         return res.status(400).json({ error: "Voter ID from document required" });
       }
+
+      // Sakhi live photo + declaration must remain required.
       if (!sakhiPhoto) {
         return res.status(400).json({ error: "Sakhi live photo required" });
       }
       if (!declarationChecked) {
         return res.status(400).json({ error: "Declaration must be checked" });
       }
+
+      // Booth is required for mapping.
+      if (!((voterMappingBoothId || "").trim())) {
+        return res.status(400).json({ error: "Booth ID required" });
+      }
+
       const payload = {
         appUserId: String(appUserId),
         villageId: villageId || null,
@@ -4705,6 +4726,7 @@ export async function registerRoutes(
         sakhiName: String(sakhiName).trim(),
         mobileNumber: String(mobileNumber).trim(),
         mobileVerified: !!mobileVerified,
+        consentServeSakhi50: !!body.consentServeSakhi50,
         profileComplete: true,
         fatherHusbandName: String(fatherHusbandName).trim(),
         aadhaarFront: aadhaarFront || null,
@@ -4829,11 +4851,50 @@ export async function registerRoutes(
 
   app.delete("/api/admin/mahila-samman/:id", async (req, res) => {
     try {
-      await storage.deleteMahilaSammanSubmission(req.params.id);
-      res.json({ success: true });
+      await storage.updateMahilaSammanSubmission(req.params.id, {
+        isDeleted: true,
+        deletedAt: new Date(),
+      } as any);
+      res.json({ success: true, softDeleted: true });
     } catch (error) {
       console.error("Admin Mahila Samman delete error:", error);
       res.status(500).json({ error: "Failed to delete" });
+    }
+  });
+
+  app.post("/api/mahila-samman/my/:id/delete", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body as any;
+      const existing = await storage.getMahilaSammanSubmission(id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
+      const updated = await storage.updateMahilaSammanSubmission(id, {
+        isDeleted: true,
+        deletedAt: new Date(),
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Mahila Samman soft delete error:", error);
+      res.status(500).json({ error: "Failed to delete" });
+    }
+  });
+
+  app.post("/api/mahila-samman/my/:id/undelete", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const body = req.body as any;
+      const existing = await storage.getMahilaSammanSubmission(id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
+      const updated = await storage.updateMahilaSammanSubmission(id, {
+        isDeleted: false,
+        deletedAt: null,
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Mahila Samman undelete error:", error);
+      res.status(500).json({ error: "Failed to undelete" });
     }
   });
 

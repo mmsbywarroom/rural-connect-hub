@@ -1952,22 +1952,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined> {
-    const [row] = await db.select().from(mahilaSammanSubmissions).where(eq(mahilaSammanSubmissions.id, id));
+    const [row] = await db
+      .select()
+      .from(mahilaSammanSubmissions)
+      .where(eq(mahilaSammanSubmissions.id, id));
     return row;
   }
 
   async getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]> {
-    return db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
+    return db
+      .select()
+      .from(mahilaSammanSubmissions)
+      .where(eq(mahilaSammanSubmissions.isDeleted, false))
+      .orderBy(desc(mahilaSammanSubmissions.createdAt));
   }
 
   async getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]> {
-    return db.select().from(mahilaSammanSubmissions)
+    return db
+      .select()
+      .from(mahilaSammanSubmissions)
       .where(eq(mahilaSammanSubmissions.appUserId, appUserId))
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
   }
 
   async deleteMahilaSammanSubmission(id: string): Promise<void> {
-    await db.delete(mahilaSammanSubmissions).where(eq(mahilaSammanSubmissions.id, id));
+    await db
+      .update(mahilaSammanSubmissions)
+      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+      .where(eq(mahilaSammanSubmissions.id, id));
   }
 
   async getMahilaSammanStats(): Promise<{
@@ -1996,7 +2008,11 @@ export class DatabaseStorage implements IStorage {
     boothsTenSakhis: number;
     boothsExactlyOneSakhi: number;
   }> {
-    const all = await db.select().from(mahilaSammanSubmissions).orderBy(desc(mahilaSammanSubmissions.createdAt));
+    const all = await db
+      .select()
+      .from(mahilaSammanSubmissions)
+      .where(eq(mahilaSammanSubmissions.isDeleted, false))
+      .orderBy(desc(mahilaSammanSubmissions.createdAt));
     const total = all.length;
     const pending = all.filter((s) => (s.status || "pending") === "pending").length;
     const accepted = all.filter((s) => s.status === "accepted").length;
