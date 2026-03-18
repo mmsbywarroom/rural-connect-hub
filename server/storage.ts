@@ -4,7 +4,7 @@ import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
   appUsers, cscs, cscReports, mappedVolunteers, supporters,
-  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions,   csvUploads, userAdditionalRoles, voterList, voterMappingMaster, pushSubscriptions,
+  taskCategories, taskConfigs, formFields, fieldOptions, fieldConditions, taskSubmissions,   csvUploads, userAdditionalRoles, voterList, voterMappingMaster, voterMappingClusters, pushSubscriptions,
   chatGroups, groupMembers, groupMessages, groupCalls, groupCallParticipants,
   adminRoles, loginPageConfig,
   type AdminRole, type InsertAdminRole,
@@ -38,6 +38,7 @@ import {
   type CsvUpload, type InsertCsvUpload,
   type VoterListRecord, type InsertVoterList,
   type VoterMappingMaster, type InsertVoterMappingMaster,
+  type VoterMappingCluster,
   type PushSubscription, type InsertPushSubscription,
   type ChatGroup, type InsertChatGroup,
   type GroupMember, type InsertGroupMember,
@@ -2007,6 +2008,13 @@ export class DatabaseStorage implements IStorage {
       serialStart: number;
       serialEnd: number;
     }[];
+    clusterWiseSakhiCounts: {
+      boothId: string;
+      clusterNo: number;
+      serialStart: number;
+      serialEnd: number;
+      sakhiCount: number;
+    }[];
     voterCardUploadedSakhis: number;
     aadhaarUploadedSakhis: number;
     boothKnownSakhis: number;
@@ -2113,8 +2121,9 @@ export class DatabaseStorage implements IStorage {
       boothId: string | null;
     }[] = [];
 
-    // OTP verified unique cluster coverage
+    // OTP verified unique cluster coverage + per-cluster OTP-verified sakhi counts
     const coveredClusterKeys = new Set<string>();
+    const clusterSakhiCount = new Map<string, number>();
 
     for (const s of all) {
       const voterIdRaw = (s.ocrVoterId || "").trim();
@@ -2130,13 +2139,15 @@ export class DatabaseStorage implements IStorage {
         const mapping = mappingByVoterId.get(voterId.toLowerCase());
         if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
 
-        // Cluster coverage calculation (only OTP verified + mapped cluster)
+        // Cluster coverage calculation (OTP verified + mapped cluster)
         // clusterNo = floor((slNo-1)/100)+1
         if (s.mobileVerified && mapping?.slNo != null && mapping.boothId) {
           const bid = (mapping.boothId || "").trim();
           if (bid) {
             const clusterNo = Math.floor((mapping.slNo - 1) / 100) + 1;
-            coveredClusterKeys.add(`${bid}-${clusterNo}`);
+            const key = `${bid}-${clusterNo}`;
+            coveredClusterKeys.add(key);
+            clusterSakhiCount.set(key, (clusterSakhiCount.get(key) ?? 0) + 1);
           }
         }
 
@@ -2154,32 +2165,54 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Cluster totals + uncovered clusters list
-    let clusterTotal = 0;
-    const uncoveredClusters: {
-      boothId: string;
-      clusterNo: number;
-      serialStart: number;
-      serialEnd: number;
-    }[] = [];
+    // Build cluster list:
+    // Prefer DB-generated `voter_mapping_clusters`, else fallback derive from `voter_mapping_master.slNo`.
+    type ClusterRow = { boothId: string; clusterNo: number; serialStart: number; serialEnd: number };
 
-    for (const [bid, maxSlNo] of Array.from(boothMaxSlNo.entries())) {
-      const boothClusters = Math.ceil((maxSlNo || 0) / 100);
-      if (!boothClusters || boothClusters <= 0) continue;
-      clusterTotal += boothClusters;
+    const dbClusters = await db.select().from(voterMappingClusters);
+    const clusterList: ClusterRow[] =
+      dbClusters && dbClusters.length > 0
+        ? dbClusters.map((c) => ({
+            boothId: (c.boothId || "").trim(),
+            clusterNo: Number(c.clusterNo),
+            serialStart: Number(c.serialStart),
+            serialEnd: Number(c.serialEnd),
+          }))
+        : (() => {
+            const derived: ClusterRow[] = [];
+            for (const [bid, maxSlNo] of Array.from(boothMaxSlNo.entries())) {
+              const boothClusters = Math.ceil((maxSlNo || 0) / 100);
+              if (!boothClusters || boothClusters <= 0) continue;
+              for (let clusterNo = 1; clusterNo <= boothClusters; clusterNo++) {
+                derived.push({
+                  boothId: bid,
+                  clusterNo,
+                  serialStart: (clusterNo - 1) * 100 + 1,
+                  serialEnd: Math.min(clusterNo * 100, maxSlNo),
+                });
+              }
+            }
+            return derived;
+          })();
 
-      for (let clusterNo = 1; clusterNo <= boothClusters; clusterNo++) {
-        const key = `${bid}-${clusterNo}`;
-        if (!coveredClusterKeys.has(key)) {
-          const serialStart = (clusterNo - 1) * 100 + 1;
-          const serialEnd = Math.min(clusterNo * 100, maxSlNo);
-          uncoveredClusters.push({ boothId: bid, clusterNo, serialStart, serialEnd });
-        }
-      }
-    }
-
+    const clusterTotal = clusterList.length;
     const otpVerifiedUniqueClusters = coveredClusterKeys.size;
-    const clusterCoveragePercent = clusterTotal > 0 ? Math.round(((otpVerifiedUniqueClusters / clusterTotal) * 100) * 100) / 100 : 0;
+    const clusterCoveragePercent =
+      clusterTotal > 0 ? Math.round(((otpVerifiedUniqueClusters / clusterTotal) * 100) * 100) / 100 : 0;
+
+    const uncoveredClusters = clusterList.filter((c) => !coveredClusterKeys.has(`${c.boothId}-${c.clusterNo}`));
+
+    const clusterWiseSakhiCounts = clusterList
+      .map((c) => {
+        const key = `${c.boothId}-${c.clusterNo}`;
+        return { ...c, sakhiCount: clusterSakhiCount.get(key) ?? 0 };
+      })
+      .sort(
+        (a, b) =>
+          b.sakhiCount - a.sakhiCount ||
+          a.boothId.localeCompare(b.boothId, undefined, { numeric: true }) ||
+          a.clusterNo - b.clusterNo
+      );
 
     return {
       total,
@@ -2195,6 +2228,7 @@ export class DatabaseStorage implements IStorage {
       otpVerifiedUniqueClusters,
       clusterCoveragePercent,
       uncoveredClusters,
+      clusterWiseSakhiCounts,
       voterCardUploadedSakhis,
       aadhaarUploadedSakhis,
       boothKnownSakhis,

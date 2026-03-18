@@ -417,6 +417,20 @@ export const insertVoterMappingMasterSchema = createInsertSchema(voterMappingMas
 export type VoterMappingMaster = typeof voterMappingMaster.$inferSelect;
 export type InsertVoterMappingMaster = z.infer<typeof insertVoterMappingMasterSchema>;
 
+// Voter mapping clusters (100 voters per cluster) generated from voter_mapping_master.sl_no.
+export const voterMappingClusters = pgTable("voter_mapping_clusters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  boothId: text("booth_id").notNull(),
+  clusterNo: integer("cluster_no").notNull(),
+  serialStart: integer("serial_start").notNull(),
+  serialEnd: integer("serial_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVoterMappingClustersSchema = createInsertSchema(voterMappingClusters).omit({ id: true, createdAt: true });
+export type VoterMappingCluster = typeof voterMappingClusters.$inferSelect;
+export type InsertVoterMappingCluster = z.infer<typeof insertVoterMappingClustersSchema>;
+
 // Voter List (imported from CSV)
 export const voterList = pgTable("voter_list", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

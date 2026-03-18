@@ -38,6 +38,13 @@ export interface MahilaSammanStats {
     serialStart: number;
     serialEnd: number;
   }[];
+  clusterWiseSakhiCounts: {
+    boothId: string;
+    clusterNo: number;
+    serialStart: number;
+    serialEnd: number;
+    sakhiCount: number;
+  }[];
   voterCardUploadedSakhis: number;
   aadhaarUploadedSakhis: number;
   boothKnownSakhis: number;
@@ -650,6 +657,47 @@ export default function MahilaSammanAdminPage() {
                           <td className="py-2 pr-2 font-mono text-xs">{row.voterId || "—"}</td>
                           <td className="py-2 pr-2 font-mono">{row.voterMappingSlNo ?? "—"}</td>
                           <td className="py-2 font-mono text-xs">{row.boothId ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cluster-wise OTP verified Sakhi count */}
+          {stats.clusterWiseSakhiCounts && stats.clusterWiseSakhiCounts.length > 0 && (
+            <Card className="border-indigo-100">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Cluster-wise Sakhi count (OTP verified)
+                </CardTitle>
+                <CardDescription>
+                  Shows how many OTP verified sakhis map to each 100-voter cluster (serial range from voter mapping).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b">
+                      <tr className="text-left text-slate-600">
+                        <th className="py-2 pr-2 font-medium">Booth</th>
+                        <th className="py-2 pr-2 font-medium">Cluster #</th>
+                        <th className="py-2 pr-2 font-medium">Serial Range</th>
+                        <th className="py-2 font-medium text-right pr-2">OTP Sakhi Count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.clusterWiseSakhiCounts.map((c) => (
+                        <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
+                          <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
+                          <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
+                          <td className="py-2 font-mono text-xs">
+                            {c.serialStart} - {c.serialEnd}
+                          </td>
+                          <td className="py-2 pr-2 font-semibold text-right">{c.sakhiCount}</td>
                         </tr>
                       ))}
                     </tbody>
