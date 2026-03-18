@@ -360,7 +360,7 @@ export default function MahilaSammanAdminPage() {
                         <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                       </div>
                       <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (>=1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
+                        <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (at least 1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
                         <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
                         <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
                       </div>
@@ -443,7 +443,7 @@ export default function MahilaSammanAdminPage() {
                       <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
                     </div>
                     <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (>=1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
+                      <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (at least 1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
                       <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
                       <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
                     </div>
