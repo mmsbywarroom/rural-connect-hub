@@ -158,6 +158,7 @@ function DocLink({ src, label }: { src: string | null | undefined; label: string
 }
 
 type BoothFilter = "gt1" | "zero" | "tenPlus" | "exactlyOne" | "";
+type UncoveredClusterFilter = "mapped" | "zero" | "";
 
 export default function MahilaSammanAdminPage() {
   const { data: list = [], isLoading } = useQuery<MahilaSammanSubmission[]>({
@@ -171,6 +172,8 @@ export default function MahilaSammanAdminPage() {
   const [adminNote, setAdminNote] = useState("");
   const [search, setSearch] = useState("");
   const [boothFilter, setBoothFilter] = useState<BoothFilter>("");
+  const [uncoveredClusterFilter, setUncoveredClusterFilter] = useState<UncoveredClusterFilter>("");
+  const [uncoveredClusterSearch, setUncoveredClusterSearch] = useState("");
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -578,8 +581,52 @@ export default function MahilaSammanAdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {stats.uncoveredClusters && stats.uncoveredClusters.length > 0 && (
+                  <div className="flex justify-end mb-2 gap-2 flex-wrap">
+                    <Button
+                      variant={uncoveredClusterFilter === "" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUncoveredClusterFilter("")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={uncoveredClusterFilter === "mapped" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUncoveredClusterFilter("mapped")}
+                    >
+                      Mapped &gt; 0
+                    </Button>
+                    <Button
+                      variant={uncoveredClusterFilter === "zero" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUncoveredClusterFilter("zero")}
+                    >
+                      Mapped = 0
+                    </Button>
+                  </div>
+                )}
                 <div className="text-xs text-slate-600 mb-2">
-                  Total uncovered clusters: <span className="font-semibold">{stats.uncoveredClusters.length}</span>
+                  Total uncovered clusters:{" "}
+                  <span className="font-semibold">
+                    {
+                      stats.uncoveredClusters.filter((c) =>
+                        uncoveredClusterFilter === "mapped"
+                          ? c.mappedSakhiCount > 0
+                          : uncoveredClusterFilter === "zero"
+                            ? c.mappedSakhiCount === 0
+                            : true
+                      ).length
+                    }
+                  </span>
+                </div>
+                <div className="flex items-center justify-end mb-2 gap-2 flex-wrap">
+                  <Input
+                    value={uncoveredClusterSearch}
+                    onChange={(e) => setUncoveredClusterSearch(e.target.value)}
+                    placeholder="Search booth or cluster"
+                    className="max-w-xs"
+                  />
                 </div>
                 <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
                   <table className="w-full text-sm">
@@ -592,16 +639,37 @@ export default function MahilaSammanAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.uncoveredClusters.map((c) => (
-                        <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
-                          <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
-                          <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
-                          <td className="py-2 font-mono text-xs">
-                            {c.serialStart} - {c.serialEnd}
-                          </td>
-                          <td className="py-2 pr-2 font-semibold text-right">{c.mappedSakhiCount}</td>
-                        </tr>
-                      ))}
+                      {stats.uncoveredClusters
+                        .filter((c) => {
+                          const matchesMapped =
+                            uncoveredClusterFilter === "mapped"
+                              ? c.mappedSakhiCount > 0
+                              : uncoveredClusterFilter === "zero"
+                                ? c.mappedSakhiCount === 0
+                                : true;
+
+                          const q = uncoveredClusterSearch.trim();
+                          if (!q) return matchesMapped;
+
+                          const qNum = Number(q);
+                          const matchesBooth = (c.boothId || "").toLowerCase().includes(q.toLowerCase());
+                          const matchesCluster =
+                            Number.isFinite(qNum) && qNum > 0
+                              ? c.clusterNo === qNum
+                              : String(c.clusterNo).includes(q);
+
+                          return matchesMapped && (matchesBooth || matchesCluster);
+                        })
+                        .map((c) => (
+                          <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
+                            <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
+                            <td className="py-2 pr-2 font-mono text-xs">{c.clusterNo}</td>
+                            <td className="py-2 font-mono text-xs">
+                              {c.serialStart} - {c.serialEnd}
+                            </td>
+                            <td className="py-2 pr-2 font-semibold text-right">{c.mappedSakhiCount}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
