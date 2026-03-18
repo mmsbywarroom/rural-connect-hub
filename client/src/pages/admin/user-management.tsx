@@ -989,28 +989,52 @@ export default function UserManagementPage() {
                         />
                       </div>
                       <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
-                        {activeVillages
-                          .filter(v => {
+                        {(() => {
+                          const filtered = activeVillages.filter(v => {
                             if (!villageSearchAdmin.trim()) return true;
                             return v.name.toLowerCase().includes(villageSearchAdmin.toLowerCase());
-                          })
-                          .map(v => (
-                            <label key={v.id} className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer text-sm">
-                              <Checkbox
-                                checked={field.value?.includes(v.id) || false}
-                                onCheckedChange={(checked) => {
-                                  const current = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...current, v.id]);
-                                  } else {
-                                    field.onChange(current.filter((id: string) => id !== v.id));
-                                  }
-                                }}
-                                data-testid={`checkbox-village-${v.id}`}
-                              />
-                              <span>{v.name}</span>
-                            </label>
-                          ))}
+                          });
+                          const allSelected = filtered.length > 0 && filtered.every(v => field.value?.includes(v.id));
+                          return (
+                            <>
+                              {filtered.length > 0 && (
+                                <label className="flex items-center gap-2 p-1.5 mb-1 rounded hover-elevate cursor-pointer text-sm border-b border-border">
+                                  <Checkbox
+                                    checked={allSelected}
+                                    onCheckedChange={(checked) => {
+                                      const current = new Set(field.value || []);
+                                      if (checked) {
+                                        filtered.forEach(v => current.add(v.id));
+                                      } else {
+                                        filtered.forEach(v => current.delete(v.id));
+                                      }
+                                      field.onChange(Array.from(current));
+                                    }}
+                                    data-testid="checkbox-village-select-all"
+                                  />
+                                  <span className="font-medium">Select all ({filtered.length})</span>
+                                </label>
+                              )}
+                              {filtered.map(v => (
+                                <label key={v.id} className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer text-sm">
+                                  <Checkbox
+                                    checked={field.value?.includes(v.id) || false}
+                                    onCheckedChange={(checked) => {
+                                      const current = field.value || [];
+                                      if (checked) {
+                                        field.onChange([...current, v.id]);
+                                      } else {
+                                        field.onChange(current.filter((id: string) => id !== v.id));
+                                      }
+                                    }}
+                                    data-testid={`checkbox-village-${v.id}`}
+                                  />
+                                  <span>{v.name}</span>
+                                </label>
+                              ))}
+                            </>
+                          );
+                        })()}
                         {activeVillages.filter(v => !villageSearchAdmin.trim() || v.name.toLowerCase().includes(villageSearchAdmin.toLowerCase())).length === 0 && (
                           <p className="text-sm text-muted-foreground text-center py-2">No villages found</p>
                         )}
@@ -1136,28 +1160,52 @@ export default function UserManagementPage() {
                         />
                       </div>
                       <div className="max-h-[200px] overflow-y-auto p-2 space-y-1">
-                        {activeVillages
-                          .filter(v => {
+                        {(() => {
+                          const filtered = activeVillages.filter(v => {
                             if (!villageSearchAdmin.trim()) return true;
                             return v.name.toLowerCase().includes(villageSearchAdmin.toLowerCase());
-                          })
-                          .map(v => (
-                            <label key={v.id} className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer text-sm">
-                              <Checkbox
-                                checked={field.value?.includes(v.id) || false}
-                                onCheckedChange={(checked) => {
-                                  const current = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...current, v.id]);
-                                  } else {
-                                    field.onChange(current.filter((id: string) => id !== v.id));
-                                  }
-                                }}
-                                data-testid={`checkbox-edit-village-${v.id}`}
-                              />
-                              <span>{v.name}</span>
-                            </label>
-                          ))}
+                          });
+                          const allSelected = filtered.length > 0 && filtered.every(v => field.value?.includes(v.id));
+                          return (
+                            <>
+                              {filtered.length > 0 && (
+                                <label className="flex items-center gap-2 p-1.5 mb-1 rounded hover-elevate cursor-pointer text-sm border-b border-border">
+                                  <Checkbox
+                                    checked={allSelected}
+                                    onCheckedChange={(checked) => {
+                                      const current = new Set(field.value || []);
+                                      if (checked) {
+                                        filtered.forEach(v => current.add(v.id));
+                                      } else {
+                                        filtered.forEach(v => current.delete(v.id));
+                                      }
+                                      field.onChange(Array.from(current));
+                                    }}
+                                    data-testid="checkbox-edit-village-select-all"
+                                  />
+                                  <span className="font-medium">Select all ({filtered.length})</span>
+                                </label>
+                              )}
+                              {filtered.map(v => (
+                                <label key={v.id} className="flex items-center gap-2 p-1.5 rounded hover-elevate cursor-pointer text-sm">
+                                  <Checkbox
+                                    checked={field.value?.includes(v.id) || false}
+                                    onCheckedChange={(checked) => {
+                                      const current = field.value || [];
+                                      if (checked) {
+                                        field.onChange([...current, v.id]);
+                                      } else {
+                                        field.onChange(current.filter((id: string) => id !== v.id));
+                                      }
+                                    }}
+                                    data-testid={`checkbox-edit-village-${v.id}`}
+                                  />
+                                  <span>{v.name}</span>
+                                </label>
+                              ))}
+                            </>
+                          );
+                        })()}
                         {activeVillages.filter(v => !villageSearchAdmin.trim() || v.name.toLowerCase().includes(villageSearchAdmin.toLowerCase())).length === 0 && (
                           <p className="text-sm text-muted-foreground text-center py-2">No villages found</p>
                         )}
