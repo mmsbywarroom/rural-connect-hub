@@ -2085,14 +2085,21 @@ export class DatabaseStorage implements IStorage {
     const boothsTenSakhis = boothWise.filter((b) => b.count >= 10).length;
     const boothsExactlyOneSakhi = boothWise.filter((b) => b.count === 1).length;
 
+    // Normalize voter ids for matching across sources (OCR can include spaces/punctuation).
+    const normalizeVoterId = (id: string | null | undefined): string => {
+      const s = String(id || "")
+        .trim()
+        .toUpperCase();
+      // EPIC/IDs are alphanumeric; drop everything else (spaces, hyphens, etc).
+      return s.replace(/[^0-9A-Z]/g, "");
+    };
+
     // Preload voter list & mapping data in bulk to avoid per-row queries
-    const voterIds = Array.from(
-      new Set(
-        all
-          .map((s) => (s.ocrVoterId || "").trim())
-          .filter((id) => id !== "")
-      )
-    );
+    const voterIdsRaw = all
+      .map((s) => (s.ocrVoterId || "").trim())
+      .filter((id) => id !== "");
+    const voterIdsNorm = voterIdsRaw.map((id) => normalizeVoterId(id)).filter((id) => id !== "");
+    const voterIds = Array.from(new Set([...voterIdsRaw, ...voterIdsNorm]));
 
     const voterListRows =
       voterIds.length > 0
@@ -2101,16 +2108,14 @@ export class DatabaseStorage implements IStorage {
 
     const voterListById = new Map<string, VoterListRecord>();
     for (const row of voterListRows) {
-      if (row.vcardId) {
-        voterListById.set((row.vcardId || "").trim(), row);
-      }
+      const norm = normalizeVoterId(row.vcardId);
+      if (norm) voterListById.set(norm, row);
     }
 
     const mappingByVoterId = new Map<string, VoterMappingMaster>();
     for (const row of mappingRows) {
-      if (row.voterId) {
-        mappingByVoterId.set((row.voterId || "").trim().toLowerCase(), row);
-      }
+      const norm = normalizeVoterId(row.voterId);
+      if (norm) mappingByVoterId.set(norm, row);
     }
 
     const sakhiVoterListDetails: {
@@ -2128,19 +2133,23 @@ export class DatabaseStorage implements IStorage {
     // - coveredClusterKeys: above but also OTP verified (mobileVerified)
     const coveredClusterKeys = new Set<string>();
     const mappedClusterKeys = new Set<string>();
+    // Actual counts requested in UI (how many sakhi records map to the cluster).
+    const coveredClusterCounts = new Map<string, number>();
+    const mappedClusterCounts = new Map<string, number>();
 
     for (const s of all) {
       const voterIdRaw = (s.ocrVoterId || "").trim();
-      const voterId = voterIdRaw || null;
+      const voterId = voterIdRaw || null; // displayed value
+      const voterIdNorm = voterId ? normalizeVoterId(voterId) : "";
       let voterListSrno: string | null = null;
       let voterMappingSlNo: number | null = null;
       let boothId: string | null = (s.voterMappingBoothId || "").trim() || null;
 
-      if (voterId) {
-        const vlist = voterListById.get(voterId);
+      if (voterIdNorm) {
+        const vlist = voterListById.get(voterIdNorm);
         if (vlist?.srno) voterListSrno = vlist.srno;
 
-        const mapping = mappingByVoterId.get(voterId.toLowerCase());
+        const mapping = mappingByVoterId.get(voterIdNorm);
         if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
 
         if (mapping?.boothId && !boothId) boothId = mapping.boothId;
@@ -2154,7 +2163,9 @@ export class DatabaseStorage implements IStorage {
             const clusterNo = Math.floor((voterMappingSlNo - 1) / 100) + 1;
             const key = `${bid}-${clusterNo}`;
             mappedClusterKeys.add(key);
+            mappedClusterCounts.set(key, (mappedClusterCounts.get(key) ?? 0) + 1);
             if (s.mobileVerified) coveredClusterKeys.add(key);
+            if (s.mobileVerified) coveredClusterCounts.set(key, (coveredClusterCounts.get(key) ?? 0) + 1);
           }
         }
       }
@@ -2214,14 +2225,14 @@ export class DatabaseStorage implements IStorage {
           clusterNo: c.clusterNo,
           serialStart: c.serialStart,
           serialEnd: c.serialEnd,
-          mappedSakhiCount: mappedClusterKeys.has(key) ? 1 : 0,
+          mappedSakhiCount: mappedClusterCounts.get(key) ?? 0,
         };
       });
 
     const clusterWiseSakhiCounts = clusterList
       .map((c) => {
         const key = `${c.boothId}-${c.clusterNo}`;
-        return { ...c, sakhiCount: coveredClusterKeys.has(key) ? 1 : 0 };
+        return { ...c, sakhiCount: coveredClusterCounts.get(key) ?? 0 };
       })
       .sort(
         (a, b) =>
