@@ -2143,21 +2143,20 @@ export class DatabaseStorage implements IStorage {
         const mapping = mappingByVoterId.get(voterId.toLowerCase());
         if (mapping?.slNo != null) voterMappingSlNo = mapping.slNo;
 
-        // Cluster coverage calculation (map sakhi to booth-cluster using mapping voter id)
-        // clusterNo = floor((slNo-1)/100)+1
-        if (mapping?.slNo != null && mapping.boothId) {
-          const bid = (mapping.boothId || "").trim();
+        if (mapping?.boothId && !boothId) boothId = mapping.boothId;
+
+        // Cluster coverage calculation:
+        // clusterNo = floor((voterMappingSlNo-1)/100)+1
+        // Use the final `boothId` we have for the sakhi (from submission or fallback to mapping).
+        if (voterMappingSlNo != null && boothId) {
+          const bid = (boothId || "").trim();
           if (bid) {
-            const clusterNo = Math.floor((mapping.slNo - 1) / 100) + 1;
+            const clusterNo = Math.floor((voterMappingSlNo - 1) / 100) + 1;
             const key = `${bid}-${clusterNo}`;
             mappedClusterKeys.add(key);
-            if (s.mobileVerified) {
-              coveredClusterKeys.add(key);
-            }
+            if (s.mobileVerified) coveredClusterKeys.add(key);
           }
         }
-
-        if (mapping?.boothId && !boothId) boothId = mapping.boothId;
       }
 
       sakhiVoterListDetails.push({
