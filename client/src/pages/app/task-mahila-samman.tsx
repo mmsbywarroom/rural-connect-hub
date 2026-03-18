@@ -491,8 +491,9 @@ export default function TaskMahilaSamman({ user }: Props) {
   });
 
   const handleSubmitClick = () => {
-    // Show warning only when creating a new Sakhi WITHOUT Aadhaar (Voter ID is still required).
-    if (!editingId && !hasAnyAadhaar && !showMinimalConfirm) {
+    // Show warning whenever submitting WITHOUT Aadhaar.
+    // (Voter ID is still required by validation; this popup is only for UX.)
+    if (!hasAnyAadhaar && !showMinimalConfirm) {
       setShowMinimalConfirm(true);
       return;
     }
@@ -634,11 +635,40 @@ export default function TaskMahilaSamman({ user }: Props) {
                     <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
                     <div className="flex gap-1 flex-shrink-0">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
-                      {!s.profileComplete ? (
-                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("profileIncomplete", language)}</Button>
-                      ) : s.status === "pending" ? (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setEditingId(s.id); setStep("form"); }}>{L("edit", language)}</Button>
-                      ) : null}
+                      {!s.isDeleted ? (
+                        <>
+                          {s.status === "pending" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setEditingId(s.id);
+                                setStep("form");
+                              }}
+                            >
+                              {L("edit", language)}
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => deleteMutation.mutate(s.id)}
+                          >
+                            {L("delete", language)}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => undeleteMutation.mutate(s.id)}
+                        >
+                          {L("undelete", language)}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -684,11 +714,41 @@ export default function TaskMahilaSamman({ user }: Props) {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2 border-t flex-wrap">
-                    {!sub.profileComplete && (
-                      <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("profileIncomplete", language)}</Button>
+                    {!sub.isDeleted && sub.status === "pending" && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(viewingId);
+                          setViewingId(null);
+                          setStep("form");
+                        }}
+                      >
+                        {L("edit", language)}
+                      </Button>
                     )}
-                    {sub.profileComplete && sub.status === "pending" && (
-                      <Button size="sm" onClick={() => { setEditingId(viewingId); setViewingId(null); setStep("form"); }}>{L("edit", language)}</Button>
+                    {!sub.isDeleted && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          deleteMutation.mutate(sub.id);
+                          setViewingId(null);
+                        }}
+                      >
+                        {L("delete", language)}
+                      </Button>
+                    )}
+                    {sub.isDeleted && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          undeleteMutation.mutate(sub.id);
+                          setViewingId(null);
+                        }}
+                      >
+                        {L("undelete", language)}
+                      </Button>
                     )}
                     <Button variant="outline" size="sm" onClick={() => setViewingId(null)}>{L("close", language)}</Button>
                   </div>
