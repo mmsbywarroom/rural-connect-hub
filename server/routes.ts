@@ -8,7 +8,7 @@ import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded, sendToUser } 
 import { translateBatch } from "./translate";
 import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
-import { sendOtpSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
+import { sendOtpSms, sendCustomSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
 import bcrypt from "bcryptjs";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
@@ -536,6 +536,303 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   attachCallWebSocket(httpServer);
+
+  type ContactsHubRow = {
+    id: string;
+    name: string;
+    mobileNumber: string;
+    unit: string;
+    voterId: string;
+    tasks: string[];
+    latestTaskAt: string;
+  };
+
+  const escCsv = (val: any) => {
+    if (val === null || val === undefined) return "";
+    const s = String(val);
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const normalizeTaskLabel = (s: string) => s.trim();
+
+  const buildContactsHubRows = async (): Promise<ContactsHubRow[]> => {
+    const [
+      coreVolunteers,
+      mappedVols,
+      supportersList,
+      appUsersList,
+      hstcList,
+      sdskList,
+      sunwaiList,
+      nvyList,
+      blaList,
+      roadList,
+      outdoorList,
+      govSchoolList,
+      appointmentsList,
+      eventList,
+      tirthList,
+      mahilaList,
+      mahilaPunjabList,
+      voterRegList,
+    ] = await Promise.all([
+      storage.getVolunteers(),
+      storage.getMappedVolunteers(),
+      storage.getSupporters(),
+      storage.getAppUsers(),
+      storage.getHstcSubmissions(),
+      storage.getSdskSubmissions(),
+      storage.getSunwaiComplaints(),
+      storage.getNvyReports(),
+      storage.getBlaSubmissions(),
+      storage.getRoadReports(),
+      storage.getOutdoorAds(),
+      storage.getGovSchoolSubmissions(),
+      storage.getAppointments(),
+      storage.getEventVenues(),
+      storage.getTirthYatraRequests(),
+      storage.getMahilaSammanSubmissions(),
+      storage.getMahilaSammanPunjabSubmissions(),
+      storage.getVoterRegistrationSubmissions(),
+    ]);
+
+    type RawEntry = {
+      id: string;
+      name: string;
+      mobileNumber: string;
+      unit?: string | null;
+      voterId?: string | null;
+      task: string;
+      createdAt?: Date | string | null;
+    };
+    const raw: RawEntry[] = [];
+    const appUserById = new Map((appUsersList || []).map((u) => [u.id, u]));
+
+    for (const v of coreVolunteers) {
+      raw.push({
+        id: v.id,
+        name: v.name || "",
+        mobileNumber: v.mobileNumber || "",
+        unit: v.wardName || "",
+        voterId: v.voterId || "",
+        task: "Volunteer",
+        createdAt: null,
+      });
+    }
+    for (const v of mappedVols) {
+      raw.push({
+        id: v.id,
+        name: v.name || "",
+        mobileNumber: v.mobileNumber || "",
+        unit: v.selectedVillageName || "",
+        voterId: v.voterId || "",
+        task: "Volunteer Mapping",
+        createdAt: v.createdAt,
+      });
+    }
+    for (const s of supportersList) {
+      raw.push({
+        id: s.id,
+        name: s.name || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.selectedVillageName || "",
+        voterId: s.voterId || "",
+        task: "Supporter",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of hstcList) {
+      raw.push({
+        id: s.id,
+        name: s.houseOwnerName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: s.ocrVoterId || "",
+        task: "HSTC",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of sdskList) {
+      raw.push({
+        id: s.id,
+        name: s.personName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.selectedVillageName || "",
+        voterId: "",
+        task: "Sukh Dukh",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of sunwaiList) {
+      raw.push({
+        id: s.id,
+        name: s.complainantName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Sunwai",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of nvyList) {
+      const appUser = appUserById.get(s.appUserId);
+      raw.push({
+        id: s.id,
+        name: appUser?.name || "",
+        mobileNumber: appUser?.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Nasha Viruddh Yuddh",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of blaList) {
+      raw.push({
+        id: s.id,
+        name: s.bloName || "",
+        mobileNumber: s.bloMobileNumber || "",
+        unit: s.villageName || "",
+        voterId: s.ocrVoterId || "",
+        task: "Booth Level Agent",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of roadList) {
+      raw.push({
+        id: s.id,
+        name: s.reporterName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Road Report",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of outdoorList) {
+      raw.push({
+        id: s.id,
+        name: s.ownerName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Outdoor Ads",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of govSchoolList) {
+      raw.push({
+        id: s.id,
+        name: s.principalName || "",
+        mobileNumber: s.mobileNumber || s.principalMobile || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Gov School Work",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of appointmentsList) {
+      raw.push({
+        id: s.id,
+        name: s.personName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Appointment",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of eventList) {
+      raw.push({
+        id: s.id,
+        name: s.requesterName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: "",
+        task: "Event Venue",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of tirthList) {
+      raw.push({
+        id: s.id,
+        name: s.applicantName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: s.ocrVoterId || "",
+        task: "Tirth Yatra",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of mahilaList) {
+      raw.push({
+        id: s.id,
+        name: s.sakhiName || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: s.ocrVoterId || "",
+        task: "Mahila Samman Rashi",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of mahilaPunjabList) {
+      raw.push({
+        id: s.id,
+        name: s.name || "",
+        mobileNumber: s.mobileNumber || "",
+        unit: s.villageName || "",
+        voterId: s.ocrVoterId || "",
+        task: "Mahila Samman Punjab Gov",
+        createdAt: s.createdAt,
+      });
+    }
+    for (const s of voterRegList) {
+      raw.push({
+        id: s.id,
+        name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
+        mobileNumber: s.mobileNumber || "",
+        unit: s.assemblyConstituency || s.district || "",
+        voterId: "",
+        task: "Voter Registration",
+        createdAt: s.createdAt,
+      });
+    }
+
+    const byMobile = new Map<string, ContactsHubRow>();
+    for (const r of raw) {
+      const mobile = normalizeMobile(String(r.mobileNumber || ""));
+      if (!isIndianMobile(mobile)) continue;
+      const task = normalizeTaskLabel(r.task);
+      const latest = r.createdAt ? new Date(r.createdAt).toISOString() : new Date(0).toISOString();
+      const existing = byMobile.get(mobile);
+
+      if (!existing) {
+        byMobile.set(mobile, {
+          id: `${task}:${r.id}`,
+          name: (r.name || "").trim() || "Unknown",
+          mobileNumber: mobile,
+          unit: (r.unit || "").trim(),
+          voterId: (r.voterId || "").trim(),
+          tasks: [task],
+          latestTaskAt: latest,
+        });
+        continue;
+      }
+
+      if (!existing.tasks.includes(task)) {
+        existing.tasks.push(task);
+      }
+      // Keep richer fields if current source has missing data.
+      if (!existing.voterId && r.voterId) existing.voterId = String(r.voterId).trim();
+      if (!existing.unit && r.unit) existing.unit = String(r.unit).trim();
+      if (existing.name === "Unknown" && r.name) existing.name = String(r.name).trim();
+      if (latest > existing.latestTaskAt) existing.latestTaskAt = latest;
+    }
+
+    return Array.from(byMobile.values()).sort((a, b) => b.latestTaskAt.localeCompare(a.latestTaskAt));
+  };
 
   // OCR endpoint using Google Cloud Vision API
   app.post("/api/ocr", async (req, res) => {
@@ -6972,6 +7269,121 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[EventVenue] Admin update error:", error.message);
       res.status(500).json({ error: "Failed to update event venue" });
+    }
+  });
+
+  // ===== Contacts Hub (cross-task consolidated contacts) =====
+  app.get("/api/admin/contacts-hub", async (req, res) => {
+    try {
+      const search = String(req.query.search || "").trim().toLowerCase();
+      const task = String(req.query.task || "").trim().toLowerCase();
+      const limit = Math.max(1, Math.min(1000, Number(req.query.limit || 100)));
+      const offset = Math.max(0, Number(req.query.offset || 0));
+
+      let rows = await buildContactsHubRows();
+
+      if (search) {
+        rows = rows.filter((r) =>
+          r.name.toLowerCase().includes(search) ||
+          r.mobileNumber.includes(search.replace(/\D/g, "")) ||
+          r.voterId.toLowerCase().includes(search) ||
+          r.unit.toLowerCase().includes(search) ||
+          r.tasks.some((t) => t.toLowerCase().includes(search))
+        );
+      }
+      if (task && task !== "all") {
+        rows = rows.filter((r) => r.tasks.some((t) => t.toLowerCase() === task));
+      }
+
+      const total = rows.length;
+      const paged = rows.slice(offset, offset + limit);
+      res.json({ items: paged, total });
+    } catch (error) {
+      console.error("Contacts Hub list error:", error);
+      res.status(500).json({ error: "Failed to fetch contacts hub data" });
+    }
+  });
+
+  app.get("/api/admin/contacts-hub/export", async (req, res) => {
+    try {
+      const search = String(req.query.search || "").trim().toLowerCase();
+      const task = String(req.query.task || "").trim().toLowerCase();
+      let rows = await buildContactsHubRows();
+
+      if (search) {
+        rows = rows.filter((r) =>
+          r.name.toLowerCase().includes(search) ||
+          r.mobileNumber.includes(search.replace(/\D/g, "")) ||
+          r.voterId.toLowerCase().includes(search) ||
+          r.unit.toLowerCase().includes(search) ||
+          r.tasks.some((t) => t.toLowerCase().includes(search))
+        );
+      }
+      if (task && task !== "all") {
+        rows = rows.filter((r) => r.tasks.some((t) => t.toLowerCase() === task));
+      }
+
+      const headers = ["Name", "Mobile Number", "Unit", "Voter ID", "Tasks", "Latest Task At"];
+      const lines = rows.map((r) => [
+        escCsv(r.name),
+        escCsv(r.mobileNumber),
+        escCsv(r.unit),
+        escCsv(r.voterId),
+        escCsv(r.tasks.join(" | ")),
+        escCsv(r.latestTaskAt ? new Date(r.latestTaskAt).toLocaleString("en-IN") : ""),
+      ].join(","));
+
+      const csv = [headers.join(","), ...lines].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="contacts_hub_${new Date().toISOString().slice(0, 10)}.csv"`);
+      res.send("\uFEFF" + csv);
+    } catch (error) {
+      console.error("Contacts Hub export error:", error);
+      res.status(500).json({ error: "Failed to export contacts hub data" });
+    }
+  });
+
+  app.post("/api/admin/contacts-hub/send-sms", async (req, res) => {
+    try {
+      const { message, mobiles } = req.body as { message?: string; mobiles?: string[] };
+      const cleanMessage = String(message || "").trim();
+      const uniqueMobiles = Array.from(new Set((mobiles || []).map((m) => normalizeMobile(String(m || ""))).filter((m) => isIndianMobile(m))));
+
+      if (!isSmsConfigured()) {
+        return res.status(400).json({ error: "SMS provider is not configured" });
+      }
+      if (!cleanMessage) {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      if (uniqueMobiles.length === 0) {
+        return res.status(400).json({ error: "No valid mobile numbers selected" });
+      }
+      if (uniqueMobiles.length > 500) {
+        return res.status(400).json({ error: "Maximum 500 mobiles allowed per request" });
+      }
+
+      let successCount = 0;
+      const failed: { mobile: string; error: string }[] = [];
+
+      for (const mobile of uniqueMobiles) {
+        try {
+          await sendCustomSms(mobile, cleanMessage);
+          successCount++;
+        } catch (e: any) {
+          failed.push({ mobile, error: e?.message || "Failed to send" });
+        }
+      }
+
+      res.json({
+        success: true,
+        total: uniqueMobiles.length,
+        successCount,
+        failureCount: failed.length,
+        failed,
+      });
+    } catch (error) {
+      console.error("Contacts Hub send SMS error:", error);
+      res.status(500).json({ error: "Failed to send SMS" });
     }
   });
 

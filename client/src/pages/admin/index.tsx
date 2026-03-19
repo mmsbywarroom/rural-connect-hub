@@ -51,6 +51,7 @@ import LoginPageSettingsPage from "./login-page-settings";
 import TaskCategoriesPage from "./task-categories";
 import GroupChatManagementPage from "./group-chat-management";
 import VoterRegistrationSubmissionsPage from "./voter-registration-submissions";
+import ContactsHubPage from "./contacts-hub";
 
 interface AdminUser {
   id: string;
@@ -84,6 +85,7 @@ const allMenuItems = [
   { id: "mahila-samman", label: "Mahila Samman Rashi", icon: Users, path: "/admin/mahila-samman", group: "Management" },
   { id: "mahila-samman-punjab", label: "Mahila Samman (Punjab Gov)", icon: Users, path: "/admin/mahila-samman-punjab", group: "Management" },
   { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Management" },
+  { id: "contacts-hub", label: "Contacts Hub", icon: Users, path: "/admin/contacts-hub", group: "Management" },
   { id: "villages", label: "Villages", icon: MapPin, path: "/admin/villages", group: "Master Data" },
   { id: "issues", label: "Issues", icon: AlertTriangle, path: "/admin/issues", group: "Master Data" },
   { id: "departments", label: "Departments", icon: Briefcase, path: "/admin/departments", group: "Master Data" },
@@ -434,6 +436,7 @@ export default function AdminPage() {
     if (currentPath.includes("positions")) return "positions";
     if (currentPath.includes("leadership")) return "leadership";
     if (currentPath.includes("voter-registration")) return "voter-registration";
+    if (currentPath.includes("contacts-hub")) return "contacts-hub";
     if (currentPath.includes("voter-database")) return "voter-database";
     if (currentPath.includes("voter-mapping-work")) return "voter-mapping-work";
     if (currentPath.includes("csv-upload")) return "csv-upload";
@@ -530,6 +533,7 @@ export default function AdminPage() {
             {activeSection === "mahila-samman" && <MahilaSammanAdminPage />}
             {activeSection === "mahila-samman-punjab" && <MahilaSammanPunjabAdminPage />}
             {activeSection === "voter-registration" && <VoterRegistrationSubmissionsPage />}
+            {activeSection === "contacts-hub" && <ContactsHubPage />}
             {activeSection === "form-builder" && <FormBuilderPage />}
             {activeSection === "villages" && <VillagesPage />}
             {activeSection === "issues" && <IssuesPage />}

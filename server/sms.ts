@@ -98,3 +98,42 @@ export function maskMobile(mobile: string): string {
   if (cleaned.length < 4) return cleaned;
   return `${cleaned.slice(0, 2)}${"*".repeat(cleaned.length - 4)}${cleaned.slice(-2)}`;
 }
+
+// Generic SMS sender for admin broadcast/messages (non-OTP).
+export async function sendCustomSms(mobileNumber: string, message: string): Promise<void> {
+  const apiKey = process.env.FAST2SMS_API_KEY;
+  const senderId = process.env.FAST2SMS_SENDER_ID || "VIDEHE";
+
+  if (!apiKey) {
+    throw new Error("FAST2SMS_API_KEY not configured");
+  }
+
+  const cleanNumber = mobileNumber.replace(/\D/g, "").replace(/^91/, "");
+  if (cleanNumber.length !== 10) {
+    throw new Error("Invalid Indian mobile number");
+  }
+
+  const url = "https://www.fast2sms.com/dev/bulkV2";
+
+  const payload = {
+    route: "dlt_manual",
+    sender_id: senderId,
+    message,
+    flash: "0",
+    numbers: cleanNumber,
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!data.return) {
+    throw new Error("Failed to send SMS");
+  }
+}
