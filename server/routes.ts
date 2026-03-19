@@ -22,14 +22,23 @@ import {
   insertTaskSubmissionSchema, insertHstcSubmissionSchema, insertVoterRegistrationSubmissionSchema, insertAdminRoleSchema,
   LEVELS, WINGS, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   insertGovPositionSchema, adminRoles, users,
-  taskSubmissions, taskConfigs, appUsers, voterList, officeManagers, hstcSubmissions, voterRegistrationSubmissions,
-  mappedVolunteers, supporters, otpCodes, sdskSubmissions, sdskCategories,
+  taskSubmissions, taskConfigs, appUsers, voterList, officeManagers,
+  volunteers, visitors, cscReports,
+  hstcSubmissions, voterRegistrationSubmissions,
+  mappedVolunteers, supporters, otpCodes,
+  sdskSubmissions, sdskCategories,
   insertSdskSubmissionSchema,
   surveys, surveyQuestions, surveyResponses,
   sunwaiComplaints, sunwaiLogs, insertSunwaiComplaintSchema,
   outdoorAdSubmissions, insertOutdoorAdSchema,
+  govSchoolSubmissions,
   insertGovSchoolSubmissionSchema, insertGovSchoolIssueCategorySchema,
+  appointments,
+  eventVenues,
   insertAppointmentSchema,
+  tirthYatraRequests,
+  mahilaSammanSubmissions,
+  mahilaSammanPunjabSubmissions,
   nvyReports, insertNvyReportSchema,
   roadReports, insertRoadReportSchema,
   blaSubmissions, insertBlaSubmissionSchema,
@@ -609,24 +618,156 @@ export async function registerRoutes(
       mahilaPunjabList,
       voterRegList,
     ] = await Promise.all([
-      storage.getVolunteers(),
-      storage.getMappedVolunteers(),
-      storage.getSupporters(),
-      storage.getAppUsers(),
-      storage.getHstcSubmissions(),
-      storage.getSdskSubmissions(),
-      storage.getSunwaiComplaints(),
-      storage.getNvyReports(),
-      storage.getBlaSubmissions(),
-      storage.getRoadReports(),
-      storage.getOutdoorAds(),
-      storage.getGovSchoolSubmissions(),
-      storage.getAppointments(),
-      storage.getEventVenues(),
-      storage.getTirthYatraRequests(),
-      storage.getMahilaSammanSubmissions(),
-      storage.getMahilaSammanPunjabSubmissions(),
-      storage.getVoterRegistrationSubmissions(),
+      // Contacts Hub needs only lightweight fields (no base64/photos/audio/PDF)
+      db.select({
+        id: volunteers.id,
+        name: volunteers.name,
+        mobileNumber: volunteers.mobileNumber,
+        wardName: volunteers.wardName,
+        voterId: volunteers.voterId,
+      }).from(volunteers),
+
+      db.select({
+        id: mappedVolunteers.id,
+        name: mappedVolunteers.name,
+        mobileNumber: mappedVolunteers.mobileNumber,
+        selectedVillageName: mappedVolunteers.selectedVillageName,
+        voterId: mappedVolunteers.voterId,
+        createdAt: mappedVolunteers.createdAt,
+      }).from(mappedVolunteers),
+
+      db.select({
+        id: supporters.id,
+        name: supporters.name,
+        mobileNumber: supporters.mobileNumber,
+        selectedVillageName: supporters.selectedVillageName,
+        voterId: supporters.voterId,
+        createdAt: supporters.createdAt,
+      }).from(supporters),
+
+      db.select({
+        id: appUsers.id,
+        name: appUsers.name,
+        mobileNumber: appUsers.mobileNumber,
+      }).from(appUsers),
+
+      db.select({
+        id: hstcSubmissions.id,
+        houseOwnerName: hstcSubmissions.houseOwnerName,
+        mobileNumber: hstcSubmissions.mobileNumber,
+        villageName: hstcSubmissions.villageName,
+        ocrVoterId: hstcSubmissions.ocrVoterId,
+        createdAt: hstcSubmissions.createdAt,
+      }).from(hstcSubmissions),
+
+      db.select({
+        id: sdskSubmissions.id,
+        personName: sdskSubmissions.personName,
+        mobileNumber: sdskSubmissions.mobileNumber,
+        selectedVillageName: sdskSubmissions.selectedVillageName,
+        createdAt: sdskSubmissions.createdAt,
+      }).from(sdskSubmissions),
+
+      db.select({
+        id: sunwaiComplaints.id,
+        complainantName: sunwaiComplaints.complainantName,
+        mobileNumber: sunwaiComplaints.mobileNumber,
+        villageName: sunwaiComplaints.villageName,
+        createdAt: sunwaiComplaints.createdAt,
+      }).from(sunwaiComplaints),
+
+      db.select({
+        id: nvyReports.id,
+        appUserId: nvyReports.appUserId,
+        villageName: nvyReports.villageName,
+        createdAt: nvyReports.createdAt,
+      }).from(nvyReports),
+
+      db.select({
+        id: blaSubmissions.id,
+        bloName: blaSubmissions.bloName,
+        bloMobileNumber: blaSubmissions.bloMobileNumber,
+        villageName: blaSubmissions.villageName,
+        ocrVoterId: blaSubmissions.ocrVoterId,
+        createdAt: blaSubmissions.createdAt,
+      }).from(blaSubmissions),
+
+      db.select({
+        id: roadReports.id,
+        reporterName: roadReports.reporterName,
+        mobileNumber: roadReports.mobileNumber,
+        villageName: roadReports.villageName,
+        createdAt: roadReports.createdAt,
+      }).from(roadReports),
+
+      db.select({
+        id: outdoorAdSubmissions.id,
+        ownerName: outdoorAdSubmissions.ownerName,
+        mobileNumber: outdoorAdSubmissions.mobileNumber,
+        villageName: outdoorAdSubmissions.villageName,
+        createdAt: outdoorAdSubmissions.createdAt,
+      }).from(outdoorAdSubmissions),
+
+      db.select({
+        id: govSchoolSubmissions.id,
+        principalName: govSchoolSubmissions.principalName,
+        principalMobile: govSchoolSubmissions.principalMobile,
+        villageName: govSchoolSubmissions.villageName,
+        createdAt: govSchoolSubmissions.createdAt,
+      }).from(govSchoolSubmissions),
+
+      db.select({
+        id: appointments.id,
+        personName: appointments.personName,
+        mobileNumber: appointments.mobileNumber,
+        villageName: appointments.villageName,
+        createdAt: appointments.createdAt,
+      }).from(appointments),
+
+      db.select({
+        id: eventVenues.id,
+        requesterName: eventVenues.requesterName,
+        mobileNumber: eventVenues.mobileNumber,
+        villageName: eventVenues.villageName,
+        createdAt: eventVenues.createdAt,
+      }).from(eventVenues),
+
+      db.select({
+        id: tirthYatraRequests.id,
+        applicantName: tirthYatraRequests.applicantName,
+        mobileNumber: tirthYatraRequests.mobileNumber,
+        villageName: tirthYatraRequests.villageName,
+        ocrVoterId: tirthYatraRequests.ocrVoterId,
+        createdAt: tirthYatraRequests.createdAt,
+      }).from(tirthYatraRequests),
+
+      db.select({
+        id: mahilaSammanSubmissions.id,
+        sakhiName: mahilaSammanSubmissions.sakhiName,
+        mobileNumber: mahilaSammanSubmissions.mobileNumber,
+        villageName: mahilaSammanSubmissions.villageName,
+        ocrVoterId: mahilaSammanSubmissions.ocrVoterId,
+        createdAt: mahilaSammanSubmissions.createdAt,
+      }).from(mahilaSammanSubmissions),
+
+      db.select({
+        id: mahilaSammanPunjabSubmissions.id,
+        name: mahilaSammanPunjabSubmissions.name,
+        mobileNumber: mahilaSammanPunjabSubmissions.mobileNumber,
+        villageName: mahilaSammanPunjabSubmissions.villageName,
+        ocrVoterId: mahilaSammanPunjabSubmissions.ocrVoterId,
+        createdAt: mahilaSammanPunjabSubmissions.createdAt,
+      }).from(mahilaSammanPunjabSubmissions),
+
+      db.select({
+        id: voterRegistrationSubmissions.id,
+        firstName: voterRegistrationSubmissions.firstName,
+        lastName: voterRegistrationSubmissions.lastName,
+        mobileNumber: voterRegistrationSubmissions.mobileNumber,
+        assemblyConstituency: voterRegistrationSubmissions.assemblyConstituency,
+        district: voterRegistrationSubmissions.district,
+        createdAt: voterRegistrationSubmissions.createdAt,
+      }).from(voterRegistrationSubmissions),
     ]);
 
     type RawEntry = {
@@ -756,7 +897,7 @@ export async function registerRoutes(
       raw.push({
         id: s.id,
         name: s.principalName || "",
-        mobileNumber: s.mobileNumber || s.principalMobile || "",
+        mobileNumber: s.principalMobile || "",
         unit: s.villageName || "",
         voterId: "",
         task: "Gov School Work",
@@ -3378,15 +3519,38 @@ export async function registerRoutes(
 
   app.get("/api/analytics/overview", async (req, res) => {
     try {
-      const allSubmissions = await storage.getTaskSubmissions();
-      const allUsers = await storage.getAppUsers();
       const allTasks = await storage.getTaskConfigs();
-      const allVillages = await storage.getVillages();
-      const allVolunteers = await storage.getVolunteers();
-      const allVisitors = await storage.getVisitors();
-      const allCscReports = await storage.getCscReports();
-      const allMappedVolunteers = await storage.getMappedVolunteers();
-      const allSupporters = await storage.getSupporters();
+
+      // Lightweight selects to avoid pulling base64/photo/PDF fields
+      const allUsers = await db.select({
+        id: appUsers.id,
+        name: appUsers.name,
+      }).from(appUsers);
+
+      const allSubmissions = await db.select({
+        taskConfigId: taskSubmissions.taskConfigId,
+        appUserId: taskSubmissions.appUserId,
+        createdAt: taskSubmissions.createdAt,
+      }).from(taskSubmissions);
+
+      const allVillages = await db.select({ id: villages.id }).from(villages);
+      const allVolunteers = await db.select({ id: volunteers.id }).from(volunteers);
+      const allVisitors = await db.select({ id: visitors.id }).from(visitors);
+
+      const allCscReports = await db.select({
+        appUserId: cscReports.appUserId,
+        createdAt: cscReports.createdAt,
+      }).from(cscReports);
+
+      const allMappedVolunteers = await db.select({
+        addedByUserId: mappedVolunteers.addedByUserId,
+        createdAt: mappedVolunteers.createdAt,
+      }).from(mappedVolunteers);
+
+      const allSupporters = await db.select({
+        addedByUserId: supporters.addedByUserId,
+        createdAt: supporters.createdAt,
+      }).from(supporters);
 
       type ActivityEvent = {
         appUserId: string;
@@ -3650,21 +3814,43 @@ export async function registerRoutes(
 
   app.get("/api/analytics/user-report", async (req, res) => {
     try {
-      const allUsers = await storage.getAppUsers();
-      const allSubmissions = await storage.getTaskSubmissions();
-      const allTasks = await storage.getTaskConfigs();
+      // Lightweight selects to avoid pulling base64/photo/PDF fields
+      const allUsers = await db.select({
+        id: appUsers.id,
+        name: appUsers.name,
+        mobileNumber: appUsers.mobileNumber,
+        role: appUsers.role,
+        isActive: appUsers.isActive,
+        createdAt: appUsers.createdAt,
+        voterId: appUsers.voterId,
+        mappedAreaName: appUsers.mappedAreaName,
+        mappedZone: appUsers.mappedZone,
+        mappedDistrict: appUsers.mappedDistrict,
+        mappedHalka: appUsers.mappedHalka,
+        mappedBlockNumber: appUsers.mappedBlockNumber,
+      }).from(appUsers);
+
+      const allSubmissions = await db.select({
+        appUserId: taskSubmissions.appUserId,
+        taskConfigId: taskSubmissions.taskConfigId,
+        createdAt: taskSubmissions.createdAt,
+      }).from(taskSubmissions);
+
+      const subsStatsByUser = new Map<string, { total: number; taskIds: Set<string>; lastCreatedAt: any }>();
+      for (const sub of allSubmissions) {
+        const key = sub.appUserId;
+        const entry = subsStatsByUser.get(key) || { total: 0, taskIds: new Set<string>(), lastCreatedAt: null };
+        entry.total += 1;
+        entry.taskIds.add(sub.taskConfigId);
+
+        const subTime = sub.createdAt ? new Date(sub.createdAt).getTime() : 0;
+        const lastTime = entry.lastCreatedAt ? new Date(entry.lastCreatedAt).getTime() : 0;
+        if (subTime > lastTime) entry.lastCreatedAt = sub.createdAt;
+        subsStatsByUser.set(key, entry);
+      }
 
       const userStats = allUsers.map(user => {
-        const userSubs = allSubmissions.filter(s => s.appUserId === user.id);
-        const taskIds = new Set(userSubs.map(s => s.taskConfigId));
-        const lastSubmission = userSubs.length > 0
-          ? userSubs.reduce((latest, sub) => {
-              const subDate = sub.createdAt ? new Date(sub.createdAt).getTime() : 0;
-              const latestDate = latest.createdAt ? new Date(latest.createdAt).getTime() : 0;
-              return subDate > latestDate ? sub : latest;
-            })
-          : null;
-
+        const entry = subsStatsByUser.get(user.id);
         return {
           id: user.id,
           name: user.name,
@@ -3678,9 +3864,9 @@ export async function registerRoutes(
           mappedDistrict: user.mappedDistrict,
           mappedHalka: user.mappedHalka,
           mappedBlockNumber: user.mappedBlockNumber,
-          totalSubmissions: userSubs.length,
-          tasksCompleted: taskIds.size,
-          lastSubmission: lastSubmission?.createdAt || null,
+          totalSubmissions: entry?.total || 0,
+          tasksCompleted: entry?.taskIds.size || 0,
+          lastSubmission: entry?.lastCreatedAt || null,
         };
       });
 
