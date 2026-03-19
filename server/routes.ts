@@ -138,6 +138,36 @@ function isRateLimited(key: RateKey): boolean {
   return entry.count > LOGIN_MAX_ATTEMPTS;
 }
 
+function getClientIp(req: any): string {
+  const xff = req?.headers?.["x-forwarded-for"];
+  if (typeof xff === "string") return xff.split(",")[0]!.trim();
+  if (Array.isArray(xff) && xff.length > 0) return String(xff[0]).trim();
+  return (req?.ip || "unknown") as string;
+}
+
+// Lightweight anti-scrape limits for big binary endpoints (PDF/images).
+// This should not impact normal admin usage, but blocks runaway bots.
+const DOWNLOAD_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const DOWNLOAD_MAX_ATTEMPTS = 300; // per (ip + endpointKey) per window
+const downloadRateStore: Record<RateKey, RateEntry> = {};
+
+function isDownloadRateLimited(req: any, endpointKey: string): boolean {
+  const now = Date.now();
+  const ip = getClientIp(req);
+  const key = `${ip}:${endpointKey}`;
+  const entry = downloadRateStore[key];
+  if (!entry) {
+    downloadRateStore[key] = { count: 1, first: now };
+    return false;
+  }
+  if (now - entry.first > DOWNLOAD_WINDOW_MS) {
+    downloadRateStore[key] = { count: 1, first: now };
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > DOWNLOAD_MAX_ATTEMPTS;
+}
+
 // Simple TOTP implementation (no external library)
 import crypto from "crypto";
 
@@ -2510,9 +2540,13 @@ export async function registerRoutes(
       const matches = user.selfPhoto.match(/^data:(.+?);base64,(.+)$/);
       if (matches) {
         const mimeType = matches[1];
-        const buffer = Buffer.from(matches[2], "base64");
-        res.setHeader("Content-Type", mimeType);
+        const base64Data = matches[2];
+        const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+        res.setHeader("ETag", etag);
         res.setHeader("Cache-Control", "public, max-age=3600");
+
+        const buffer = Buffer.from(base64Data, "base64");
+        res.setHeader("Content-Type", mimeType);
         return res.send(buffer);
       }
       res.setHeader("Content-Type", "image/jpeg");
@@ -3262,6 +3296,7 @@ export async function registerRoutes(
 
   app.get("/api/export/mapped-volunteers/:id/attachment/:field", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "export-attachment")) return res.status(429).json({ error: "Too many download requests" });
       const vol = await storage.getMappedVolunteer(req.params.id);
       if (!vol) return res.status(404).json({ error: "Volunteer not found" });
       const fieldMap: Record<string, string | null> = {
@@ -3275,7 +3310,12 @@ export async function registerRoutes(
       const match = data.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
         const mimeType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
+        const base64Data = match[2];
+        const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+
+        const buffer = Buffer.from(base64Data, "base64");
         res.setHeader("Content-Type", mimeType);
         res.setHeader("Content-Disposition", `inline; filename="${vol.name}_${req.params.field}.${mimeType.split('/')[1]}"`);
         return res.send(buffer);
@@ -3288,6 +3328,7 @@ export async function registerRoutes(
 
   app.get("/api/export/supporters/:id/attachment/:field", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "export-attachment")) return res.status(429).json({ error: "Too many download requests" });
       const sup = await storage.getSupporter(req.params.id);
       if (!sup) return res.status(404).json({ error: "Supporter not found" });
       const fieldMap: Record<string, string | null> = {
@@ -3301,7 +3342,12 @@ export async function registerRoutes(
       const match = data.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
         const mimeType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
+        const base64Data = match[2];
+        const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+
+        const buffer = Buffer.from(base64Data, "base64");
         res.setHeader("Content-Type", mimeType);
         res.setHeader("Content-Disposition", `inline; filename="${sup.name}_${req.params.field}.${mimeType.split('/')[1]}"`);
         return res.send(buffer);
@@ -5564,6 +5610,7 @@ export async function registerRoutes(
   // Download voter card PDF
   app.get("/api/voter-registration/submissions/:id/card", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "voter-card-pdf")) return res.status(429).json({ error: "Too many download requests" });
       const submission = await storage.getVoterRegistrationSubmission(req.params.id);
       if (!submission || !submission.cardPdf) {
         return res.status(404).json({ error: "Card not found" });
@@ -5576,6 +5623,10 @@ export async function registerRoutes(
         mimeType = match[1];
         base64Data = match[2];
       }
+      const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+
       const buffer = Buffer.from(base64Data, "base64");
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Content-Disposition", `attachment; filename="voter_card_${submission.id}.pdf"`);
@@ -5587,6 +5638,7 @@ export async function registerRoutes(
 
   app.get("/api/hstc/submissions/:id/attachment/:field", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "hstc-attachment")) return res.status(429).json({ error: "Too many download requests" });
       const { id, field } = req.params;
       const submission = await storage.getHstcSubmission(id);
       if (!submission) return res.status(404).json({ error: "Not found" });
@@ -5613,7 +5665,12 @@ export async function registerRoutes(
       if (!match) return res.status(400).json({ error: "Invalid image data" });
 
       const mimeType = match[1];
-      const buffer = Buffer.from(match[2], "base64");
+      const decodedBase64 = match[2];
+      const etag = `"${crypto.createHash("sha256").update(decodedBase64).digest("hex")}"`;
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, max-age=3600");
+
+      const buffer = Buffer.from(decodedBase64, "base64");
       const ext = mimeType.split("/")[1] || "png";
       res.setHeader("Content-Type", mimeType);
       res.setHeader("Content-Disposition", `attachment; filename="${field}_${id}.${ext}"`);
@@ -6612,6 +6669,7 @@ export async function registerRoutes(
 
   app.get("/api/outdoor-ad/submissions/:id/wall-image", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "outdoor-ad-image")) return res.status(429).json({ error: "Too many download requests" });
       const submission = await storage.getOutdoorAdById(req.params.id);
       if (!submission || !submission.wallImage) {
         return res.status(404).json({ error: "Image not found" });
@@ -6619,7 +6677,12 @@ export async function registerRoutes(
       const match = submission.wallImage.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
         const contentType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
+        const base64Data = match[2];
+        const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+
+        const buffer = Buffer.from(base64Data, "base64");
         res.setHeader("Content-Type", contentType);
         return res.send(buffer);
       }
@@ -6631,6 +6694,7 @@ export async function registerRoutes(
 
   app.get("/api/outdoor-ad/submissions/:id/poster-image", async (req, res) => {
     try {
+      if (isDownloadRateLimited(req, "outdoor-ad-image")) return res.status(429).json({ error: "Too many download requests" });
       const submission = await storage.getOutdoorAdById(req.params.id);
       if (!submission || !submission.posterImage) {
         return res.status(404).json({ error: "Image not found" });
@@ -6638,7 +6702,12 @@ export async function registerRoutes(
       const match = submission.posterImage.match(/^data:(image\/\w+);base64,(.+)$/);
       if (match) {
         const contentType = match[1];
-        const buffer = Buffer.from(match[2], "base64");
+        const base64Data = match[2];
+        const etag = `"${crypto.createHash("sha256").update(base64Data).digest("hex")}"`;
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+
+        const buffer = Buffer.from(base64Data, "base64");
         res.setHeader("Content-Type", contentType);
         return res.send(buffer);
       }
