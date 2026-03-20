@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,7 +85,7 @@ function ScheduleDialog({ appointment, open, onClose }: { appointment: Appointme
     },
     onSuccess: () => {
       toast({ title: "Appointment scheduled", description: `Date set to ${appointmentDate}` });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointment/appointments"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointment/appointments"] });
       onClose();
     },
     onError: () => {
@@ -162,7 +162,7 @@ function ResolveDialog({ appointment, open, onClose }: { appointment: Appointmen
     },
     onSuccess: () => {
       toast({ title: "Appointment marked as resolved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/appointment/appointments"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointment/appointments"] });
       onClose();
     },
     onError: () => {
@@ -217,19 +217,22 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [resolveOpen, setResolveOpen] = useState(false);
 
-  const merged = appointment;
-  const logs = merged.logs || [];
-
   const handleDownloadDocument = () => {
-    if (!merged.documentPhoto) return;
+    if (!appointment.documentPhoto) return;
     const a = document.createElement("a");
-    a.href = merged.documentPhoto;
+    a.href = appointment.documentPhoto;
     a.download = "appointment-document.png";
     a.target = "_blank";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
+
+  const { data: detailData } = useQuery<{ appointment: Appointment; logs: AppointmentLog[] }>({
+    queryKey: ["/api/appointment/appointments", appointment.id],
+  });
+
+  const logs = detailData?.logs || appointment.logs || [];
 
   const Field = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
     <div>
@@ -245,10 +248,10 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-semibold" data-testid="text-appointment-name">{merged.personName}</h2>
-          <p className="text-sm text-muted-foreground">{merged.villageName || "Unknown village"}</p>
+          <h2 className="text-lg font-semibold" data-testid="text-appointment-name">{appointment.personName}</h2>
+          <p className="text-sm text-muted-foreground">{appointment.villageName || "Unknown village"}</p>
         </div>
-        <StatusBadge status={merged.status} appointmentDate={merged.appointmentDate} />
+        <StatusBadge status={appointment.status} appointmentDate={appointment.appointmentDate} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -258,17 +261,17 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
               <User className="h-4 w-4" /> Person Info
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Name" value={merged.personName} />
-              <Field label="Father/Husband" value={merged.fatherHusbandName} />
-              <Field label="Mobile" value={merged.mobileNumber} />
-              <Field label="Mobile Verified" value={merged.mobileVerified ? "Yes" : "No"} />
-              <Field label="Village" value={merged.villageName} />
+              <Field label="Name" value={appointment.personName} />
+              <Field label="Father/Husband" value={appointment.fatherHusbandName} />
+              <Field label="Mobile" value={appointment.mobileNumber} />
+              <Field label="Mobile Verified" value={appointment.mobileVerified ? "Yes" : "No"} />
+              <Field label="Village" value={appointment.villageName} />
             </div>
 
-            {merged.address && (
+            {appointment.address && (
               <div>
                 <span className="text-xs text-muted-foreground">Address</span>
-                <p className="text-sm font-medium mt-0.5" data-testid="text-address">{merged.address}</p>
+                <p className="text-sm font-medium mt-0.5" data-testid="text-address">{appointment.address}</p>
               </div>
             )}
 
@@ -278,17 +281,17 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
             <div className="space-y-2">
               <div>
                 <span className="text-xs text-muted-foreground">Description</span>
-                <p className="text-sm font-medium mt-0.5" data-testid="text-description">{merged.description}</p>
+                <p className="text-sm font-medium mt-0.5" data-testid="text-description">{appointment.description}</p>
               </div>
-              {merged.documentPhoto && (
+              {appointment.documentPhoto && (
                 <div>
                   <span className="text-xs text-muted-foreground">Document / Application</span>
                 <div className="mt-1 space-y-2">
                   <img
-                    src={merged.documentPhoto}
+                    src={appointment.documentPhoto}
                     alt="Document"
                     className="max-h-60 rounded-lg border border-slate-200 cursor-pointer"
-                    onClick={() => window.open(merged.documentPhoto!, "_blank")}
+                    onClick={() => window.open(appointment.documentPhoto!, "_blank")}
                     data-testid="img-appointment-document"
                   />
                   <Button
@@ -303,29 +306,29 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
                 </div>
                 </div>
               )}
-              {merged.audioNote && (
+              {appointment.audioNote && (
                 <div>
                   <span className="text-xs text-muted-foreground">Audio Note</span>
                   <audio controls className="w-full mt-1" data-testid="audio-appointment-note">
-                    <source src={merged.audioNote} />
+                    <source src={appointment.audioNote} />
                   </audio>
                 </div>
               )}
             </div>
 
-            {merged.status !== "pending" && (
+            {appointment.status !== "pending" && (
               <>
                 <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2 mt-4">
                   <CalendarDays className="h-4 w-4" /> Schedule & Resolution Info
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Appointment Date" value={merged.appointmentDate} />
-                  <Field label="Admin Note" value={merged.adminNote} />
-                  <Field label="Scheduled At" value={merged.scheduledAt ? new Date(merged.scheduledAt).toLocaleString() : undefined} />
-                  {merged.status === "resolved" && (
+                  <Field label="Appointment Date" value={appointment.appointmentDate} />
+                  <Field label="Admin Note" value={appointment.adminNote} />
+                  <Field label="Scheduled At" value={appointment.scheduledAt ? new Date(appointment.scheduledAt).toLocaleString() : undefined} />
+                  {appointment.status === "resolved" && (
                     <>
-                      <Field label="Completion Note" value={merged.completionNote} />
-                      <Field label="Resolved At" value={merged.resolvedAt ? new Date(merged.resolvedAt).toLocaleString() : undefined} />
+                      <Field label="Completion Note" value={appointment.completionNote} />
+                      <Field label="Resolved At" value={appointment.resolvedAt ? new Date(appointment.resolvedAt).toLocaleString() : undefined} />
                     </>
                   )}
                 </div>
@@ -333,7 +336,7 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
             )}
 
             <div className="text-xs text-muted-foreground mt-2">
-              Submitted: {merged.createdAt ? new Date(merged.createdAt).toLocaleString() : "\u2014"}
+              Submitted: {appointment.createdAt ? new Date(appointment.createdAt).toLocaleString() : "\u2014"}
             </div>
           </CardContent>
         </Card>
@@ -346,7 +349,7 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
             </CardContent>
           </Card>
 
-          {merged.status === "pending" && (
+          {appointment.status === "pending" && (
             <Card>
               <CardContent className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-muted-foreground">Actions</h3>
@@ -360,7 +363,7 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
             </Card>
           )}
 
-          {merged.status === "scheduled" && (
+          {appointment.status === "scheduled" && (
             <Card>
               <CardContent className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-muted-foreground">Actions</h3>
@@ -374,38 +377,24 @@ function AppointmentDetail({ appointment, onBack }: { appointment: AppointmentWi
       </div>
 
       {scheduleOpen && (
-        <ScheduleDialog appointment={merged} open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
+        <ScheduleDialog appointment={appointment} open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
       )}
       {resolveOpen && (
-        <ResolveDialog appointment={merged} open={resolveOpen} onClose={() => setResolveOpen(false)} />
+        <ResolveDialog appointment={appointment} open={resolveOpen} onClose={() => setResolveOpen(false)} />
       )}
     </div>
   );
 }
 
-type AppointmentListResponse = {
-  items: Appointment[];
-  total: number;
-  limit: number;
-  offset: number;
-  statusCounts?: { pending: number; scheduled: number; resolved: number; total: number };
-};
-
 export default function AppointmentSubmissionsPage() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, statusFilter]);
+  const { data: appointments, isLoading } = useQuery<Appointment[]>({
+    queryKey: ["/api/appointment/appointments"],
+  });
 
   const adminAssignedVillages: string[] = (() => {
     try {
@@ -413,60 +402,34 @@ export default function AppointmentSubmissionsPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
 
-  const { data: listResponse, isLoading } = useQuery<AppointmentListResponse>({
-    queryKey: ["/api/appointment/appointments", page, debouncedSearch, statusFilter, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/appointment/appointments?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const areaFiltered = adminAssignedVillages.length > 0
+    ? (appointments || []).filter(a => a.villageId && adminAssignedVillages.includes(a.villageId))
+    : (appointments || []);
+
+  const filtered = areaFiltered.filter((a) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !search ||
+      a.personName.toLowerCase().includes(q) ||
+      a.mobileNumber.includes(search) ||
+      (a.villageName || "").toLowerCase().includes(q) ||
+      a.description.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  const paged = listResponse?.items ?? [];
-  const listTotal = listResponse?.total ?? 0;
-  const statusCounts = listResponse?.statusCounts;
-  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const { data: selectedAppointment, isLoading: selectedLoading } = useQuery<AppointmentWithLogs>({
-    queryKey: ["/api/appointment/appointments", selectedId, "row"],
-    enabled: !!selectedId,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/appointment/appointments/${selectedId}`);
-      return res.json();
-    },
-  });
+  const selected = selectedId ? areaFiltered.find((a) => a.id === selectedId) : null;
 
-  useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
-    if (page > maxPage) setPage(maxPage);
-  }, [listTotal, page]);
-
-  if (selectedId) {
-    if (selectedLoading || !selectedAppointment) {
-      return (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      );
-    }
-    return <AppointmentDetail appointment={selectedAppointment} onBack={() => setSelectedId(null)} />;
+  if (selected) {
+    return <AppointmentDetail appointment={selected} onBack={() => setSelectedId(null)} />;
   }
 
-  const pendingCount = statusCounts?.pending ?? 0;
-  const scheduledCount = statusCounts?.scheduled ?? 0;
-  const resolvedCount = statusCounts?.resolved ?? 0;
+  const pendingCount = areaFiltered.filter((a) => a.status === "pending").length;
+  const scheduledCount = areaFiltered.filter((a) => a.status === "scheduled").length;
+  const resolvedCount = areaFiltered.filter((a) => a.status === "resolved").length;
 
   return (
     <div className="space-y-6">
@@ -485,7 +448,7 @@ export default function AppointmentSubmissionsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Calendar className="h-8 w-8 text-purple-600" />
             <div>
-              <p className="text-2xl font-bold" data-testid="text-total-count">{statusCounts?.total ?? listTotal}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-count">{areaFiltered.length}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </CardContent>
@@ -583,7 +546,7 @@ export default function AppointmentSubmissionsPage() {
               {paged.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    {debouncedSearch || statusFilter !== "all" ? "No appointments match your filters" : "No appointments submitted yet"}
+                    {search || statusFilter !== "all" ? "No appointments match your filters" : "No appointments submitted yet"}
                   </TableCell>
                 </TableRow>
               )}
@@ -595,7 +558,7 @@ export default function AppointmentSubmissionsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="button-prev-page">

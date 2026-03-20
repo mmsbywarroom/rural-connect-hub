@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,17 +14,9 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Search, Clock, CheckCircle, ArrowLeft, ChevronLeft, ChevronRight, Loader2, Megaphone, User, Phone, MapPin, FileText, CalendarDays, Play } from "lucide-react";
 import type { SunwaiComplaint, SunwaiLog } from "@shared/schema";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
-type ComplaintWithLogs = SunwaiComplaint & { logs?: SunwaiLog[]; issueCategoryName?: string | null };
-
-type SunwaiListApiResponse = {
-  items: ComplaintWithLogs[];
-  total: number;
-  limit: number;
-  offset: number;
-  stats: { total: number; pending: number; accepted: number; completed: number };
-};
+type ComplaintWithLogs = SunwaiComplaint & { logs?: SunwaiLog[] };
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "accepted") return <Badge className="bg-blue-100 text-blue-800 no-default-hover-elevate no-default-active-elevate"><Play className="h-3 w-3 mr-1" />Accepted</Badge>;
@@ -82,7 +74,7 @@ function AcceptDialog({ complaint, open, onClose }: { complaint: SunwaiComplaint
     },
     onSuccess: () => {
       toast({ title: "Complaint accepted", description: `Timeline set to ${expectedDays} days` });
-      queryClient.invalidateQueries({ queryKey: ["/api/sunwai/complaints"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/sunwai/complaints"] });
       onClose();
     },
     onError: () => {
@@ -162,7 +154,7 @@ function CompleteDialog({ complaint, open, onClose }: { complaint: SunwaiComplai
     },
     onSuccess: () => {
       toast({ title: "Complaint marked as completed" });
-      queryClient.invalidateQueries({ queryKey: ["/api/sunwai/complaints"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/sunwai/complaints"] });
       onClose();
     },
     onError: () => {
@@ -349,64 +341,39 @@ function ComplaintDetail({ complaint, onBack }: { complaint: ComplaintWithLogs; 
 
 export default function SunwaiSubmissionsPage() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selected, setSelected] = useState<ComplaintWithLogs | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, statusFilter]);
-
-  const adminAssignedVillages: string[] = (() => {
-    try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
-
-  const { data: listResponse, isLoading } = useQuery<SunwaiListApiResponse>({
-    queryKey: ["/api/sunwai/complaints", page, debouncedSearch, statusFilter, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/sunwai/complaints?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const { data: complaints, isLoading } = useQuery<SunwaiComplaint[]>({
+    queryKey: ["/api/sunwai/complaints"],
   });
 
-  const paged = listResponse?.items ?? [];
-  const listTotal = listResponse?.total ?? 0;
-  const stats = listResponse?.stats;
-  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
-  const canPrev = page > 0;
-  const canNext = (page + 1) * PAGE_SIZE < listTotal;
+  const allComplaints = complaints || [];
+
+  const filtered = allComplaints.filter((c) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !search ||
+      c.complainantName.toLowerCase().includes(q) ||
+      c.mobileNumber.includes(search) ||
+      (c.villageName || "").toLowerCase().includes(q) ||
+      c.complaintNote.toLowerCase().includes(q);
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const selected = selectedId ? allComplaints.find((c) => c.id === selectedId) : null;
 
   if (selected) {
-    return <ComplaintDetail complaint={selected} onBack={() => setSelected(null)} />;
+    return <ComplaintDetail complaint={selected} onBack={() => setSelectedId(null)} />;
   }
 
-  const pendingCount = stats?.pending ?? 0;
-  const acceptedCount = stats?.accepted ?? 0;
-  const completedCount = stats?.completed ?? 0;
-  const totalCount = stats?.total ?? 0;
+  const pendingCount = allComplaints.filter((c) => c.status === "pending").length;
+  const acceptedCount = allComplaints.filter((c) => c.status === "accepted").length;
+  const completedCount = allComplaints.filter((c) => c.status === "completed").length;
 
   return (
     <div className="space-y-6">
@@ -425,7 +392,7 @@ export default function SunwaiSubmissionsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Megaphone className="h-8 w-8 text-red-500" />
             <div>
-              <p className="text-2xl font-bold" data-testid="text-total-count">{totalCount}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-count">{allComplaints.length}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </CardContent>
@@ -465,12 +432,12 @@ export default function SunwaiSubmissionsPage() {
           <Input
             placeholder="Search by name, mobile, village, complaint..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             className="pl-9"
             data-testid="input-search-complaints"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
           <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -506,7 +473,7 @@ export default function SunwaiSubmissionsPage() {
                 <TableRow
                   key={c.id}
                   className="cursor-pointer hover-elevate"
-                  onClick={() => setSelected(c)}
+                  onClick={() => setSelectedId(c.id)}
                   data-testid={`row-complaint-${c.id}`}
                 >
                   <TableCell data-testid={`text-complainant-${c.id}`}>{c.complainantName}</TableCell>
@@ -532,17 +499,17 @@ export default function SunwaiSubmissionsPage() {
         </div>
       )}
 
-      {listTotal > 0 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" disabled={!canPrev} onClick={() => setPage((p) => Math.max(0, p - 1))} data-testid="button-prev-page">
+            <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="button-prev-page">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm">{page + 1} / {totalPages}</span>
-            <Button variant="outline" size="icon" disabled={!canNext} onClick={() => setPage((p) => p + 1)} data-testid="button-next-page">
+            <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} data-testid="button-next-page">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

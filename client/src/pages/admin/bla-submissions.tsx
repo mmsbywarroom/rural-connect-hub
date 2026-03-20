@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,18 +14,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Download, Trash2, Eye } from "lucide-react";
 import type { BlaSubmission } from "@shared/schema";
-
-const PAGE_SIZE = 50;
-
-type BlaListResponse = {
-  items: BlaSubmission[];
-  total: number;
-  limit: number;
-  offset: number;
-};
 
 function escapeCSVField(value: string): string {
   const s = String(value ?? "").replace(/"/g, '""');
@@ -35,62 +26,12 @@ function escapeCSVField(value: string): string {
 export default function BlaSubmissionsPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<BlaSubmission | null>(null);
   const [editBooth, setEditBooth] = useState("");
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch]);
-
-  const adminAssignedVillages: string[] = (() => {
-    try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
-
-  const { data: listRes, isLoading } = useQuery<BlaListResponse>({
-    queryKey: ["/api/bla/submissions", page, debouncedSearch, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/bla/submissions?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const { data, isLoading, refetch } = useQuery<BlaSubmission[]>({
+    queryKey: ["/api/bla/submissions"],
   });
-
-  const { data: selectedFull } = useQuery<BlaSubmission>({
-    queryKey: ["/api/bla/submissions/detail", selected?.id],
-    enabled: !!selected?.id,
-    queryFn: async () => {
-      const res = await fetch(`/api/bla/submissions/${selected!.id}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
-  });
-
-  const detail = selectedFull ?? selected;
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -98,17 +39,31 @@ export default function BlaSubmissionsPage() {
     },
     onSuccess: () => {
       toast({ title: "Deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/bla/submissions"], exact: false });
+      refetch();
     },
     onError: () => {
       toast({ title: "Failed to delete", variant: "destructive" });
     },
   });
 
-  const list = listRes?.items ?? [];
-  const listTotal = listRes?.total ?? 0;
-  const canPrev = page > 0;
-  const canNext = (page + 1) * PAGE_SIZE < listTotal;
+  const list = data ?? [];
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return list;
+    const q = search.toLowerCase();
+    return list.filter((s) =>
+      [
+        s.bloName,
+        s.bloMobileNumber,
+        s.villageName,
+        s.ocrVoterId,
+        s.voterMappingBoothId,
+        s.manualBoothId,
+      ]
+        .map((v) => (v || "").toString().toLowerCase())
+        .some((v) => v.includes(q)),
+    );
+  }, [list, search]);
 
   const boothCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -120,18 +75,8 @@ export default function BlaSubmissionsPage() {
     return counts;
   }, [list]);
 
-  const handleDownloadCSV = async () => {
-    const params = new URLSearchParams();
-    params.set("limit", "200");
-    params.set("offset", "0");
-    const q = debouncedSearch.trim();
-    if (q) params.set("search", q);
-    if (villageIdsParam) params.set("villageIds", villageIdsParam);
-    const res = await fetch(`/api/bla/submissions?${params.toString()}`, { credentials: "include" });
-    if (!res.ok) return;
-    const body = (await res.json()) as BlaListResponse;
-    const exportList = body.items || [];
-    if (!exportList.length) return;
+  const handleDownloadCSV = () => {
+    if (!list.length) return;
     const headers = [
       "BLO Name",
       "BLO Mobile",
@@ -143,7 +88,7 @@ export default function BlaSubmissionsPage() {
       "Voter Name",
       "Created At",
     ];
-    const rows = exportList.map((s) => [
+    const rows = list.map((s) => [
       s.bloName,
       s.bloMobileNumber,
       s.villageName ?? "",
@@ -178,7 +123,7 @@ export default function BlaSubmissionsPage() {
     onSuccess: () => {
       toast({ title: "Updated booth number" });
       setSelected(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/bla/submissions"], exact: false });
+      refetch();
     },
     onError: () => {
       toast({ title: "Failed to update booth", variant: "destructive" });
@@ -196,9 +141,9 @@ export default function BlaSubmissionsPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Booth wise summary (this page)</CardTitle>
+          <CardTitle className="text-sm">Booth wise summary</CardTitle>
           <CardDescription className="text-xs">
-            Counts for the current page only. Use search / pagination to explore other booths.
+            Total BLAs per booth number (from voter mapping or manual booth).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -219,7 +164,7 @@ export default function BlaSubmissionsPage() {
       <Card>
         <CardHeader className="pb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-sm">BLA entries ({listTotal})</CardTitle>
+            <CardTitle className="text-sm">All BLA entries ({filtered.length})</CardTitle>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Input
@@ -233,7 +178,7 @@ export default function BlaSubmissionsPage() {
               size="sm"
               className="h-8"
               onClick={handleDownloadCSV}
-              disabled={listTotal === 0}
+              disabled={!list.length}
             >
               <Download className="h-4 w-4 mr-1" />
               CSV
@@ -245,7 +190,7 @@ export default function BlaSubmissionsPage() {
             <div className="flex justify-center py-10">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : list.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6">No BLA entries found.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -263,11 +208,11 @@ export default function BlaSubmissionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.map((s, idx) => {
+                  {filtered.map((s, idx) => {
                     const booth = (s.voterMappingBoothId || s.manualBoothId || "").trim();
                     return (
                       <TableRow key={s.id}>
-                        <TableCell className="text-xs text-muted-foreground">{page * PAGE_SIZE + idx + 1}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="text-sm font-medium">{s.bloName}</TableCell>
                         <TableCell className="text-sm">{s.bloMobileNumber}</TableCell>
                         <TableCell className="text-sm">{s.villageName ?? "—"}</TableCell>
@@ -307,25 +252,9 @@ export default function BlaSubmissionsPage() {
         </CardContent>
       </Card>
 
-      {listTotal > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
-            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-              Previous
-            </Button>
-            <Button type="button" variant="outline" size="sm" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-lg">
-          {selected && detail && (
+          {selected && (
             <>
               <DialogHeader>
                 <DialogTitle>Booth Level Agent details</DialogTitle>
@@ -337,62 +266,62 @@ export default function BlaSubmissionsPage() {
                 <div>
                   <p className="font-semibold">BLO</p>
                   <p>
-                    {detail.bloName} &middot; {detail.bloMobileNumber}
+                    {selected.bloName} &middot; {selected.bloMobileNumber}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="font-semibold">Village</p>
-                    <p>{detail.villageName || "—"}</p>
+                    <p>{selected.villageName || "—"}</p>
                   </div>
                   <div>
                     <p className="font-semibold">Booth (final)</p>
-                    <p>{(detail.voterMappingBoothId || detail.manualBoothId || "—").toString()}</p>
+                    <p>{(selected.voterMappingBoothId || selected.manualBoothId || "—").toString()}</p>
                   </div>
                 </div>
                 <div>
                   <p className="font-semibold">Aadhaar (OCR data)</p>
                   <p className="text-xs text-muted-foreground">
-                    Name: {detail.ocrAadhaarName || "—"} &middot; Aadhaar: {detail.ocrAadhaarNumber || "—"} &middot; DOB:{" "}
-                    {detail.ocrAadhaarDob || "—"} &middot; Gender: {detail.ocrAadhaarGender || "—"}
+                    Name: {selected.ocrAadhaarName || "—"} &middot; Aadhaar: {selected.ocrAadhaarNumber || "—"} &middot; DOB:{" "}
+                    {selected.ocrAadhaarDob || "—"} &middot; Gender: {selected.ocrAadhaarGender || "—"}
                   </p>
                   <p className="mt-1">
                     <span className="font-semibold">Address (from Aadhaar)</span>
                     <br />
-                    {detail.ocrAadhaarAddress || "—"}
+                    {selected.ocrAadhaarAddress || "—"}
                   </p>
                 </div>
                 <div>
                   <p className="font-semibold">Voter Card (OCR data)</p>
                   <p className="text-xs text-muted-foreground">
-                    Voter ID: {detail.ocrVoterId || "—"} &middot; Name: {detail.ocrVoterName || "—"}
+                    Voter ID: {selected.ocrVoterId || "—"} &middot; Name: {selected.ocrVoterName || "—"}
                   </p>
                 </div>
                 <div>
                   <p className="font-semibold">Voter Mapping</p>
                   <p>
-                    Booth: {detail.voterMappingBoothId || "—"} | Name: {detail.voterMappingName || "—"} | Father&apos;s Name:{" "}
-                    {detail.voterMappingFatherName || "—"} | Village: {detail.voterMappingVillageName || "—"}
+                    Booth: {selected.voterMappingBoothId || "—"} | Name: {selected.voterMappingName || "—"} | Father&apos;s Name:{" "}
+                    {selected.voterMappingFatherName || "—"} | Village: {selected.voterMappingVillageName || "—"}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {detail.aadhaarFront && (
+                  {selected.aadhaarFront && (
                     <Button asChild variant="outline" size="sm">
-                      <a href={detail.aadhaarFront} target="_blank" rel="noreferrer" download={`aadhaar-front-${detail.id}.jpg`}>
+                      <a href={selected.aadhaarFront} target="_blank" rel="noreferrer" download={`aadhaar-front-${selected.id}.jpg`}>
                         View / Download Aadhaar Front
                       </a>
                     </Button>
                   )}
-                  {detail.aadhaarBack && (
+                  {selected.aadhaarBack && (
                     <Button asChild variant="outline" size="sm">
-                      <a href={detail.aadhaarBack} target="_blank" rel="noreferrer" download={`aadhaar-back-${detail.id}.jpg`}>
+                      <a href={selected.aadhaarBack} target="_blank" rel="noreferrer" download={`aadhaar-back-${selected.id}.jpg`}>
                         View / Download Aadhaar Back
                       </a>
                     </Button>
                   )}
-                  {detail.voterCardImage && (
+                  {selected.voterCardImage && (
                     <Button asChild variant="outline" size="sm">
-                      <a href={detail.voterCardImage} target="_blank" rel="noreferrer" download={`voter-card-${detail.id}.jpg`}>
+                      <a href={selected.voterCardImage} target="_blank" rel="noreferrer" download={`voter-card-${selected.id}.jpg`}>
                         View / Download Voter Card
                       </a>
                     </Button>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Calendar, FileText, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Users, Calendar, FileText } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MahilaSammanPunjabSubmission } from "@shared/schema";
 
@@ -17,8 +16,6 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 border border-red-200",
   closed: "bg-slate-100 text-slate-700 border border-slate-200",
 };
-
-const PAGE_SIZE = 25;
 
 const CATEGORY_LABELS: Record<string, string> = {
   general: "General",
@@ -60,76 +57,14 @@ function DocLink({ src, label }: { src: string | null | undefined; label: string
   );
 }
 
-type MahilaPunjabListResponse = {
-  items: MahilaSammanPunjabSubmission[];
-  total: number;
-  limit: number;
-  offset: number;
-};
-
 export default function MahilaSammanPunjabAdminPage() {
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [page, setPage] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, statusFilter]);
-
-  const adminAssignedVillages: string[] = (() => {
-    try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
-
-  const { data: listResponse, isLoading } = useQuery<MahilaPunjabListResponse>({
-    queryKey: ["/api/admin/mahila-samman-punjab", page, debouncedSearch, statusFilter, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/admin/mahila-samman-punjab?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const { data: list = [], isLoading } = useQuery<MahilaSammanPunjabSubmission[]>({
+    queryKey: ["/api/admin/mahila-samman-punjab"],
   });
-
-  const { data: selected, isLoading: detailLoading } = useQuery<MahilaSammanPunjabSubmission>({
-    queryKey: ["/api/admin/mahila-samman-punjab", selectedId, "detail"],
-    enabled: !!selectedId,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/admin/mahila-samman-punjab/${selectedId}`);
-      return res.json();
-    },
-  });
-
+  const [selected, setSelected] = useState<MahilaSammanPunjabSubmission | null>(null);
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
-
-  useEffect(() => {
-    if (selected) {
-      setStatus(selected.status || "pending");
-      setAdminNote(selected.adminNote || "");
-    }
-  }, [selected]);
+  const [search, setSearch] = useState("");
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -138,19 +73,21 @@ export default function MahilaSammanPunjabAdminPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman-punjab"], exact: false });
-      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/mahila-samman-punjab"] });
+      setSelected(null);
     },
   });
 
-  const paged = listResponse?.items ?? [];
-  const listTotal = listResponse?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
-
-  useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
-    if (page > maxPage) setPage(maxPage);
-  }, [listTotal, page]);
+  const sorted = list.slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
+  const filtered = !search.trim()
+    ? sorted
+    : sorted.filter(
+        (s) =>
+          (s.name || "").toLowerCase().includes(search.toLowerCase()) ||
+          (s.mobileNumber || "").includes(search) ||
+          (s.ocrVoterId || "").toLowerCase().includes(search.toLowerCase()) ||
+          (s.id || "").toLowerCase().includes(search.toLowerCase())
+      );
 
   return (
     <div className="space-y-4">
@@ -163,52 +100,39 @@ export default function MahilaSammanPunjabAdminPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-2 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, mobile, voter ID"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <CardTitle className="text-sm font-semibold">Submissions</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">All Submissions (serial-wise)</CardTitle>
+          <Input
+            placeholder="Search by name, mobile, voter ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs mt-2"
+          />
         </CardHeader>
         <CardContent className="space-y-2">
           {isLoading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : paged.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No submissions yet.</p>
           ) : (
-            paged.map((s, idx) => {
+            filtered.map((s, idx) => {
               const created = s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
               const badgeClass = STATUS_COLORS[s.status || "pending"] || STATUS_COLORS.pending;
               return (
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => setSelectedId(s.id)}
+                  onClick={() => {
+                    setSelected(s);
+                    setStatus(s.status || "pending");
+                    setAdminNote(s.adminNote || "");
+                  }}
                   className="w-full text-left border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3 hover:bg-slate-50"
                 >
                   <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 font-semibold text-purple-700 text-sm">
-                    {page * PAGE_SIZE + idx + 1}
+                    {idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">
@@ -236,36 +160,15 @@ export default function MahilaSammanPunjabAdminPage() {
               );
             })
           )}
-          {listTotal > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-sm text-muted-foreground">
-                Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">{page + 1} / {totalPages}</span>
-                <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      <Dialog open={!!selectedId} onOpenChange={(open) => !open && setSelectedId(null)}>
+      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Mahila Samman Rashi (Punjab Gov) – Submission Details</DialogTitle>
           </DialogHeader>
-          {(detailLoading || !selected) && (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          )}
-          {!detailLoading && selected && (
+          {selected && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -344,7 +247,7 @@ export default function MahilaSammanPunjabAdminPage() {
                   <Textarea rows={3} value={adminNote} onChange={(e) => setAdminNote(e.target.value)} />
                 </div>
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => setSelectedId(null)}>Cancel</Button>
+                  <Button variant="outline" size="sm" onClick={() => setSelected(null)}>Cancel</Button>
                   <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
                     {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
                     Save

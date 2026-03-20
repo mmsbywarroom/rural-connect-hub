@@ -15,15 +15,7 @@ import { Home, Search, Eye, CheckCircle, XCircle, Clock, ArrowLeft, ChevronLeft,
 import { compressImage } from "@/lib/image-compress";
 import type { HstcSubmission } from "@shared/schema";
 
-const PAGE_SIZE = 50;
-
-type HstcListApiResponse = {
-  items: HstcSubmission[];
-  total: number;
-  limit: number;
-  offset: number;
-  statusCounts: { pending: number; approved: number; rejected: number };
-};
+const PAGE_SIZE = 10;
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "approved") return <Badge className="bg-green-100 text-green-800 no-default-hover-elevate no-default-active-elevate"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
@@ -68,7 +60,7 @@ function PaymentProofUpload({ submission }: { submission: HstcSubmission }) {
     },
     onSuccess: () => {
       toast({ title: "Payment proof saved", description: "User will be notified" });
-      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save payment proof", variant: "destructive" });
@@ -190,7 +182,7 @@ function SubmissionDetail({ submission, onBack }: { submission: HstcSubmission; 
     },
     onSuccess: () => {
       toast({ title: "Review saved", description: `Submission ${reviewAction}` });
-      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"] });
       onBack();
     },
     onError: () => {
@@ -205,7 +197,7 @@ function SubmissionDetail({ submission, onBack }: { submission: HstcSubmission; 
     },
     onSuccess: (data: any) => {
       toast({ title: data.editAllowed ? "Edit access granted" : "Edit access revoked" });
-      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"] });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to toggle edit access", variant: "destructive" });
@@ -439,21 +431,11 @@ function SubmissionDetail({ submission, onBack }: { submission: HstcSubmission; 
 
 export default function HstcSubmissionsPage() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, statusFilter]);
 
   useEffect(() => {
     const query = typeof window !== "undefined" ? window.location.search : "";
@@ -468,12 +450,16 @@ export default function HstcSubmissionsPage() {
     },
     onSuccess: () => {
       toast({ title: "Submission deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["/api/hstc/submissions"] });
       setDeleteId(null);
     },
     onError: () => {
       toast({ title: "Failed to delete", variant: "destructive" });
     },
+  });
+
+  const { data: submissions, isLoading } = useQuery<HstcSubmission[]>({
+    queryKey: ["/api/hstc/submissions"],
   });
 
   const adminAssignedVillages: string[] = (() => {
@@ -482,31 +468,22 @@ export default function HstcSubmissionsPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
 
-  const { data: listResponse, isLoading } = useQuery<HstcListApiResponse>({
-    queryKey: ["/api/hstc/submissions", page, debouncedSearch, statusFilter, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/hstc/submissions?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const areaFilteredSubmissions = adminAssignedVillages.length > 0
+    ? (submissions || []).filter(s => s.villageId && adminAssignedVillages.includes(s.villageId))
+    : (submissions || []);
+
+  const filtered = areaFilteredSubmissions.filter((s) => {
+    const matchesSearch = !search ||
+      s.houseOwnerName.toLowerCase().includes(search.toLowerCase()) ||
+      s.mobileNumber.includes(search) ||
+      (s.villageName || "").toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
-  const paged = listResponse?.items ?? [];
-  const listTotal = listResponse?.total ?? 0;
-  const canPrev = page > 0;
-  const canNext = (page + 1) * PAGE_SIZE < listTotal;
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // Fetch full submission (with images) when a row is selected - list API omits heavy columns
   const { data: selectedSubmission, isLoading: selectedLoading } = useQuery<HstcSubmission>({
@@ -525,9 +502,9 @@ export default function HstcSubmissionsPage() {
     );
   }
 
-  const pendingCount = listResponse?.statusCounts?.pending ?? 0;
-  const approvedCount = listResponse?.statusCounts?.approved ?? 0;
-  const rejectedCount = listResponse?.statusCounts?.rejected ?? 0;
+  const pendingCount = areaFilteredSubmissions.filter((s) => s.status === "pending").length;
+  const approvedCount = areaFilteredSubmissions.filter((s) => s.status === "approved").length;
+  const rejectedCount = areaFilteredSubmissions.filter((s) => s.status === "rejected").length;
 
   return (
     <div className="space-y-6">
@@ -546,7 +523,7 @@ export default function HstcSubmissionsPage() {
           onClick={() => {
             window.open("/api/hstc/export-csv", "_blank");
           }}
-          disabled={listTotal === 0}
+          disabled={!submissions || submissions.length === 0}
           data-testid="button-hstc-export-csv"
         >
           <Download className="h-4 w-4 mr-2" /> Export CSV
@@ -589,7 +566,7 @@ export default function HstcSubmissionsPage() {
           <Input
             placeholder="Search by name, mobile, village..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
             className="pl-9"
             data-testid="input-search"
           />
@@ -662,19 +639,17 @@ export default function HstcSubmissionsPage() {
         </CardContent>
       </Card>
 
-      {listTotal > 0 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" disabled={!canPrev} onClick={() => setPage((p) => Math.max(0, p - 1))} data-testid="button-prev-page">
+            <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="button-prev-page">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm">
-              {listTotal === 0 ? 0 : page + 1} / {Math.max(1, Math.ceil(listTotal / PAGE_SIZE))}
-            </span>
-            <Button variant="outline" size="icon" disabled={!canNext} onClick={() => setPage((p) => p + 1)} data-testid="button-next-page">
+            <span className="text-sm">{page + 1} / {totalPages}</span>
+            <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} data-testid="button-next-page">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

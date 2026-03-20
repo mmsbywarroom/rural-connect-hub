@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Search,
   MapPin,
@@ -294,81 +294,41 @@ function ReportDetail({ report, onBack, onRefresh }: DetailProps) {
   );
 }
 
-type RoadListResponse = {
-  items: RoadReport[];
-  total: number;
-  limit: number;
-  offset: number;
-  scopeStats?: { distinctUnits: number; latestCreatedAt: string | Date | null };
-};
-
 export default function RoadReportsPage() {
   const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch]);
-
-  const adminAssignedVillages: string[] = (() => {
-    try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  })();
-  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
-
-  const { data: listResponse, isLoading, refetch } = useQuery<RoadListResponse>({
-    queryKey: ["/api/road/reports", page, debouncedSearch, villageIdsParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("limit", String(PAGE_SIZE));
-      params.set("offset", String(page * PAGE_SIZE));
-      const q = debouncedSearch.trim();
-      if (q) params.set("search", q);
-      if (villageIdsParam) params.set("villageIds", villageIdsParam);
-      const res = await fetch(`/api/road/reports?${params.toString()}`, { credentials: "include" });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status}: ${text || res.statusText}`);
-      }
-      return res.json();
-    },
+  const { data: reports, isLoading, refetch } = useQuery<RoadReport[]>({
+    queryKey: ["/api/road/reports"],
   });
 
-  const { data: detailReport, isLoading: detailLoading } = useQuery<ReportWithLogs>({
-    queryKey: ["/api/road/reports", selectedId, "detail"],
-    enabled: !!selectedId,
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/road/reports/${selectedId}`);
-      return res.json();
-    },
+  const allReports = (reports || []) as ReportWithLogs[];
+
+  const filtered = allReports.filter((r) => {
+    const q = search.toLowerCase();
+    if (!q) return true;
+    return (
+      (r.villageName || "").toLowerCase().includes(q) ||
+      (r.reporterName || "").toLowerCase().includes(q) ||
+      (r.description || "").toLowerCase().includes(q) ||
+      (r.mobileNumber || "").toLowerCase().includes(q)
+    );
   });
 
-  const pageItems = listResponse?.items ?? [];
-  const listTotal = listResponse?.total ?? 0;
-  const scopeStats = listResponse?.scopeStats;
-  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
-  const startIndex = page * PAGE_SIZE;
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const startIndex = currentPage * PAGE_SIZE;
+  const pageItems = filtered.slice(startIndex, startIndex + PAGE_SIZE);
 
-  useEffect(() => {
-    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
-    if (page > maxPage) setPage(maxPage);
-  }, [listTotal, page]);
-
-  const totalUnits = scopeStats?.distinctUnits ?? 0;
-  const latestDate = scopeStats?.latestCreatedAt
-    ? new Date(scopeStats.latestCreatedAt as string).toLocaleString()
+  const totalUnits = new Set(allReports.map((r) => r.villageId || r.villageName || "")).size;
+  const latestDate = allReports[0]?.createdAt
+    ? new Date(allReports[0].createdAt).toLocaleString()
     : "—";
+
+  const selectedReport = selectedId
+    ? allReports.find((r) => r.id === selectedId) || null
+    : null;
 
   return (
     <div className="space-y-5">
@@ -385,7 +345,7 @@ export default function RoadReportsPage() {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total Reports</p>
-            <p className="text-lg font-semibold">{listTotal}</p>
+            <p className="text-lg font-semibold">{allReports.length}</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Distinct Units</p>
@@ -414,10 +374,10 @@ export default function RoadReportsPage() {
               />
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{listTotal} results</span>
+              <span>{total} results</span>
               <span>·</span>
               <span>
-                Page {page + 1} of {totalPages}
+                Page {currentPage + 1} of {totalPages}
               </span>
             </div>
           </div>
@@ -485,7 +445,21 @@ export default function RoadReportsPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setSelectedId(r.id)}
+                        onClick={async () => {
+                          setSelectedId(r.id);
+                          // fetch full report with logs
+                          try {
+                            const res = await apiRequest("GET", `/api/road/reports/${r.id}`);
+                            const full: ReportWithLogs = await res.json();
+                            // replace in local array so detail screen gets logs
+                            const idx = allReports.findIndex((x) => x.id === r.id);
+                            if (idx >= 0) {
+                              allReports[idx] = full;
+                            }
+                          } catch {
+                            // ignore
+                          }
+                        }}
                       >
                         View
                       </Button>
@@ -501,18 +475,18 @@ export default function RoadReportsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={page === 0}
+                disabled={currentPage === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" /> Previous
               </Button>
               <div className="text-xs text-muted-foreground">
-                Showing {listTotal === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, listTotal)} of {listTotal}
+                Showing {startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, total)} of {total}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={page >= totalPages - 1}
+                disabled={currentPage >= totalPages - 1}
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               >
                 Next <ChevronRight className="h-4 w-4 ml-1" />
@@ -524,22 +498,16 @@ export default function RoadReportsPage() {
 
       <Dialog open={!!selectedId} onOpenChange={(open) => { if (!open) setSelectedId(null); }}>
         <DialogContent className="max-w-3xl">
-          {detailLoading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          {!detailLoading && detailReport && (
+          {selectedReport && (
             <>
               <DialogHeader>
                 <DialogTitle>Road Report Detail</DialogTitle>
               </DialogHeader>
               <ReportDetail
-                report={detailReport}
+                report={selectedReport as ReportWithLogs}
                 onBack={() => setSelectedId(null)}
                 onRefresh={() => {
                   refetch();
-                  queryClient.invalidateQueries({ queryKey: ["/api/road/reports", selectedId, "detail"] });
                 }}
               />
             </>
