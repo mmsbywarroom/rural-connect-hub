@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, and, or, isNull, asc, sql, count, inArray } from "drizzle-orm";
+import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
 import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
@@ -86,6 +86,40 @@ import {
   type BlaSubmission,
   type InsertBlaSubmission,
 } from "@shared/schema";
+
+/** Admin list only — avoids loading multi‑MB base64 blobs and OOM on small hosts (e.g. Render). */
+const mahilaSammanAdminListColumns = (() => {
+  const {
+    aadhaarFront: _omitAadhaarFront,
+    aadhaarBack: _omitAadhaarBack,
+    voterCard: _omitVoterCard,
+    sakhiPhoto: _omitSakhiPhoto,
+    ...cols
+  } = getTableColumns(mahilaSammanSubmissions);
+  return cols;
+})();
+
+const MAHILA_PAGE_MAX = 200;
+const MAHILA_PAGE_DEFAULT = 50;
+const MAHILA_VOTER_ID_IN_CHUNK = 3000;
+
+function mahilaSammanNotDeleted() {
+  return or(eq(mahilaSammanSubmissions.isDeleted, false), isNull(mahilaSammanSubmissions.isDeleted));
+}
+
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  if (size <= 0) return [arr];
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+export type MahilaSammanSubmissionsPage = {
+  items: MahilaSammanSubmission[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 
 export interface IStorage {
   // Admin Roles
@@ -425,7 +459,11 @@ export interface IStorage {
   createMahilaSammanSubmission(data: InsertMahilaSammanSubmission): Promise<MahilaSammanSubmission>;
   updateMahilaSammanSubmission(id: string, data: Partial<InsertMahilaSammanSubmission>): Promise<MahilaSammanSubmission | undefined>;
   getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
-  getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]>;
+  getMahilaSammanSubmissions(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<MahilaSammanSubmissionsPage>;
   getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
   deleteMahilaSammanSubmission(id: string): Promise<void>;
   getMahilaSammanStats(): Promise<{
@@ -1960,14 +1998,48 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getMahilaSammanSubmissions(): Promise<MahilaSammanSubmission[]> {
-    return db
-      .select()
-      .from(mahilaSammanSubmissions)
-      .where(
-        or(eq(mahilaSammanSubmissions.isDeleted, false), isNull(mahilaSammanSubmissions.isDeleted)),
-      )
-      .orderBy(desc(mahilaSammanSubmissions.createdAt));
+  async getMahilaSammanSubmissions(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<MahilaSammanSubmissionsPage> {
+    const limit = Math.min(
+      Math.max(Number(opts?.limit ?? MAHILA_PAGE_DEFAULT) || MAHILA_PAGE_DEFAULT, 1),
+      MAHILA_PAGE_MAX,
+    );
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+    const m = mahilaSammanSubmissions;
+    const base = mahilaSammanNotDeleted();
+    const whereClause =
+      safeSearch.length > 0
+        ? and(
+            base,
+            or(
+              ilike(m.sakhiName, `%${safeSearch}%`),
+              ilike(m.mobileNumber, `%${safeSearch}%`),
+              ilike(m.id, `%${safeSearch}%`),
+            ),
+          )
+        : base;
+
+    const [countRow] = await db.select({ n: sql<number>`count(*)::int` }).from(m).where(whereClause);
+
+    const rows = await db
+      .select(mahilaSammanAdminListColumns)
+      .from(m)
+      .where(whereClause)
+      .orderBy(desc(m.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: rows as MahilaSammanSubmission[],
+      total: countRow?.n ?? 0,
+      limit,
+      offset,
+    };
   }
 
   async getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]> {
@@ -2037,31 +2109,73 @@ export class DatabaseStorage implements IStorage {
     boothsTenSakhis: number;
     boothsExactlyOneSakhi: number;
   }> {
-    const all = await db
-      .select()
-      .from(mahilaSammanSubmissions)
-      .where(
-        or(eq(mahilaSammanSubmissions.isDeleted, false), isNull(mahilaSammanSubmissions.isDeleted)),
-      )
-      .orderBy(desc(mahilaSammanSubmissions.createdAt));
-    const total = all.length;
-    const pending = all.filter((s) => (s.status || "pending") === "pending").length;
-    const accepted = all.filter((s) => s.status === "accepted").length;
-    const rejected = all.filter((s) => s.status === "rejected").length;
-    const closed = all.filter((s) => s.status === "closed").length;
-    const voterIdMapped = all.filter((s) => (s.voterMappingBoothId || "").trim() !== "").length;
+    const m = mahilaSammanSubmissions;
+    const md = mahilaSammanNotDeleted();
 
-    // New high-level Sakhi stats
-    const otpVerifiedSakhis = all.filter((s) => !!s.mobileVerified).length;
-    // Voter card uploaded when voterCard image/url is present
-    const voterCardUploadedSakhis = all.filter((s) => !!s.voterCard && String(s.voterCard).trim()).length;
-    // Aadhaar uploaded when both front and back images are present
-    const aadhaarUploadedSakhis = all.filter((s) => !!s.aadhaarFront && !!s.aadhaarBack).length;
-    // Booth number known if voter mapping booth id is present
+    const [agg] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where coalesce(${m.status}, 'pending') = 'pending')::int`,
+        accepted: sql<number>`count(*) filter (where ${m.status} = 'accepted')::int`,
+        rejected: sql<number>`count(*) filter (where ${m.status} = 'rejected')::int`,
+        closed: sql<number>`count(*) filter (where ${m.status} = 'closed')::int`,
+        voterIdMapped: sql<number>`count(*) filter (where trim(coalesce(${m.voterMappingBoothId}, '')) <> '')::int`,
+        otpVerifiedSakhis: sql<number>`count(*) filter (where ${m.mobileVerified} is true)::int`,
+        voterCardUploadedSakhis: sql<number>`count(*) filter (where coalesce(length(trim(coalesce(${m.voterCard}, ''))), 0) > 0)::int`,
+        aadhaarUploadedSakhis: sql<number>`count(*) filter (where coalesce(length(trim(coalesce(${m.aadhaarFront}, ''))), 0) > 0 and coalesce(length(trim(coalesce(${m.aadhaarBack}, ''))), 0) > 0)::int`,
+      })
+      .from(m)
+      .where(md);
+
+    const total = Number(agg?.total ?? 0);
+    const pending = Number(agg?.pending ?? 0);
+    const accepted = Number(agg?.accepted ?? 0);
+    const rejected = Number(agg?.rejected ?? 0);
+    const closed = Number(agg?.closed ?? 0);
+    const voterIdMapped = Number(agg?.voterIdMapped ?? 0);
+    const otpVerifiedSakhis = Number(agg?.otpVerifiedSakhis ?? 0);
+    const voterCardUploadedSakhis = Number(agg?.voterCardUploadedSakhis ?? 0);
+    const aadhaarUploadedSakhis = Number(agg?.aadhaarUploadedSakhis ?? 0);
     const boothKnownSakhis = voterIdMapped;
 
+    const boothIdTrim = sql<string>`trim(coalesce(${m.voterMappingBoothId}, ''))`;
+    const submissionBoothCounts = await db
+      .select({
+        boothId: boothIdTrim,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(m)
+      .where(and(md, sql`trim(coalesce(${m.voterMappingBoothId}, '')) <> ''`))
+      .groupBy(boothIdTrim);
+
+    const submissionCountByBooth = new Map<string, number>();
+    for (const r of submissionBoothCounts) {
+      const bid = (r.boothId ?? "").trim();
+      if (bid) submissionCountByBooth.set(bid, Number(r.cnt));
+    }
+
+    const all = await db
+      .select({
+        id: m.id,
+        status: m.status,
+        mobileVerified: m.mobileVerified,
+        voterMappingBoothId: m.voterMappingBoothId,
+        ocrVoterId: m.ocrVoterId,
+        sakhiName: m.sakhiName,
+        mobileNumber: m.mobileNumber,
+      })
+      .from(m)
+      .where(md)
+      .orderBy(desc(m.createdAt));
+
     // Unique booth IDs from voter mapping work (sab booths dikhane ke liye)
-    const mappingRows = await db.select().from(voterMappingMaster);
+    const mappingRows = await db
+      .select({
+        boothId: voterMappingMaster.boothId,
+        slNo: voterMappingMaster.slNo,
+        voterId: voterMappingMaster.voterId,
+      })
+      .from(voterMappingMaster);
     const uniqueBoothIds = Array.from(
       new Set((mappingRows || []).map((r) => (r.boothId || "").trim()).filter((b) => b !== ""))
     );
@@ -2079,15 +2193,11 @@ export class DatabaseStorage implements IStorage {
 
     const boothMap = new Map<string, number>();
     for (const bid of uniqueBoothIds) {
-      boothMap.set(bid, 0);
+      boothMap.set(bid, submissionCountByBooth.get(bid) ?? 0);
     }
-    for (const s of all) {
-      const bid = (s.voterMappingBoothId || "").trim();
-      if (bid) {
-        if (!boothMap.has(bid)) boothMap.set(bid, 0);
-        boothMap.set(bid, (boothMap.get(bid) ?? 0) + 1);
-      }
-    }
+    submissionCountByBooth.forEach((cnt, bid) => {
+      if (!boothMap.has(bid)) boothMap.set(bid, cnt);
+    });
     const boothWise = Array.from(boothMap.entries())
       .map(([boothId, count]) => ({ boothId, count }))
       .sort((a, b) => b.count - a.count || a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
@@ -2115,18 +2225,27 @@ export class DatabaseStorage implements IStorage {
     const voterIdsNorm = voterIdsRaw.map((id) => normalizeVoterId(id)).filter((id) => id !== "");
     const voterIds = Array.from(new Set([...voterIdsRaw, ...voterIdsNorm]));
 
-    const voterListRows =
-      voterIds.length > 0
-        ? await db.select().from(voterList).where(inArray(voterList.vcardId, voterIds))
-        : [];
-
-    const voterListById = new Map<string, VoterListRecord>();
-    for (const row of voterListRows) {
-      const norm = normalizeVoterId(row.vcardId);
-      if (norm) voterListById.set(norm, row);
+    const voterListRows: { vcardId: string | null; srno: string | null }[] = [];
+    if (voterIds.length > 0) {
+      for (const part of chunkArray(voterIds, MAHILA_VOTER_ID_IN_CHUNK)) {
+        const chunk = await db
+          .select({ vcardId: voterList.vcardId, srno: voterList.srno })
+          .from(voterList)
+          .where(inArray(voterList.vcardId, part));
+        voterListRows.push(...chunk);
+      }
     }
 
-    const mappingByVoterId = new Map<string, VoterMappingMaster>();
+    const voterListById = new Map<string, { srno: string | null }>();
+    for (const row of voterListRows) {
+      const norm = normalizeVoterId(row.vcardId);
+      if (norm) voterListById.set(norm, { srno: row.srno });
+    }
+
+    const mappingByVoterId = new Map<
+      string,
+      { boothId: string | null; slNo: number | null; voterId: string }
+    >();
     for (const row of mappingRows) {
       const norm = normalizeVoterId(row.voterId);
       if (norm) mappingByVoterId.set(norm, row);
@@ -2199,7 +2318,14 @@ export class DatabaseStorage implements IStorage {
     // Prefer DB-generated `voter_mapping_clusters`, else fallback derive from `voter_mapping_master.slNo`.
     type ClusterRow = { boothId: string; clusterNo: number; serialStart: number; serialEnd: number };
 
-    const dbClusters = await db.select().from(voterMappingClusters);
+    const dbClusters = await db
+      .select({
+        boothId: voterMappingClusters.boothId,
+        clusterNo: voterMappingClusters.clusterNo,
+        serialStart: voterMappingClusters.serialStart,
+        serialEnd: voterMappingClusters.serialEnd,
+      })
+      .from(voterMappingClusters);
     const clusterList: ClusterRow[] =
       dbClusters && dbClusters.length > 0
         ? dbClusters.map((c) => ({

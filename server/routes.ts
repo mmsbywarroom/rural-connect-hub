@@ -5341,10 +5341,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/mahila-samman", async (_req, res) => {
+  app.get("/api/admin/mahila-samman", async (req, res) => {
     try {
-      const list = await storage.getMahilaSammanSubmissions();
-      res.json(list);
+      const limit = req.query.limit != null ? Number(req.query.limit) : undefined;
+      const offset = req.query.offset != null ? Number(req.query.offset) : undefined;
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const page = await storage.getMahilaSammanSubmissions({
+        limit: Number.isFinite(limit) ? limit : undefined,
+        offset: Number.isFinite(offset) ? offset : undefined,
+        search,
+      });
+      res.json(page);
     } catch (error) {
       console.error("Admin Mahila Samman list error:", error);
       res.status(500).json({ error: "Failed to fetch list" });

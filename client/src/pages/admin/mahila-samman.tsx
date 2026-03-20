@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,15 @@ export interface MahilaSammanStats {
   boothsTenSakhis: number;
   boothsExactlyOneSakhi: number;
 }
+
+const MAHILA_ADMIN_PAGE_SIZE = 50;
+
+type MahilaAdminListResponse = {
+  items: MahilaSammanSubmission[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 border border-amber-200",
@@ -169,22 +178,69 @@ type BoothFilter = "gt1" | "zero" | "tenPlus" | "exactlyOne" | "";
 type UncoveredClusterFilter = "mapped" | "zero" | "";
 
 export default function MahilaSammanAdminPage() {
-  const { data: list = [], isLoading } = useQuery<MahilaSammanSubmission[]>({
-    queryKey: ["/api/admin/mahila-samman"],
+  const [pageIndex, setPageIndex] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchInput), 350);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [debouncedSearch]);
+
+  const { data: listResponse, isLoading } = useQuery<MahilaAdminListResponse>({
+    queryKey: ["/api/admin/mahila-samman", pageIndex, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(MAHILA_ADMIN_PAGE_SIZE));
+      params.set("offset", String(pageIndex * MAHILA_ADMIN_PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      const res = await fetch(`/api/admin/mahila-samman?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
+  const list = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const canPrevPage = pageIndex > 0;
+  const canNextPage = (pageIndex + 1) * MAHILA_ADMIN_PAGE_SIZE < listTotal;
+
   const { data: stats, isLoading: statsLoading } = useQuery<MahilaSammanStats>({
     queryKey: ["/api/admin/mahila-samman/stats"],
   });
   const [selected, setSelected] = useState<MahilaSammanSubmission | null>(null);
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
-  const [search, setSearch] = useState("");
   const [boothFilter, setBoothFilter] = useState<BoothFilter>("");
   const [uncoveredClusterFilter, setUncoveredClusterFilter] = useState<UncoveredClusterFilter>("");
   const [uncoveredClusterSearch, setUncoveredClusterSearch] = useState("");
   const [coveredClusterFilter, setCoveredClusterFilter] = useState<UncoveredClusterFilter>("");
   const [coveredClusterSearch, setCoveredClusterSearch] = useState("");
   const [clusterWiseSearch, setClusterWiseSearch] = useState("");
+  /** List API omits large base64 fields; fetch full row when opening detail. */
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openSubmissionDetail = (s: MahilaSammanSubmission) => {
+    setSelected(s);
+    setStatus(s.status || "pending");
+    setAdminNote(s.adminNote || "");
+    setDetailLoading(true);
+    void fetch(`/api/admin/mahila-samman/${s.id}`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const full = (await res.json()) as MahilaSammanSubmission;
+        setSelected((cur) => (cur?.id === s.id ? full : cur));
+      })
+      .catch(() => {})
+      .finally(() => setDetailLoading(false));
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -211,16 +267,6 @@ export default function MahilaSammanAdminPage() {
       setSelected(null);
     },
   });
-
-  const sorted = list.slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
-  const filtered = !search.trim()
-    ? sorted
-    : sorted.filter(
-        (s) =>
-          (s.sakhiName || "").toLowerCase().includes(search.toLowerCase()) ||
-          (s.mobileNumber || "").includes(search) ||
-          (s.id || "").toLowerCase().includes(search.toLowerCase())
-      );
 
   return (
     <div className="space-y-4">
@@ -958,36 +1004,44 @@ export default function MahilaSammanAdminPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold">All Submissions</CardTitle>
           <Input
-            placeholder="Search by name, mobile, ID"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, mobile, ID (server)"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="max-w-xs mt-2"
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            {listTotal === 0
+              ? "0 submissions"
+              : `Showing ${pageIndex * MAHILA_ADMIN_PAGE_SIZE + 1}–${pageIndex * MAHILA_ADMIN_PAGE_SIZE + list.length} of ${listTotal}`}
+          </p>
         </CardHeader>
         <CardContent className="space-y-2">
           {isLoading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No submissions yet.</p>
+          ) : list.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">
+              {debouncedSearch.trim()
+                ? "No matching submissions."
+                : listTotal === 0
+                  ? "No submissions yet."
+                  : "No submissions on this page."}
+            </p>
           ) : (
-            filtered.map((s, idx) => {
+            list.map((s, idx) => {
               const created = s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
               const badgeClass = STATUS_COLORS[s.status || "pending"] || STATUS_COLORS.pending;
+              const rowNo = pageIndex * MAHILA_ADMIN_PAGE_SIZE + idx + 1;
               return (
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => {
-                    setSelected(s);
-                    setStatus(s.status || "pending");
-                    setAdminNote(s.adminNote || "");
-                  }}
+                  onClick={() => openSubmissionDetail(s)}
                   className="w-full text-left border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3 hover:bg-slate-50"
                 >
                   <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 font-semibold text-purple-700 text-sm">
-                    {idx + 1}
+                    {rowNo}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">
@@ -1009,10 +1063,45 @@ export default function MahilaSammanAdminPage() {
               );
             })
           )}
+          {!isLoading && listTotal > MAHILA_ADMIN_PAGE_SIZE ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t">
+              <p className="text-xs text-muted-foreground">
+                Page {pageIndex + 1} of {Math.ceil(listTotal / MAHILA_ADMIN_PAGE_SIZE) || 1}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canPrevPage}
+                  onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canNextPage}
+                  onClick={() => setPageIndex((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+      <Dialog
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelected(null);
+            setDetailLoading(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Mahila Samman Rashi – Submission Details</DialogTitle>
@@ -1095,10 +1184,19 @@ export default function MahilaSammanAdminPage() {
                   Documents
                 </p>
                 <div className="space-y-1.5 text-sm">
-                  <div><DocLink src={selected.voterCard} label="Voter Card" /></div>
-                  <div><DocLink src={selected.aadhaarFront} label="Aadhaar Front" /></div>
-                  <div><DocLink src={selected.aadhaarBack} label="Aadhaar Back" /></div>
-                  <div><DocLink src={selected.sakhiPhoto} label="Sakhi Live Photo" /></div>
+                  {detailLoading ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-2 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading documents…
+                    </p>
+                  ) : (
+                    <>
+                      <div><DocLink src={selected.voterCard} label="Voter Card" /></div>
+                      <div><DocLink src={selected.aadhaarFront} label="Aadhaar Front" /></div>
+                      <div><DocLink src={selected.aadhaarBack} label="Aadhaar Back" /></div>
+                      <div><DocLink src={selected.sakhiPhoto} label="Sakhi Live Photo" /></div>
+                    </>
+                  )}
                 </div>
               </div>
 
