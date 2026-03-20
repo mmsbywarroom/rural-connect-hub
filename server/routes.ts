@@ -10,6 +10,8 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, sendCustomSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
+import { parseAdminListQuery } from "./admin-pagination";
+import * as adminPaged from "./admin-paged-queries";
 import bcrypt from "bcryptjs";
 import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
 import {
@@ -44,6 +46,13 @@ import {
   blaSubmissions, insertBlaSubmissionSchema,
   type InsertOfficeManager,
 } from "@shared/schema";
+
+function parseCsvQueryIds(q: unknown): string[] | undefined {
+  if (q == null || q === "") return undefined;
+  const s = Array.isArray(q) ? (q as string[]).join(",") : String(q);
+  const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+  return parts.length ? parts : undefined;
+}
 
 function normalizeEmail(email: string): string {
   return email.toLowerCase().trim().replace(/[\u200B-\u200D\uFEFF\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, '');
@@ -1618,8 +1627,9 @@ export async function registerRoutes(
   // Office Managers
   app.get("/api/office-managers", async (req, res) => {
     try {
-      const managers = await storage.getOfficeManagers();
-      res.json(managers);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const page = await adminPaged.pagedOfficeManagers({ limit, offset, search });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch office managers" });
     }
@@ -3098,8 +3108,20 @@ export async function registerRoutes(
   // Admin - List All App Users
   app.get("/api/admin/app-users", async (req, res) => {
     try {
-      const users = await storage.getAppUsers();
-      const lightweight = users.map(({ selfPhoto, aadhaarPhoto, aadhaarPhotoBack, voterCardPhoto, voterCardPhotoBack, ...rest }) => ({
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const role = String(req.query.role || "all");
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedAppUsers({
+        limit,
+        offset,
+        search,
+        role,
+        status,
+        villageIds,
+      });
+      const scopeStats = await adminPaged.appUserScopeStats({ villageIds });
+      const lightweight = page.items.map(({ selfPhoto, aadhaarPhoto, aadhaarPhotoBack, voterCardPhoto, voterCardPhotoBack, ...rest }: any) => ({
         ...rest,
         selfPhoto: selfPhoto ? true : null,
         aadhaarPhoto: aadhaarPhoto ? true : null,
@@ -3107,7 +3129,7 @@ export async function registerRoutes(
         voterCardPhoto: voterCardPhoto ? true : null,
         voterCardPhotoBack: voterCardPhotoBack ? true : null,
       }));
-      res.json(lightweight);
+      res.json({ items: lightweight, total: page.total, limit, offset, scopeStats });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch users" });
     }
@@ -3282,18 +3304,16 @@ export async function registerRoutes(
   // Birthday Management - Get all users with DOB info
   app.get("/api/admin/birthdays", async (req, res) => {
     try {
-      const users = await storage.getAppUsers();
-      const birthdayList = users
-        .filter((u: any) => u.isActive !== false)
-        .map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          ocrDob: u.ocrDob || null,
-          selfPhoto: u.selfPhoto || null,
-          mobileNumber: u.mobileNumber || null,
-          role: u.role || null,
-        }));
-      res.json(birthdayList);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const filter = String(req.query.filter || "all").trim();
+      const page = await adminPaged.pagedBirthdayManager({ limit, offset, search, filter });
+      res.json({
+        items: page.items,
+        total: page.total,
+        limit: page.limit,
+        offset: page.offset,
+        summary: page.summary,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch birthday data" });
     }
@@ -4462,10 +4482,20 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/hstc/submissions", async (_req, res) => {
+  app.get("/api/hstc/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getHstcSubmissions();
-      res.json(submissions);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedHstcSubmissions({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      const statusCounts = await adminPaged.hstcSubmissionsStatusCounts({ villageIds });
+      res.json({ ...page, statusCounts });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch submissions" });
     }
@@ -4918,10 +4948,19 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/tirth-yatra", async (_req, res) => {
+  app.get("/api/admin/tirth-yatra", async (req, res) => {
     try {
-      const list = await storage.getTirthYatraRequests();
-      res.json(list);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedTirthYatraRequests({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error) {
       console.error("Admin Tirth Yatra list error:", error);
       res.status(500).json({ error: "Failed to fetch Tirth Yatra requests" });
@@ -5093,11 +5132,24 @@ export async function registerRoutes(
   // Admin: all BLA submissions
   app.get("/api/bla/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getBlaSubmissions();
-      res.json(submissions);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedBlaSubmissions({ limit, offset, search, villageIds });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error: any) {
       console.error("[BLA] Admin list error:", error.message);
       res.status(500).json({ error: "Failed to fetch BLA submissions" });
+    }
+  });
+
+  app.get("/api/bla/submissions/:id", async (req, res) => {
+    try {
+      const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, req.params.id)).limit(1);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[BLA] Get error:", error.message);
+      res.status(500).json({ error: "Failed to fetch submission" });
     }
   });
 
@@ -5569,10 +5621,19 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/mahila-samman-punjab", async (_req, res) => {
+  app.get("/api/admin/mahila-samman-punjab", async (req, res) => {
     try {
-      const list = await storage.getMahilaSammanPunjabSubmissions();
-      res.json(list);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedMahilaPunjabSubmissions({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error) {
       console.error("Admin Mahila Samman Punjab list error:", error);
       res.status(500).json({ error: "Failed to fetch list" });
@@ -5680,10 +5741,11 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/voter-registration/submissions", async (_req, res) => {
+  app.get("/api/voter-registration/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getVoterRegistrationSubmissions();
-      res.json(submissions);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const page = await adminPaged.pagedVoterRegistrationSubmissions({ limit, offset, search });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch submissions" });
     }
@@ -6189,21 +6251,33 @@ export async function registerRoutes(
   });
 
   // SDSK Submissions list
-  app.get("/api/sdsk/submissions", async (_req, res) => {
+  app.get("/api/sdsk/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getSdskSubmissions();
-      const userIds = Array.from(new Set(submissions.map(s => s.appUserId)));
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const type = String(req.query.type || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedSdskSubmissions({
+        limit,
+        offset,
+        search,
+        status,
+        type,
+        villageIds,
+      });
+      const stats = await adminPaged.sdskSubmissionsScopedStats({ villageIds });
+      const userIds = Array.from(new Set(page.items.map((s: any) => s.appUserId)));
       let userMap = new Map<string, any>();
       if (userIds.length > 0) {
         const users = await db.select().from(appUsers).where(inArray(appUsers.id, userIds));
-        users.forEach(u => userMap.set(u.id, u));
+        users.forEach((u) => userMap.set(u.id, u));
       }
-      const enriched = submissions.map(s => ({
+      const enriched = page.items.map((s: any) => ({
         ...s,
         userName: userMap.get(s.appUserId)?.name || "",
         userPhone: userMap.get(s.appUserId)?.mobileNumber || userMap.get(s.appUserId)?.email || "",
       }));
-      res.json(enriched);
+      res.json({ items: enriched, total: page.total, limit, offset, stats });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch submissions" });
     }
@@ -6583,14 +6657,24 @@ export async function registerRoutes(
   // Admin: all complaints (with issue category names resolved)
   app.get("/api/sunwai/complaints", async (req, res) => {
     try {
-      const complaints = await storage.getSunwaiComplaints();
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedSunwaiComplaints({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
       const issues = await storage.getIssues();
       const issueNameById: Record<string, string> = Object.fromEntries(issues.map((i) => [i.id, i.name]));
-      const withNames = complaints.map((c) => ({
+      const stats = await adminPaged.sunwaiComplaintsScopedStats({ villageIds });
+      const withNames = page.items.map((c: any) => ({
         ...c,
         issueCategoryName: c.issueCategoryId ? issueNameById[c.issueCategoryId] ?? null : null,
       }));
-      res.json(withNames);
+      res.json({ items: withNames, total: page.total, limit, offset, stats });
     } catch (error: any) {
       console.error("[Sunwai] Get complaints error:", error.message);
       res.status(500).json({ error: "Failed to fetch complaints" });
@@ -6705,13 +6789,29 @@ export async function registerRoutes(
   });
 
   // Admin: list all reports
-  app.get("/api/nvy/reports", async (_req, res) => {
+  app.get("/api/nvy/reports", async (req, res) => {
     try {
-      const reports = await storage.getNvyReports();
-      res.json(reports);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedNvyReports({ limit, offset, search, villageIds });
+      const scopeStats = await adminPaged.nvyReportsScopeStats(villageIds);
+      res.json({ items: page.items, total: page.total, limit, offset, scopeStats });
     } catch (error: any) {
       console.error("[NVY] List error:", error.message);
       res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  });
+
+  app.get("/api/nvy/reports/:id", async (req, res) => {
+    try {
+      const [row] = await db.select().from(nvyReports).where(eq(nvyReports.id, req.params.id)).limit(1);
+      if (!row) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(row);
+    } catch (error: any) {
+      console.error("[NVY] Get report error:", error.message);
+      res.status(500).json({ error: "Failed to fetch report" });
     }
   });
 
@@ -6791,8 +6891,18 @@ export async function registerRoutes(
   // Get all outdoor ad submissions (admin)
   app.get("/api/outdoor-ad/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getOutdoorAds();
-      res.json(submissions);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedOutdoorAds({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      const statusCounts = await adminPaged.outdoorAdStatusCounts(villageIds);
+      res.json({ items: page.items, total: page.total, limit, offset, statusCounts });
     } catch (error: any) {
       console.error("[OutdoorAd] Get all submissions error:", error.message);
       res.status(500).json({ error: "Failed to fetch submissions" });
@@ -7036,8 +7146,18 @@ export async function registerRoutes(
   // Gov School: Admin - all submissions
   app.get("/api/gov-school/submissions", async (req, res) => {
     try {
-      const submissions = await storage.getGovSchoolSubmissions();
-      res.json(submissions);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedGovSchoolSubmissions({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      const statusCounts = await adminPaged.govSchoolStatusCounts(villageIds);
+      res.json({ items: page.items, total: page.total, limit, offset, statusCounts });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch submissions" });
     }
@@ -7205,8 +7325,18 @@ export async function registerRoutes(
 
   app.get("/api/appointment/appointments", async (req, res) => {
     try {
-      const appts = await storage.getAppointments();
-      res.json(appts);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedAppointments({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      const statusCounts = await adminPaged.appointmentStatusCounts(villageIds);
+      res.json({ items: page.items, total: page.total, limit, offset, statusCounts });
     } catch (error: any) {
       console.error("[Appointment] Get appointments error:", error.message);
       res.status(500).json({ error: "Failed to fetch appointments" });
@@ -7488,10 +7618,19 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/event-venues", async (_req, res) => {
+  app.get("/api/admin/event-venues", async (req, res) => {
     try {
-      const list = await storage.getEventVenues();
-      res.json(list);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const status = String(req.query.status || "all");
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedEventVenues({
+        limit,
+        offset,
+        search,
+        status,
+        villageIds,
+      });
+      res.json({ items: page.items, total: page.total, limit, offset });
     } catch (error: any) {
       console.error("[EventVenue] Admin list error:", error.message);
       res.status(500).json({ error: "Failed to load event venues" });
@@ -7559,7 +7698,7 @@ export async function registerRoutes(
 
       const total = rows.length;
       const paged = rows.slice(offset, offset + limit);
-      res.json({ items: paged, total });
+      res.json({ items: paged, total, limit, offset });
     } catch (error) {
       console.error("Contacts Hub list error:", error);
       res.status(500).json({ error: "Failed to fetch contacts hub data" });
@@ -7688,8 +7827,11 @@ export async function registerRoutes(
   // Admin: list all road reports
   app.get("/api/road/reports", async (req, res) => {
     try {
-      const reports = await storage.getRoadReports();
-      res.json(reports);
+      const { limit, offset, search } = parseAdminListQuery(req.query);
+      const villageIds = parseCsvQueryIds(req.query.villageIds);
+      const page = await adminPaged.pagedRoadReports({ limit, offset, search, villageIds });
+      const scopeStats = await adminPaged.roadReportsScopeStats(villageIds);
+      res.json({ items: page.items, total: page.total, limit, offset, scopeStats });
     } catch (error: any) {
       console.error("[Road] Get reports error:", error.message);
       res.status(500).json({ error: "Failed to fetch reports" });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,17 +25,68 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
 }
 
+type EventVenueListResponse = {
+  items: EventVenueRow[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export default function EventVenuesPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "accepted" | "rejected">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adminMessage, setAdminMessage] = useState("");
   const [status, setStatus] = useState<"pending" | "accepted" | "rejected">("pending");
   const [page, setPage] = useState(0);
 
-  const { data: venues, isLoading } = useQuery<EventVenueRow[]>({
-    queryKey: ["/api/admin/event-venues"],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const { data: listResponse, isLoading } = useQuery<EventVenueListResponse>({
+    queryKey: ["/api/admin/event-venues", page, debouncedSearch, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/admin/event-venues?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
+  });
+
+  const { data: selectedVenue, isLoading: venueDetailLoading } = useQuery<EventVenueRow>({
+    queryKey: ["/api/admin/event-venues", selectedId, "detail"],
+    enabled: !!selectedId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/event-venues/${selectedId}`);
+      return res.json();
+    },
   });
 
   const updateMutation = useMutation({
@@ -48,7 +99,7 @@ export default function EventVenuesPage() {
     },
     onSuccess: () => {
       toast({ title: "Updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/event-venues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/event-venues"], exact: false });
       setSelectedId(null);
       setAdminMessage("");
       setStatus("pending");
@@ -58,23 +109,14 @@ export default function EventVenuesPage() {
     },
   });
 
-  const filtered = (venues || []).filter((v) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      v.venueName.toLowerCase().includes(q) ||
-      (v.requesterName || "").toLowerCase().includes(q) ||
-      (v.villageName || "").toLowerCase().includes(q) ||
-      (v.locationLabel || "").toLowerCase().includes(q) ||
-      (v.mobileNumber || "").includes(q);
-    const matchesStatus = statusFilter === "all" || v.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const selected = selectedId ? filtered.find((v) => v.id === selectedId) : null;
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
   const openInMaps = (v: EventVenueRow) => {
     if (!v.latitude || !v.longitude) return;
@@ -82,7 +124,15 @@ export default function EventVenuesPage() {
     window.open(url, "_blank");
   };
 
-  if (selected) {
+  if (selectedId) {
+    if (venueDetailLoading || !selectedVenue) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+    const selected = selectedVenue;
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3 flex-wrap">
@@ -155,7 +205,7 @@ export default function EventVenuesPage() {
                       {selected.latitude}, {selected.longitude}
                     </span>
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       className="h-7 px-2 text-xs"
                       onClick={() => openInMaps(selected)}
@@ -310,7 +360,7 @@ export default function EventVenuesPage() {
               {paged.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {search || statusFilter !== "all" ? "No bookings match your filters" : "No event venue bookings yet"}
+                    {debouncedSearch || statusFilter !== "all" ? "No bookings match your filters" : "No event venue bookings yet"}
                   </TableCell>
                 </TableRow>
               )}
@@ -322,7 +372,7 @@ export default function EventVenuesPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+            Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
           </span>
           <div className="flex items-center gap-2">
             <Button

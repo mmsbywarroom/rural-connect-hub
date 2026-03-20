@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,13 @@ import { Vote, Search, Eye, ChevronLeft, ChevronRight, Trash2, Loader2, User, Ma
 import type { VoterRegistrationSubmission } from "@shared/schema";
 
 const PAGE_SIZE = 10;
+
+type VoterRegListResponse = {
+  items: VoterRegistrationSubmission[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 
 function StatusBadge({ status }: { status?: string | null }) {
   const s = status || "pending";
@@ -97,7 +104,7 @@ function SubmissionDetail({
     },
     onSuccess: () => {
       toast({ title: "Review saved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"], exact: false });
     },
     onError: () => {
       toast({ title: "Failed to save review", variant: "destructive" });
@@ -111,7 +118,7 @@ function SubmissionDetail({
     },
     onSuccess: () => {
       toast({ title: "Card uploaded" });
-      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"], exact: false });
       setCardPdfLocal(null);
       setCardFileName(null);
     },
@@ -353,21 +360,53 @@ function SubmissionDetail({
 
 export default function VoterRegistrationSubmissionsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editing, setEditing] = useState<VoterRegistrationSubmission | null>(null);
   const { toast } = useToast();
 
-  const { data: submissions, isLoading } = useQuery<VoterRegistrationSubmission[]>({
-    queryKey: ["/api/voter-registration/submissions"],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  const { data: listResponse, isLoading } = useQuery<VoterRegListResponse>({
+    queryKey: ["/api/voter-registration/submissions", page, debouncedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      const res = await fetch(`/api/voter-registration/submissions?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
+  });
+
+  const { data: selectedSubmission, isLoading: detailLoading } = useQuery<VoterRegistrationSubmission>({
+    queryKey: ["/api/voter-registration/submissions", selectedId, "detail"],
+    enabled: !!selectedId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/voter-registration/submissions/${selectedId}`);
+      return res.json();
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/voter-registration/submissions/${id}`),
     onSuccess: () => {
       toast({ title: "Submission deleted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"], exact: false });
       setDeleteId(null);
       setSelectedId(null);
     },
@@ -381,33 +420,33 @@ export default function VoterRegistrationSubmissionsPage() {
     },
     onSuccess: () => {
       toast({ title: "Updated" });
-      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/voter-registration/submissions"], exact: false });
       setEditing(null);
     },
     onError: () => toast({ title: "Failed to update", variant: "destructive" }),
   });
 
-  const filtered = (submissions || []).filter((s) => {
-    const q = search.toLowerCase();
-    const sn = (s as any).serialNumber as number | null | undefined;
-    const code = sn ? `B${String(sn).padStart(3, "0")}`.toLowerCase() : "";
-    return !q ||
-      (s.firstName + " " + s.lastName).toLowerCase().includes(q) ||
-      (s.mobileNumber || "").includes(q) ||
-      (s.email || "").toLowerCase().includes(q) ||
-      (s.district || "").toLowerCase().includes(q) ||
-      code.includes(q);
-  });
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const selected = selectedId ? submissions?.find((s) => s.id === selectedId) : null;
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
-  if (selected) {
+  if (selectedId) {
+    if (detailLoading || !selectedSubmission) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
     return (
       <div className="space-y-4">
         <SubmissionDetail
-          submission={selected}
+          submission={selectedSubmission}
           onBack={() => setSelectedId(null)}
           onEdit={(sub) => setEditing(sub)}
           onDelete={(id) => setDeleteId(id)}
@@ -511,7 +550,7 @@ export default function VoterRegistrationSubmissionsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+            {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)}>
@@ -525,7 +564,7 @@ export default function VoterRegistrationSubmissionsPage() {
         </div>
       )}
 
-      <Dialog open={!!deleteId && !selected} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <Dialog open={!!deleteId && !selectedId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete submission?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">This action cannot be undone.</p>

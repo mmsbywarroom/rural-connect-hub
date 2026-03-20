@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,7 +91,7 @@ function AcceptDialog({ submission, open, onClose }: { submission: GovSchoolSubm
     },
     onSuccess: () => {
       toast({ title: "Submission accepted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/gov-school/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/gov-school/submissions"], exact: false });
       setAdminNote("");
       onClose();
     },
@@ -150,7 +150,7 @@ function ResolveDialog({ submission, open, onClose }: { submission: GovSchoolSub
     },
     onSuccess: () => {
       toast({ title: "Submission resolved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/gov-school/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/gov-school/submissions"], exact: false });
       setCompletionNote("");
       onClose();
     },
@@ -583,34 +583,72 @@ function CategoriesTab() {
   );
 }
 
+type GovSchoolListResponse = {
+  items: GovSchoolSubmission[];
+  total: number;
+  limit: number;
+  offset: number;
+  statusCounts?: { pending: number; accepted: number; resolved: number; total: number };
+};
+
 export default function GovSchoolSubmissionsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
   const [selectedSubmission, setSelectedSubmission] = useState<GovSchoolSubmission | null>(null);
 
-  const { data: submissions, isLoading } = useQuery<GovSchoolSubmission[]>({
-    queryKey: ["/api/gov-school/submissions"],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const { data: listResponse, isLoading } = useQuery<GovSchoolListResponse>({
+    queryKey: ["/api/gov-school/submissions", page, debouncedSearch, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/gov-school/submissions?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
 
-  const allSubmissions = submissions || [];
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const statusCounts = listResponse?.statusCounts;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
-  const filtered = allSubmissions.filter((s) => {
-    const q = search.toLowerCase();
-    const matchesSearch = !search ||
-      s.schoolName.toLowerCase().includes(q) ||
-      (s.villageName || "").toLowerCase().includes(q) ||
-      (s.nodalVolunteerName || "").toLowerCase().includes(q);
-    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const pendingCount = statusCounts?.pending ?? 0;
+  const acceptedCount = statusCounts?.accepted ?? 0;
+  const resolvedCount = statusCounts?.resolved ?? 0;
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const pendingCount = allSubmissions.filter((s) => s.status === "pending").length;
-  const acceptedCount = allSubmissions.filter((s) => s.status === "accepted").length;
-  const resolvedCount = allSubmissions.filter((s) => s.status === "resolved").length;
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
   return (
     <div className="space-y-6">
@@ -638,7 +676,7 @@ export default function GovSchoolSubmissionsPage() {
               <CardContent className="p-4 flex items-center gap-3">
                 <School className="h-8 w-8 text-teal-500" />
                 <div>
-                  <p className="text-2xl font-bold" data-testid="text-total-count">{allSubmissions.length}</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-count">{statusCounts?.total ?? listTotal}</p>
                   <p className="text-xs text-muted-foreground">Total</p>
                 </div>
               </CardContent>
@@ -732,7 +770,7 @@ export default function GovSchoolSubmissionsPage() {
                   {paged.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        {search || statusFilter !== "all" ? "No submissions match your filters" : "No submissions yet"}
+                        {debouncedSearch || statusFilter !== "all" ? "No submissions match your filters" : "No submissions yet"}
                       </TableCell>
                     </TableRow>
                   )}
@@ -744,7 +782,7 @@ export default function GovSchoolSubmissionsPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm text-muted-foreground">
-                Showing {page * PAGE_SIZE + 1}\u2013{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}\u2013{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
               </p>
               <div className="flex items-center gap-2">
                 <Button

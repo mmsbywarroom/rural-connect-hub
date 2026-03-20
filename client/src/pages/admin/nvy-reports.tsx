@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, ShieldAlert, MapPin, Calendar, ArrowLeft, ChevronLeft, ChevronRight, Loader2, Image as ImageIcon, Mic } from "lucide-react";
 import type { NvyReport } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 const PAGE_SIZE = 10;
 
@@ -99,35 +99,89 @@ function ReportDetail({ report, onBack }: ReportDetailProps) {
   );
 }
 
+type NvyListRow = Pick<
+  NvyReport,
+  "id" | "villageId" | "villageName" | "description" | "latitude" | "longitude" | "locationAddress" | "createdAt"
+>;
+
+type NvyListResponse = {
+  items: NvyListRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  scopeStats?: { distinctUnits: number; latestCreatedAt: string | Date | null };
+};
+
 export default function NvyReportsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
-  const { data: reports, isLoading } = useQuery<NvyReport[]>({
-    queryKey: ["/api/nvy/reports"],
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const { data: listResponse, isLoading } = useQuery<NvyListResponse>({
+    queryKey: ["/api/nvy/reports", page, debouncedSearch, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/nvy/reports?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
 
-  const allReports = reports || [];
-
-  const filtered = allReports.filter((r) => {
-    const q = search.toLowerCase();
-    if (!q) return true;
-    return (
-      (r.villageName || "").toLowerCase().includes(q) ||
-      (r.locationAddress || "").toLowerCase().includes(q) ||
-      (r.description || "").toLowerCase().includes(q)
-    );
+  const { data: selectedFull, isLoading: detailLoading } = useQuery<NvyReport>({
+    queryKey: ["/api/nvy/reports", selectedId, "detail"],
+    enabled: !!selectedId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/nvy/reports/${selectedId}`);
+      return res.json();
+    },
   });
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const scopeStats = listResponse?.scopeStats;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
-  const selected = selectedId ? allReports.find((r) => r.id === selectedId) : null;
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
-  if (selected) {
-    return <ReportDetail report={selected} onBack={() => setSelectedId(null)} />;
+  if (selectedId) {
+    if (detailLoading || !selectedFull) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+    return <ReportDetail report={selectedFull} onBack={() => setSelectedId(null)} />;
   }
 
   return (
@@ -149,7 +203,7 @@ export default function NvyReportsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <ShieldAlert className="h-8 w-8 text-red-600" />
             <div>
-              <p className="text-2xl font-bold" data-testid="text-nvy-total-count">{allReports.length}</p>
+              <p className="text-2xl font-bold" data-testid="text-nvy-total-count">{listTotal}</p>
               <p className="text-xs text-muted-foreground">Total Reports</p>
             </div>
           </CardContent>
@@ -159,7 +213,7 @@ export default function NvyReportsPage() {
             <MapPin className="h-8 w-8 text-blue-600" />
             <div>
               <p className="text-2xl font-bold">
-                {new Set(allReports.map(r => r.villageId || "")).size || 0}
+                {scopeStats?.distinctUnits ?? 0}
               </p>
               <p className="text-xs text-muted-foreground">Distinct Units</p>
             </div>
@@ -170,8 +224,8 @@ export default function NvyReportsPage() {
             <Calendar className="h-8 w-8 text-emerald-600" />
             <div>
               <p className="text-2xl font-bold">
-                {allReports.length > 0
-                  ? new Date(allReports[0].createdAt || "").toLocaleDateString()
+                {scopeStats?.latestCreatedAt
+                  ? new Date(scopeStats.latestCreatedAt as string).toLocaleDateString()
                   : "—"}
               </p>
               <p className="text-xs text-muted-foreground">Latest Report Date</p>
@@ -223,20 +277,7 @@ export default function NvyReportsPage() {
                   </TableCell>
                   <TableCell className="max-w-[260px] truncate">{r.description}</TableCell>
                   <TableCell>
-                    {r.photo ? (
-                      <button
-                        className="text-xs text-blue-600 underline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPhotoPreview(r.photo as string);
-                        }}
-                        data-testid={`button-nvy-photo-preview-${r.id}`}
-                      >
-                        View
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No photo</span>
-                    )}
+                    <span className="text-xs text-muted-foreground">In detail</span>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
@@ -246,7 +287,7 @@ export default function NvyReportsPage() {
               {paged.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    {search ? "No reports match your search" : "No reports submitted yet"}
+                    {debouncedSearch ? "No reports match your search" : "No reports submitted yet"}
                   </TableCell>
                 </TableRow>
               )}
@@ -258,7 +299,7 @@ export default function NvyReportsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+            Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="button-nvy-prev-page">
@@ -272,16 +313,6 @@ export default function NvyReportsPage() {
         </div>
       )}
 
-      <Dialog open={!!photoPreview} onOpenChange={(open) => { if (!open) setPhotoPreview(null); }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Report Photo</DialogTitle>
-          </DialogHeader>
-          {photoPreview && (
-            <img src={photoPreview} alt="Nasha Viruddh Yuddh" className="w-full max-h-[70vh] object-contain rounded-md" />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

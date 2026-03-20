@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ type ContactsHubRow = {
 type ContactsHubResponse = {
   items: ContactsHubRow[];
   total: number;
+  limit?: number;
+  offset?: number;
 };
 
 const PAGE_SIZE = 100;
@@ -31,23 +33,32 @@ export default function ContactsHubPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("all");
+  const [page, setPage] = useState(0);
   const [message, setMessage] = useState("");
   const [selectedMobiles, setSelectedMobiles] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, taskFilter]);
 
   const queryUrl = useMemo(() => {
     const qs = new URLSearchParams();
     qs.set("limit", String(PAGE_SIZE));
-    qs.set("offset", "0");
+    qs.set("offset", String(page * PAGE_SIZE));
     if (search.trim()) qs.set("search", search.trim());
     if (taskFilter !== "all") qs.set("task", taskFilter);
     return `/api/admin/contacts-hub?${qs.toString()}`;
-  }, [search, taskFilter]);
+  }, [search, taskFilter, page]);
 
   const { data, isLoading, refetch } = useQuery<ContactsHubResponse>({
     queryKey: [queryUrl],
   });
 
   const rows = data?.items || [];
+  const listTotal = data?.total ?? 0;
+  const canPrevPage = page > 0;
+  const canNextPage = (page + 1) * PAGE_SIZE < listTotal;
+
   const allTasks = useMemo(() => {
     const s = new Set<string>();
     for (const r of rows) {
@@ -121,7 +132,7 @@ export default function ContactsHubPage() {
       toast({ title: "No contacts found", variant: "destructive" });
       return;
     }
-    const ok = window.confirm(`Send SMS to all ${rows.length} filtered contacts?`);
+    const ok = window.confirm(`Send SMS to all ${rows.length} contacts on this page?`);
     if (!ok) return;
     const mobiles = rows.map((r) => r.mobileNumber);
     sendSmsMutation.mutate({ mobiles });
@@ -208,7 +219,7 @@ export default function ContactsHubPage() {
               Send to Selected ({selectedCount})
             </Button>
             <Button variant="outline" onClick={handleSendAllFiltered} disabled={sendSmsMutation.isPending}>
-              Send to All Filtered ({rows.length})
+              Send to all on this page ({rows.length})
             </Button>
           </div>
         </CardContent>
@@ -260,6 +271,22 @@ export default function ContactsHubPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {!isLoading && listTotal > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                Page {page + 1} — showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}–
+                {Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={!canPrevPage} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                  Previous
+                </Button>
+                <Button type="button" variant="outline" size="sm" disabled={!canNextPage} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

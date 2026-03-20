@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Search, Plus, Edit, Trash2, Download, ChevronLeft, ChevronRight, Loader2, Smile, Frown, Mic, X, CheckCircle, XCircle, Clock, FileText } from "lucide-react";
 import type { SdskSubmission, SdskCategory } from "@shared/schema";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
 
 type EnrichedSubmission = SdskSubmission & { userName?: string; userPhone?: string };
+
+type SdskListResponse = {
+  items: EnrichedSubmission[];
+  total: number;
+  limit: number;
+  offset: number;
+  stats: { total: number; sukh: number; dukh: number; pending: number };
+};
 
 function TypeBadge({ type }: { type: string }) {
   if (type === "sukh") return <Badge className="bg-green-100 text-green-800 no-default-hover-elevate no-default-active-elevate"><Smile className="h-3 w-3 mr-1" />Sukh</Badge>;
@@ -45,7 +53,7 @@ function SubmissionDetailDialog({ submission, open, onClose }: { submission: Enr
     },
     onSuccess: () => {
       toast({ title: "Submission accepted" });
-      queryClient.invalidateQueries({ queryKey: ["/api/sdsk/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sdsk/submissions"], exact: false });
       setShowAcceptForm(false);
       setAcceptNote("");
       onClose();
@@ -62,7 +70,7 @@ function SubmissionDetailDialog({ submission, open, onClose }: { submission: Enr
     },
     onSuccess: () => {
       toast({ title: "Submission closed" });
-      queryClient.invalidateQueries({ queryKey: ["/api/sdsk/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sdsk/submissions"], exact: false });
       setShowCloseForm(false);
       setCloseNote("");
       onClose();
@@ -491,14 +499,20 @@ function CategoriesTab() {
 
 export default function SdskSubmissionsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
   const [selectedSubmission, setSelectedSubmission] = useState<EnrichedSubmission | null>(null);
 
-  const { data: submissions, isLoading } = useQuery<EnrichedSubmission[]>({
-    queryKey: ["/api/sdsk/submissions"],
-  });
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, typeFilter, statusFilter]);
 
   const adminAssignedVillages: string[] = (() => {
     try {
@@ -506,30 +520,38 @@ export default function SdskSubmissionsPage() {
       return stored ? JSON.parse(stored) : [];
     } catch { return []; }
   })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
 
-  const areaFiltered = adminAssignedVillages.length > 0
-    ? (submissions || []).filter(s => s.selectedVillageId && adminAssignedVillages.includes(s.selectedVillageId))
-    : (submissions || []);
-
-  const filtered = areaFiltered.filter((s) => {
-    const q = search.toLowerCase();
-    const matchesSearch = !search ||
-      (s.userName || "").toLowerCase().includes(q) ||
-      (s.categoryName || "").toLowerCase().includes(q) ||
-      (s.selectedVillageName || "").toLowerCase().includes(q) ||
-      (s.mobileNumber || "").includes(search);
-    const matchesType = typeFilter === "all" || s.type === typeFilter;
-    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
+  const { data: listResponse, isLoading } = useQuery<SdskListResponse>({
+    queryKey: ["/api/sdsk/submissions", page, debouncedSearch, typeFilter, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/sdsk/submissions?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const totalCount = areaFiltered.length;
-  const sukhCount = areaFiltered.filter(s => s.type === "sukh").length;
-  const dukhCount = areaFiltered.filter(s => s.type === "dukh").length;
-  const pendingCount = areaFiltered.filter(s => s.status === "pending").length;
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const stats = listResponse?.stats;
+  const totalCount = stats?.total ?? 0;
+  const sukhCount = stats?.sukh ?? 0;
+  const dukhCount = stats?.dukh ?? 0;
+  const pendingCount = stats?.pending ?? 0;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
+  const canPrev = page > 0;
+  const canNext = (page + 1) * PAGE_SIZE < listTotal;
 
   return (
     <div className="space-y-6">
@@ -597,12 +619,12 @@ export default function SdskSubmissionsPage() {
               <Input
                 placeholder="Search by name, category, village, mobile..."
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
                 data-testid="input-search-submissions"
               />
             </div>
-            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(0); }}>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-[140px]" data-testid="select-type-filter">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -612,7 +634,7 @@ export default function SdskSubmissionsPage() {
                 <SelectItem value="dukh">Dukh</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -626,7 +648,7 @@ export default function SdskSubmissionsPage() {
             <Button
               variant="outline"
               onClick={() => window.open("/api/sdsk/export-csv", "_blank")}
-              disabled={!submissions || submissions.length === 0}
+              disabled={totalCount === 0}
               data-testid="button-sdsk-export-csv"
             >
               <Download className="h-4 w-4 mr-2" /> Export CSV
@@ -690,17 +712,17 @@ export default function SdskSubmissionsPage() {
             </div>
           )}
 
-          {totalPages > 1 && (
+          {listTotal > 0 && (
             <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm text-muted-foreground">
-                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+                Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
               </p>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
-                  disabled={page === 0}
-                  onClick={() => setPage(p => p - 1)}
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
                   data-testid="button-prev-page"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -709,8 +731,8 @@ export default function SdskSubmissionsPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  disabled={page >= totalPages - 1}
-                  onClick={() => setPage(p => p + 1)}
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
                   data-testid="button-next-page"
                 >
                   <ChevronRight className="h-4 w-4" />

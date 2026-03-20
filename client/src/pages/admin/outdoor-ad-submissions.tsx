@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ function ApproveDialog({ submission, open, onClose }: { submission: OutdoorAdSub
     },
     onSuccess: () => {
       toast({ title: "Submission approved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/outdoor-ad/submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/outdoor-ad/submissions"], exact: false });
       setAdminNote("");
       onClose();
     },
@@ -106,10 +106,32 @@ function ApproveDialog({ submission, open, onClose }: { submission: OutdoorAdSub
   );
 }
 
-function DetailDialog({ submission, open, onClose }: { submission: OutdoorAdSubmission | null; open: boolean; onClose: () => void }) {
+function DetailDialog({
+  submission,
+  open,
+  detailLoading,
+  onClose,
+}: {
+  submission: OutdoorAdSubmission | null;
+  open: boolean;
+  detailLoading?: boolean;
+  onClose: () => void;
+}) {
   const [approveOpen, setApproveOpen] = useState(false);
 
-  if (!submission) return null;
+  if (!open) return null;
+
+  if (detailLoading || !submission) {
+    return (
+      <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-detail">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <>
@@ -231,35 +253,85 @@ function DetailDialog({ submission, open, onClose }: { submission: OutdoorAdSubm
   );
 }
 
+type OutdoorListRow = Omit<OutdoorAdSubmission, "wallImage" | "posterImage"> & {
+  wallImage?: string | null;
+  posterImage?: string | null;
+};
+
+type OutdoorListResponse = {
+  items: OutdoorListRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  statusCounts?: { pending: number; approved: number; total: number };
+};
+
 export default function OutdoorAdSubmissionsPage() {
-  const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
-  const [selectedSubmission, setSelectedSubmission] = useState<OutdoorAdSubmission | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { data: submissions, isLoading } = useQuery<OutdoorAdSubmission[]>({
-    queryKey: ["/api/outdoor-ad/submissions"],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const { data: listResponse, isLoading } = useQuery<OutdoorListResponse>({
+    queryKey: ["/api/outdoor-ad/submissions", page, debouncedSearch, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/outdoor-ad/submissions?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
 
-  const allSubmissions = submissions || [];
-
-  const filtered = allSubmissions.filter((s) => {
-    const q = search.toLowerCase();
-    const matchesSearch = !search ||
-      s.ownerName.toLowerCase().includes(q) ||
-      s.mobileNumber.includes(search) ||
-      (s.villageName || "").toLowerCase().includes(q) ||
-      s.wallSize.toLowerCase().includes(q);
-    const matchesStatus = statusFilter === "all" || s.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const { data: detailSubmission, isLoading: detailLoading } = useQuery<OutdoorAdSubmission>({
+    queryKey: ["/api/outdoor-ad/submissions", selectedId, "detail"],
+    enabled: !!selectedId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/outdoor-ad/submissions/${selectedId}`);
+      return res.json();
+    },
   });
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const statusCounts = listResponse?.statusCounts;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
 
-  const pendingCount = allSubmissions.filter((s) => s.status === "pending").length;
-  const approvedCount = allSubmissions.filter((s) => s.status === "approved").length;
+  const pendingCount = statusCounts?.pending ?? 0;
+  const approvedCount = statusCounts?.approved ?? 0;
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
   return (
     <div className="space-y-6">
@@ -278,7 +350,7 @@ export default function OutdoorAdSubmissionsPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <Image className="h-8 w-8 text-blue-500" />
             <div>
-              <p className="text-2xl font-bold" data-testid="text-total-count">{allSubmissions.length}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-count">{statusCounts?.total ?? listTotal}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </CardContent>
@@ -350,7 +422,7 @@ export default function OutdoorAdSubmissionsPage() {
                 <TableRow
                   key={s.id}
                   className="cursor-pointer hover-elevate"
-                  onClick={() => setSelectedSubmission(s)}
+                  onClick={() => setSelectedId(s.id)}
                   data-testid={`row-submission-${s.id}`}
                 >
                   <TableCell data-testid={`text-owner-${s.id}`}>{s.ownerName}</TableCell>
@@ -374,7 +446,7 @@ export default function OutdoorAdSubmissionsPage() {
               {paged.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    {search || statusFilter !== "all" ? "No submissions match your filters" : "No submissions yet"}
+                    {debouncedSearch || statusFilter !== "all" ? "No submissions match your filters" : "No submissions yet"}
                   </TableCell>
                 </TableRow>
               )}
@@ -386,7 +458,7 @@ export default function OutdoorAdSubmissionsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+            Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
           </span>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)} data-testid="button-prev-page">
@@ -401,9 +473,10 @@ export default function OutdoorAdSubmissionsPage() {
       )}
 
       <DetailDialog
-        submission={selectedSubmission}
-        open={!!selectedSubmission}
-        onClose={() => setSelectedSubmission(null)}
+        submission={detailSubmission ?? null}
+        open={!!selectedId}
+        detailLoading={!!selectedId && detailLoading}
+        onClose={() => setSelectedId(null)}
       />
     </div>
   );

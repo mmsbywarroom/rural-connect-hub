@@ -5,9 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Users, Calendar, MapPin, Download, FileText, Navigation, Eye } from "lucide-react";
+import { Loader2, Users, Calendar, MapPin, Download, FileText, Navigation, Eye, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { TirthYatraRequest } from "@shared/schema";
+
+const PAGE_SIZE = 25;
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-amber-100 text-amber-800 border border-amber-200",
@@ -134,23 +138,81 @@ function downloadSelectedAsPDF(req: TirthYatraRequest) {
   setTimeout(() => win.print(), 500);
 }
 
-export default function TirthYatraAdminPage() {
-  const { data, isLoading } = useQuery<TirthYatraRequest[]>({
-    queryKey: ["/api/admin/tirth-yatra"],
-  });
+type TirthListResponse = {
+  items: TirthYatraRequest[];
+  total: number;
+  limit: number;
+  offset: number;
+};
 
-  const [selected, setSelected] = useState<TirthYatraRequest | null>(null);
+export default function TirthYatraAdminPage() {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [page, setPage] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
-    const openId = params.get("open");
-    if (openId && data?.length) {
-      const req = data.find((r) => r.id === openId);
-      if (req) setSelected(req);
+    const t = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter]);
+
+  useEffect(() => {
+    const openId = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("open");
+    if (openId) setSelectedId(openId);
+  }, []);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
     }
-  }, [data]);
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const { data: listResponse, isLoading } = useQuery<TirthListResponse>({
+    queryKey: ["/api/admin/tirth-yatra", page, debouncedSearch, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(page * PAGE_SIZE));
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/admin/tirth-yatra?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
+  });
+
+  const { data: selected, isLoading: detailLoading } = useQuery<TirthYatraRequest>({
+    queryKey: ["/api/admin/tirth-yatra", selectedId, "detail"],
+    enabled: !!selectedId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/tirth-yatra/${selectedId}`);
+      return res.json();
+    },
+  });
+
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState<string>("");
+
+  useEffect(() => {
+    if (selected) {
+      setStatus(selected.status || "pending");
+      setAdminNote(selected.adminNote || "");
+    }
+  }, [selected]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -159,19 +221,23 @@ export default function TirthYatraAdminPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/tirth-yatra"] });
-      setSelected(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tirth-yatra"], exact: false });
+      setSelectedId(null);
     },
   });
 
-  const openDetails = (req: TirthYatraRequest) => {
-    setSelected(req);
-    setStatus(req.status);
-    setAdminNote(req.adminNote || "");
+  const openDetails = (id: string) => {
+    setSelectedId(id);
   };
 
-  const list = data || [];
-  const sorted = list.slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
+  const paged = listResponse?.items ?? [];
+  const listTotal = listResponse?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(listTotal / PAGE_SIZE));
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(listTotal / PAGE_SIZE) - 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [listTotal, page]);
 
   const openInMaps = (req: TirthYatraRequest) => {
     if (req.currentLatitude && req.currentLongitude) {
@@ -183,7 +249,18 @@ export default function TirthYatraAdminPage() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    const params = new URLSearchParams();
+    params.set("limit", "25000");
+    params.set("offset", "0");
+    const q = debouncedSearch.trim();
+    if (q) params.set("search", q);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (villageIdsParam) params.set("villageIds", villageIdsParam);
+    const res = await fetch(`/api/admin/tirth-yatra?${params.toString()}`, { credentials: "include" });
+    if (!res.ok) return;
+    const json = (await res.json()) as TirthListResponse;
+    const sorted = (json.items || []).slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
     const headers = [
       "S.No", "Applicant", "Mobile", "Village", "Destination", "Start Date", "End Date",
       "Current Location", "Status", "Admin Note", "Created At"
@@ -215,15 +292,38 @@ export default function TirthYatraAdminPage() {
           </h1>
           <CardDescription>Review and update status of Tirth Yatra applications.</CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={sorted.length === 0}>
+        <Button variant="outline" size="sm" onClick={() => void handleExportCSV()} disabled={listTotal === 0}>
           <Download className="h-4 w-4 mr-2" />
           Download CSV
         </Button>
       </div>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">All Requests</CardTitle>
+        <CardHeader className="pb-2 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, mobile, village, destination..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <CardTitle className="text-sm font-semibold">Requests</CardTitle>
           <CardDescription className="text-xs">Click a request to see full details and update status.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -231,11 +331,11 @@ export default function TirthYatraAdminPage() {
             <div className="flex items-center justify-center py-10">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : sorted.length === 0 ? (
+          ) : paged.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No requests yet.</p>
           ) : (
             <div className="space-y-2">
-              {sorted.map((req, index) => {
+              {paged.map((req, index) => {
                 const created = req.createdAt
                   ? new Date(req.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
                   : "";
@@ -245,11 +345,11 @@ export default function TirthYatraAdminPage() {
                   <button
                     key={req.id}
                     type="button"
-                    onClick={() => openDetails(req)}
+                    onClick={() => openDetails(req.id)}
                     className="w-full text-left border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3 hover:bg-slate-50"
                   >
                     <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 font-semibold text-slate-700 text-sm">
-                      {index + 1}
+                      {page * PAGE_SIZE + index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">
@@ -275,15 +375,38 @@ export default function TirthYatraAdminPage() {
               })}
             </div>
           )}
+          {listTotal > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-sm text-muted-foreground">
+                Showing {listTotal === 0 ? 0 : page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm">
+                  {page + 1} / {totalPages}
+                </span>
+                <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
+      <Dialog open={!!selectedId} onOpenChange={(open) => !open && setSelectedId(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tirth Yatra Request Details</DialogTitle>
           </DialogHeader>
-          {selected && (
+          {(detailLoading || !selected) && (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
+          {!detailLoading && selected && (
             <div className="space-y-3 text-sm">
               <div className="flex justify-end gap-2">
                 {(selected.currentLatitude && selected.currentLongitude) || selected.currentLocationLabel ? (
@@ -450,7 +573,7 @@ export default function TirthYatraAdminPage() {
                   />
                 </div>
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={() => setSelected(null)}>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedId(null)}>
                     Cancel
                   </Button>
                   <Button size="sm" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>

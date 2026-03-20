@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,23 @@ interface BirthdayUser {
   mobileNumber: string | null;
   role: string | null;
 }
+
+const BIRTHDAY_PAGE_SIZE = 50;
+
+type BirthdaysApiResponse = {
+  items: BirthdayUser[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary: {
+    all: number;
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    withDob: number;
+    noDob: number;
+  };
+};
 
 function getNextBirthday(dobStr: string): Date {
   const now = new Date();
@@ -105,10 +122,41 @@ export default function BirthdayManagerPage() {
   const [editDob, setEditDob] = useState("");
   const [filter, setFilter] = useState<"all" | "with-dob" | "no-dob" | "today" | "this-week" | "this-month">("all");
   const [sendingWishId, setSendingWishId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const { data: users, isLoading } = useQuery<BirthdayUser[]>({
-    queryKey: ["/api/admin/birthdays"],
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => window.clearTimeout(t);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, filter]);
+
+  const { data, isLoading } = useQuery<BirthdaysApiResponse>({
+    queryKey: ["/api/admin/birthdays", page, debouncedSearch, filter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(BIRTHDAY_PAGE_SIZE));
+      params.set("offset", String(page * BIRTHDAY_PAGE_SIZE));
+      params.set("filter", filter);
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      const res = await fetch(`/api/admin/birthdays?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
+
+  const filteredUsers = data?.items ?? [];
+  const listTotal = data?.total ?? 0;
+  const summary = data?.summary;
+  const canPrev = page > 0;
+  const canNext = (page + 1) * BIRTHDAY_PAGE_SIZE < listTotal;
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, name, ocrDob }: { id: string; name: string; ocrDob: string }) => {
@@ -116,7 +164,7 @@ export default function BirthdayManagerPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/birthdays"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/birthdays"], exact: false });
       setEditUser(null);
       toast({ title: "Updated successfully" });
     },
@@ -156,93 +204,12 @@ export default function BirthdayManagerPage() {
     updateMutation.mutate({ id: editUser.id, name: editName.trim(), ocrDob: editDob.trim() });
   };
 
-  const filteredUsers = useMemo(() => {
-    if (!users) return [];
-    const now = new Date();
-    const todayMonth = now.getMonth();
-    const todayDate = now.getDate();
-
-    let list = users;
-
-    if (filter === "with-dob") {
-      list = list.filter(u => u.ocrDob);
-    } else if (filter === "no-dob") {
-      list = list.filter(u => !u.ocrDob);
-    } else if (filter === "today") {
-      list = list.filter(u => {
-        if (!u.ocrDob) return false;
-        const next = getNextBirthday(u.ocrDob);
-        return next.getMonth() === todayMonth && next.getDate() === todayDate && next.getFullYear() === now.getFullYear();
-      });
-    } else if (filter === "this-week") {
-      const weekEnd = new Date(now);
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      list = list.filter(u => {
-        if (!u.ocrDob) return false;
-        const next = getNextBirthday(u.ocrDob);
-        return next >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && next <= weekEnd;
-      });
-    } else if (filter === "this-month") {
-      list = list.filter(u => {
-        if (!u.ocrDob) return false;
-        const next = getNextBirthday(u.ocrDob);
-        return next.getMonth() === todayMonth && next.getFullYear() === now.getFullYear();
-      });
-    }
-
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      list = list.filter(u =>
-        u.name.toLowerCase().includes(term) ||
-        (u.mobileNumber && u.mobileNumber.includes(term)) ||
-        (u.ocrDob && u.ocrDob.includes(term))
-      );
-    }
-
-    return list.sort((a, b) => {
-      if (!a.ocrDob && !b.ocrDob) return a.name.localeCompare(b.name);
-      if (!a.ocrDob) return 1;
-      if (!b.ocrDob) return -1;
-      const nextA = getNextBirthday(a.ocrDob).getTime();
-      const nextB = getNextBirthday(b.ocrDob).getTime();
-      return nextA - nextB;
-    });
-  }, [users, filter, searchTerm]);
-
-  const todayCount = useMemo(() => {
-    if (!users) return 0;
-    const now = new Date();
-    return users.filter(u => {
-      if (!u.ocrDob) return false;
-      const next = getNextBirthday(u.ocrDob);
-      return next.getMonth() === now.getMonth() && next.getDate() === now.getDate() && next.getFullYear() === now.getFullYear();
-    }).length;
-  }, [users]);
-
-  const thisWeekCount = useMemo(() => {
-    if (!users) return 0;
-    const now = new Date();
-    const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    return users.filter(u => {
-      if (!u.ocrDob) return false;
-      const next = getNextBirthday(u.ocrDob);
-      return next >= new Date(now.getFullYear(), now.getMonth(), now.getDate()) && next <= weekEnd;
-    }).length;
-  }, [users]);
-
-  const thisMonthCount = useMemo(() => {
-    if (!users) return 0;
-    const now = new Date();
-    return users.filter(u => {
-      if (!u.ocrDob) return false;
-      const next = getNextBirthday(u.ocrDob);
-      return next.getMonth() === now.getMonth() && next.getFullYear() === now.getFullYear();
-    }).length;
-  }, [users]);
-
-  const withDobCount = useMemo(() => users?.filter(u => u.ocrDob).length || 0, [users]);
-  const noDobCount = useMemo(() => users?.filter(u => !u.ocrDob).length || 0, [users]);
+  const todayCount = summary?.today ?? 0;
+  const thisWeekCount = summary?.thisWeek ?? 0;
+  const thisMonthCount = summary?.thisMonth ?? 0;
+  const withDobCount = summary?.withDob ?? 0;
+  const noDobCount = summary?.noDob ?? 0;
+  const allUsersCount = summary?.all ?? 0;
 
   if (isLoading) {
     return (
@@ -253,7 +220,7 @@ export default function BirthdayManagerPage() {
   }
 
   const filterButtons: { key: typeof filter; label: string; count: number }[] = [
-    { key: "all", label: "All", count: users?.length || 0 },
+    { key: "all", label: "All", count: allUsersCount },
     { key: "today", label: "Today", count: todayCount },
     { key: "this-week", label: "This Week", count: thisWeekCount },
     { key: "this-month", label: "This Month", count: thisMonthCount },
@@ -387,6 +354,22 @@ export default function BirthdayManagerPage() {
               </Card>
             );
           })}
+          {listTotal > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Showing {listTotal === 0 ? 0 : page * BIRTHDAY_PAGE_SIZE + 1}–
+                {Math.min((page + 1) * BIRTHDAY_PAGE_SIZE, listTotal)} of {listTotal}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={!canPrev} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                  Previous
+                </Button>
+                <Button type="button" variant="outline" size="sm" disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

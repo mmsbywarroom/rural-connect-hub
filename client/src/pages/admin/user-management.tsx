@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +63,32 @@ type AdminFormData = z.infer<typeof adminSchema>;
 
 const LEVELS = ["State", "Zone", "District", "Halka", "Block", "Village/Ward"];
 
+const USER_PAGE_SIZE = 50;
+const ADMIN_PAGE_SIZE = 50;
+
+type AppUsersListResponse = {
+  items: AppUser[];
+  total: number;
+  limit: number;
+  offset: number;
+  scopeStats: {
+    total: number;
+    active: number;
+    blocked: number;
+    volunteers: number;
+    postHolders: number;
+    approved: number;
+    pending: number;
+  };
+};
+
+type OfficeManagersListResponse = {
+  items: OfficeManager[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export default function UserManagementPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState("app-users");
@@ -96,13 +122,72 @@ export default function UserManagementPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [reset2faTarget, setReset2faTarget] = useState<{ open: boolean; id: string; name: string } | null>(null);
 
-  const { data: appUsers, isLoading: usersLoading } = useQuery<AppUser[]>({
-    queryKey: ["/api/admin/app-users"],
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const villageIdsParam = adminAssignedVillages.length > 0 ? adminAssignedVillages.join(",") : "";
+
+  const [pageAppUsers, setPageAppUsers] = useState(0);
+  const [pageAdmins, setPageAdmins] = useState(0);
+  const [debouncedUserSearch, setDebouncedUserSearch] = useState("");
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedUserSearch(search), 350);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPageAppUsers(0);
+  }, [debouncedUserSearch, roleFilter, statusFilter, villageIdsParam]);
+
+  const { data: appUsersResponse, isLoading: usersLoading } = useQuery<AppUsersListResponse>({
+    queryKey: ["/api/admin/app-users", pageAppUsers, debouncedUserSearch, roleFilter, statusFilter, villageIdsParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(USER_PAGE_SIZE));
+      params.set("offset", String(pageAppUsers * USER_PAGE_SIZE));
+      const q = debouncedUserSearch.trim();
+      if (q) params.set("search", q);
+      params.set("role", roleFilter);
+      params.set("status", statusFilter);
+      if (villageIdsParam) params.set("villageIds", villageIdsParam);
+      const res = await fetch(`/api/admin/app-users?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
 
-  const { data: managers, isLoading: managersLoading } = useQuery<OfficeManager[]>({
-    queryKey: ["/api/office-managers"],
+  const { data: managersResponse, isLoading: managersLoading } = useQuery<OfficeManagersListResponse>({
+    queryKey: ["/api/office-managers", pageAdmins],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(ADMIN_PAGE_SIZE));
+      params.set("offset", String(pageAdmins * ADMIN_PAGE_SIZE));
+      const res = await fetch(`/api/office-managers?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text || res.statusText}`);
+      }
+      return res.json();
+    },
   });
+
+  const filteredUsers = appUsersResponse?.items ?? [];
+  const appUsersTotal = appUsersResponse?.total ?? 0;
+  const managers = managersResponse?.items ?? [];
+  const managersTotal = managersResponse?.total ?? 0;
+  const canPrevUsers = pageAppUsers > 0;
+  const canNextUsers = (pageAppUsers + 1) * USER_PAGE_SIZE < appUsersTotal;
+  const canPrevAdmins = pageAdmins > 0;
+  const canNextAdmins = (pageAdmins + 1) * ADMIN_PAGE_SIZE < managersTotal;
 
   const { data: wingsData } = useQuery<Wing[]>({
     queryKey: ["/api/wings"],
@@ -147,7 +232,7 @@ export default function UserManagementPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"], exact: false });
       setCreateUserOpen(false);
       appUserForm.reset();
       toast({ title: "User created successfully" });
@@ -163,7 +248,7 @@ export default function UserManagementPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"], exact: false });
       setEditUser({ open: false, id: "", name: "", role: "", wing: "", govWing: "", currentPosition: "", level: "" });
       toast({ title: "User updated successfully" });
     },
@@ -178,7 +263,7 @@ export default function UserManagementPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"], exact: false });
       toast({ title: "User status updated" });
     },
     onError: () => {
@@ -192,7 +277,7 @@ export default function UserManagementPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"], exact: false });
       toast({ title: data.isApproved ? "User approved (verified)" : "Approval revoked" });
     },
     onError: () => {
@@ -210,9 +295,9 @@ export default function UserManagementPage() {
     },
     onSuccess: () => {
       if (deleteConfirm.type === "app") {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/app-users"], exact: false });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/office-managers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/office-managers"], exact: false });
       }
       setDeleteConfirm({ open: false, id: "", name: "", type: "app" });
       toast({ title: "Deleted successfully" });
@@ -227,7 +312,7 @@ export default function UserManagementPage() {
       return apiRequest("POST", "/api/office-managers", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"], exact: false });
       setCreateAdminOpen(false);
       adminForm.reset();
       toast({ title: "Admin account created!" });
@@ -242,7 +327,7 @@ export default function UserManagementPage() {
       return apiRequest("PATCH", `/api/office-managers/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"], exact: false });
       setEditAdmin({ open: false, manager: null });
       toast({ title: "Admin updated!" });
     },
@@ -256,7 +341,7 @@ export default function UserManagementPage() {
       return apiRequest("PATCH", `/api/office-managers/${id}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/office-managers"], exact: false });
       toast({ title: "Admin status updated" });
     },
   });
@@ -289,32 +374,26 @@ export default function UserManagementPage() {
     },
   });
 
-  const adminAssignedVillages: string[] = (() => {
-    try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  })();
-
-  const areaFilteredUsers = adminAssignedVillages.length > 0
-    ? appUsers?.filter(u => u.mappedAreaId && adminAssignedVillages.includes(u.mappedAreaId)) || []
-    : appUsers || [];
-
-  const filteredUsers = areaFilteredUsers.filter((u) => {
-    const matchesSearch = !search ||
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      (u.mobileNumber || "").includes(search);
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
-    const matchesStatus = statusFilter === "all" ||
-      (statusFilter === "active" && u.isActive !== false) ||
-      (statusFilter === "blocked" && u.isActive === false);
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const handleExportUsers = () => {
-    if (!filteredUsers.length) return;
+  const handleExportUsers = async () => {
+    const res = await fetch("/api/export/app-users", { credentials: "include" });
+    if (!res.ok) return;
+    const allUsers = (await res.json()) as AppUser[];
+    const areaFilteredUsers = adminAssignedVillages.length > 0
+      ? allUsers.filter((u) => u.mappedAreaId && adminAssignedVillages.includes(u.mappedAreaId))
+      : allUsers;
+    const exportRows = areaFilteredUsers.filter((u) => {
+      const matchesSearch = !search ||
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        (u.mobileNumber || "").includes(search);
+      const matchesRole = roleFilter === "all" || u.role === roleFilter;
+      const matchesStatus = statusFilter === "all" ||
+        (statusFilter === "active" && u.isActive !== false) ||
+        (statusFilter === "blocked" && u.isActive === false);
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+    if (!exportRows.length) return;
     const headers = ["Name", "Mobile", "Role", "Wing", "Position", "Level", "Village", "Zone", "District", "Halka", "Block", "Source", "Status", "Joined"];
-    const rows = filteredUsers.map(u => [
+    const rows = exportRows.map(u => [
       u.name, u.mobileNumber, u.role === "party_post_holder" ? "Post Holder" : "Volunteer",
       u.wing || "", u.currentPosition || "", u.level || "", u.mappedAreaName || "",
       u.mappedZone || "", u.mappedDistrict || "", u.mappedHalka || "", u.mappedBlockNumber || "",
@@ -326,14 +405,14 @@ export default function UserManagementPage() {
     downloadCSV(csv, "app_users.csv");
   };
 
-  const stats = {
-    total: areaFilteredUsers.length,
-    active: areaFilteredUsers.filter(u => u.isActive !== false).length,
-    blocked: areaFilteredUsers.filter(u => u.isActive === false).length,
-    volunteers: areaFilteredUsers.filter(u => u.role === "volunteer").length,
-    postHolders: areaFilteredUsers.filter(u => u.role === "party_post_holder").length,
-    approved: areaFilteredUsers.filter(u => u.isApproved).length,
-    pending: areaFilteredUsers.filter(u => !u.isApproved).length,
+  const stats = appUsersResponse?.scopeStats ?? {
+    total: 0,
+    active: 0,
+    blocked: 0,
+    volunteers: 0,
+    postHolders: 0,
+    approved: 0,
+    pending: 0,
   };
 
   return (
@@ -576,9 +655,32 @@ export default function UserManagementPage() {
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground" data-testid="text-showing-count">
-                Showing {filteredUsers.length} of {areaFilteredUsers.length} users
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground" data-testid="text-showing-count">
+                  Showing {appUsersTotal === 0 ? 0 : pageAppUsers * USER_PAGE_SIZE + 1}–
+                  {Math.min((pageAppUsers + 1) * USER_PAGE_SIZE, appUsersTotal)} of {appUsersTotal} users
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canPrevUsers}
+                    onClick={() => setPageAppUsers((p) => Math.max(0, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canNextUsers}
+                    onClick={() => setPageAppUsers((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -690,6 +792,34 @@ export default function UserManagementPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+              {!managersLoading && managersTotal > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {managersTotal === 0 ? 0 : pageAdmins * ADMIN_PAGE_SIZE + 1}–
+                    {Math.min((pageAdmins + 1) * ADMIN_PAGE_SIZE, managersTotal)} of {managersTotal} admins
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canPrevAdmins}
+                      onClick={() => setPageAdmins((p) => Math.max(0, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canNextAdmins}
+                      onClick={() => setPageAdmins((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
