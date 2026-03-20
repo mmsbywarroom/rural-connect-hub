@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, and, asc, sql, count, inArray } from "drizzle-orm";
+import { eq, desc, and, or, isNull, asc, sql, count, inArray } from "drizzle-orm";
 import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
@@ -1964,7 +1964,9 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(mahilaSammanSubmissions)
-      .where(eq(mahilaSammanSubmissions.isDeleted, false))
+      .where(
+        or(eq(mahilaSammanSubmissions.isDeleted, false), isNull(mahilaSammanSubmissions.isDeleted)),
+      )
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
   }
 
@@ -2038,7 +2040,9 @@ export class DatabaseStorage implements IStorage {
     const all = await db
       .select()
       .from(mahilaSammanSubmissions)
-      .where(eq(mahilaSammanSubmissions.isDeleted, false))
+      .where(
+        or(eq(mahilaSammanSubmissions.isDeleted, false), isNull(mahilaSammanSubmissions.isDeleted)),
+      )
       .orderBy(desc(mahilaSammanSubmissions.createdAt));
     const total = all.length;
     const pending = all.filter((s) => (s.status || "pending") === "pending").length;
