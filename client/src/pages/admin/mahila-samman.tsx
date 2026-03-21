@@ -99,15 +99,25 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Safe filename for downloaded HTML fallback */
+function filenameFromTitle(title: string): string {
+  const base = title.replace(/[^\w\u0900-\u0C7F\-]+/g, "_").slice(0, 80) || "report";
+  return `${base}.html`;
+}
+
+/**
+ * Opens print dialog so user can save as PDF. Mobile Safari requires print() in the same
+ * user-gesture turn as window.open — async setTimeout breaks that. We also avoid closing
+ * the window immediately (breaks print/share on many phones).
+ */
 function printToPdf(title: string, htmlContent: string) {
-  const win = window.open("", "_blank");
-  if (!win) return;
-  win.document.write(`
-<!DOCTYPE html>
+  const safeTitle = escapeHtml(title);
+  const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${title}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${safeTitle}</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 24px 28px; color: #0f172a; background: #f8fafc; }
@@ -131,14 +141,32 @@ function printToPdf(title: string, htmlContent: string) {
 <body>
   ${htmlContent}
 </body>
-</html>
-  `);
+</html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) {
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filenameFromTitle(title);
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  win.document.open();
+  win.document.write(fullHtml);
   win.document.close();
   win.focus();
-  setTimeout(() => {
+  try {
     win.print();
-    win.close();
-  }, 300);
+  } catch {
+    /* Some embedded WebViews throw; HTML fallback already handled null window */
+  }
 }
 
 function DocLink({ src, label }: { src: string | null | undefined; label: string }) {
