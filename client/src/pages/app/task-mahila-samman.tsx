@@ -114,6 +114,12 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
     pa: "ਮੈਂ ਸਖੀ ਵਜੋਂ ਸੇਵਾ ਕਰਨ ਲਈ ਤਿਆਰ ਹਾਂ ਅਤੇ ਸਰਗਰਮੀ ਨਾਲ ਇਹ ਯਕੀਨੀ ਬਣਾਵਾਂਗੀ ਕਿ ਘੱਟੋ-ਘੱਟ 50 ਔਰਤਾਂ ਨੂੰ ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ ਦਾ ਲਾਭ ਮਿਲੇ।",
   },
   profileIncomplete: { en: "Profile incomplete", hi: "प्रोफाइल अधूरी", pa: "ਪ੍ਰੋਫਾਈਲ ਅਧੂਰੀ" },
+  completeProfile: { en: "Complete profile", hi: "प्रोफाइल पूरी करें", pa: "ਪ੍ਰੋਫਾਈਲ ਪੂਰੀ ਕਰੋ" },
+  firstSubmitHint: {
+    en: "Verify mobile with OTP, tick the consent, then submit. You can upload Aadhaar, Voter ID, and photo later from My submissions.",
+    hi: "मोबाइल OTP से सत्यापित करें, सहमति चुनें, फिर जमा करें। आधार, वोटर आईडी और फोटो बाद में \"मेरी जमा\" से अपलोड कर सकते हैं।",
+    pa: "ਮੋਬਾਈਲ OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ, ਸਹਿਮਤੀ ਚੁਣੋ, ਫਿਰ ਜਮ੍ਹਾਂ ਕਰੋ। ਆਧਾਰ, ਵੋਟਰ ਆਈਡੀ ਅਤੇ ਫੋਟੋ ਬਾਅਦ ਵਿੱਚ \"ਮੇਰੀਆਂ ਜਮ੍ਹਾਂ\" ਤੋਂ ਅਪਲੋਡ ਕਰ ਸਕਦੇ ਹੋ।",
+  },
   delete: { en: "Delete", hi: "हटाएं", pa: "ਹਟਾਓ" },
   undelete: { en: "Restore", hi: "वापस लाएं", pa: "ਵਾਪਸ ਲਿਆਓ" },
   deleted: { en: "Deleted", hi: "हटाया गया", pa: "ਹਟਾਇਆ ਗਿਆ" },
@@ -356,6 +362,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           sakhiName: sakhiName.trim(),
           mobileNumber: mobileNumber.trim(),
           mobileVerified,
+          consentServeSakhi50,
           fatherHusbandName: fatherHusbandName.trim(),
           aadhaarFront,
           aadhaarBack,
@@ -385,8 +392,8 @@ export default function TaskMahilaSamman({ user }: Props) {
         sakhiName: sakhiName.trim(),
         mobileNumber: mobileNumber.trim(),
         mobileVerified,
-        fatherHusbandName: fatherHusbandName.trim(),
         consentServeSakhi50,
+        fatherHusbandName: fatherHusbandName.trim(),
         aadhaarFront,
         aadhaarBack,
         ocrAadhaarName: ocrAadhaarName.trim() || null,
@@ -460,7 +467,9 @@ export default function TaskMahilaSamman({ user }: Props) {
     hasVoterBooth &&
     !!sakhiPhoto &&
     declarationChecked;
-  const canSubmit = canSubmitFull;
+  /** New nomination: only name + verified mobile + consent (server stores minimal row). Edit: full KYC fields. */
+  const isCompletingProfile = !!editingId;
+  const canSubmit = isCompletingProfile ? canSubmitFull : canSubmitMinimal;
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -477,8 +486,11 @@ export default function TaskMahilaSamman({ user }: Props) {
   });
 
   const handleSubmitClick = () => {
-    // Show warning whenever submitting WITHOUT Aadhaar.
-    // (Voter ID is still required by validation; this popup is only for UX.)
+    if (!isCompletingProfile) {
+      submitMutation.mutate();
+      return;
+    }
+    // Full profile: optional Aadhaar — confirm when submitting without any Aadhaar upload.
     if (!hasAnyAadhaar && !showMinimalConfirm) {
       setShowMinimalConfirm(true);
       return;
@@ -618,7 +630,12 @@ export default function TaskMahilaSamman({ user }: Props) {
                 .filter((s) => !searchQuery.trim() || [s.sakhiName, s.mobileNumber, s.id].some((v) => (v || "").toLowerCase().includes(searchQuery.toLowerCase())))
                 .map((s) => (
                   <div key={s.id} className="flex items-center justify-between border rounded px-3 py-2 bg-white text-sm">
-                    <span className="truncate">{s.sakhiName} – {s.mobileNumber}</span>
+                    <span className="truncate flex items-center gap-2 min-w-0">
+                      {s.sakhiName} – {s.mobileNumber}
+                      {(s as MahilaSammanSubmission & { profileComplete?: boolean }).profileComplete === false && (
+                        <Badge variant="secondary" className="text-[10px] shrink-0">{L("profileIncomplete", language)}</Badge>
+                      )}
+                    </span>
                     <div className="flex gap-1 flex-shrink-0">
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewingId(s.id)}>{L("view", language)}</Button>
                       {s.status === "pending" && (
@@ -631,7 +648,9 @@ export default function TaskMahilaSamman({ user }: Props) {
                             setStep("form");
                           }}
                         >
-                          {L("edit", language)}
+                          {(s as MahilaSammanSubmission & { profileComplete?: boolean }).profileComplete === false
+                            ? L("completeProfile", language)
+                            : L("edit", language)}
                         </Button>
                       )}
                       <Button
@@ -689,7 +708,9 @@ export default function TaskMahilaSamman({ user }: Props) {
                           setStep("form");
                         }}
                       >
-                        {L("edit", language)}
+                        {(sub as MahilaSammanSubmission & { profileComplete?: boolean }).profileComplete === false
+                          ? L("completeProfile", language)
+                          : L("edit", language)}
                       </Button>
                     )}
                     <Button
@@ -738,8 +759,6 @@ export default function TaskMahilaSamman({ user }: Props) {
     );
   }
 
-  const isSimpleForm = false;
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24">
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
@@ -749,6 +768,9 @@ export default function TaskMahilaSamman({ user }: Props) {
         <h1 className="font-semibold text-base truncate">{L("title", language)}</h1>
       </header>
       <main className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+        {!isCompletingProfile && (
+          <p className="text-xs text-slate-600 leading-relaxed">{L("firstSubmitHint", language)}</p>
+        )}
         <Card>
           <CardContent className="p-4 space-y-3">
             <div>
@@ -772,7 +794,7 @@ export default function TaskMahilaSamman({ user }: Props) {
           </CardContent>
         </Card>
 
-        {isSimpleForm ? (
+        {!isCompletingProfile ? (
           <Card>
             <CardContent className="p-4">
               <div className="flex items-start space-x-2">

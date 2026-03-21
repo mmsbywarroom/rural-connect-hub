@@ -5304,14 +5304,26 @@ export async function registerRoutes(
       if (existing.appUserId !== body.appUserId) return res.status(403).json({ error: "Not allowed" });
       if (existing.status !== "pending") return res.status(400).json({ error: "Only pending can be edited" });
       const update: any = {};
-      const keys = ["villageId", "villageName", "sakhiName", "mobileNumber", "fatherHusbandName", "aadhaarFront", "aadhaarBack",
+      const keys = ["villageId", "villageName", "sakhiName", "mobileNumber", "mobileVerified", "consentServeSakhi50", "fatherHusbandName", "aadhaarFront", "aadhaarBack",
         "ocrAadhaarName", "ocrAadhaarNumber", "ocrAadhaarDob", "ocrAadhaarGender", "ocrAadhaarAddress", "aadhaarVerifiedSameAsVoter",
         "ocrVoterId", "ocrVoterName", "voterCard", "voterMappingBoothId", "voterMappingName", "voterMappingFatherName", "voterMappingVillageName",
         "sakhiPhoto", "declarationChecked"];
       for (const k of keys) {
         if (body[k] !== undefined) update[k] = body[k];
       }
-      if (body.aadhaarFront && body.aadhaarBack && body.sakhiPhoto) update.profileComplete = true;
+      const get = (key: string) => (body[key] !== undefined ? body[key] : (existing as any)[key]);
+      const fatherHusband = String(get("fatherHusbandName") || "").trim();
+      const mobileOk = !!get("mobileVerified");
+      const ocrVid = String(get("ocrVoterId") || "").trim();
+      const booth = String(get("voterMappingBoothId") || "").trim();
+      const photo = get("sakhiPhoto");
+      const decl = !!get("declarationChecked");
+      const af = get("aadhaarFront");
+      const ab = get("aadhaarBack");
+      const aadhaarOk = !(af || ab) || (!!(af && ab) && !!get("aadhaarVerifiedSameAsVoter"));
+      if (mobileOk && fatherHusband && ocrVid && booth && photo && decl && aadhaarOk) {
+        update.profileComplete = true;
+      }
       const updated = await storage.updateMahilaSammanSubmission(id, update);
       res.json(updated);
     } catch (error) {
