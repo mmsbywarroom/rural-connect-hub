@@ -124,7 +124,6 @@ function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
         <tr><td>Clusters with OTP verified Sakhi (at least 1)</td><td>${stats.otpVerifiedUniqueClusters}</td></tr>
         <tr><td>Clusters with 0 OTP verified Sakhi</td><td>${clustersZeroOtp}</td></tr>
         <tr><td>Cluster Coverage (OTP)</td><td>${stats.clusterCoveragePercent}% <span class="pdf-kpi-sub">(${stats.otpVerifiedUniqueClusters} / ${stats.clusterTotal} clusters covered)</span></td></tr>
-        <tr><td>Booth Number Known Sakhis</td><td>${stats.boothKnownSakhis}</td></tr>
       </tbody>
     </table>
   `;
