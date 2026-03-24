@@ -89,6 +89,9 @@ function escapeHtml(s: string): string {
 /** Target Sakhis for Vidhansabha Patiala Rural PDF summary (percentages vs this number). */
 const MAHILA_PDF_TARGET_SAKHIS = 2580;
 
+/** Total booths for Vidhansabha Patiala Rural PDF (constituency figure; booth % rows use this denominator). */
+const MAHILA_PDF_TOTAL_BOOTHS = 258;
+
 function formatPct(numerator: number, denominator: number): string {
   if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return "0.00";
   return ((numerator / denominator) * 100).toFixed(2);
@@ -96,12 +99,12 @@ function formatPct(numerator: number, denominator: number): string {
 
 /** Ordered KPI block for print/PDF: Patiala Rural heading, then total booths → target → OTP/Voter % → counts → booth %. */
 function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
-  const totalBooths = stats.boothWise.length;
+  const pdfTotalBooths = MAHILA_PDF_TOTAL_BOOTHS;
   const target = MAHILA_PDF_TARGET_SAKHIS;
   const otpPct = formatPct(stats.otpVerifiedSakhis, target);
   const voterPct = formatPct(stats.voterIdMapped, target);
-  const booth0Pct = formatPct(stats.boothsZeroSakhis, totalBooths);
-  const booth10Pct = formatPct(stats.boothsTenSakhis, totalBooths);
+  const booth0Pct = formatPct(stats.boothsZeroSakhis, pdfTotalBooths);
+  const booth10Pct = formatPct(stats.boothsTenSakhis, pdfTotalBooths);
   const clustersZeroOtp = stats.clusterTotal - stats.otpVerifiedUniqueClusters;
 
   return `
@@ -109,15 +112,15 @@ function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
     <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
     <table class="pdf-kpi">
       <tbody>
-        <tr><td>Total booths</td><td>${totalBooths}</td></tr>
+        <tr><td>Total booths</td><td>${pdfTotalBooths}</td></tr>
         <tr><td>Target</td><td>${target}</td></tr>
         <tr><td>OTP verified Sakhi percentage (÷ ${target})</td><td>${otpPct}%</td></tr>
         <tr><td>Total OTP verified Sakhis</td><td>${stats.otpVerifiedSakhis}</td></tr>
         <tr><td>Has Voter ID percentage (÷ ${target})</td><td>${voterPct}%</td></tr>
         <tr><td>Total has Voter ID</td><td>${stats.voterIdMapped}</td></tr>
         <tr><td>Aadhaar Uploaded Sakhis</td><td>${stats.aadhaarUploadedSakhis}</td></tr>
-        <tr><td>Booths with 0 Sakhis</td><td>${stats.boothsZeroSakhis} (${booth0Pct}% of ${totalBooths} booths)</td></tr>
-        <tr><td>Booths with 10+ Sakhis</td><td>${stats.boothsTenSakhis} (${booth10Pct}% of ${totalBooths} booths)</td></tr>
+        <tr><td>Booths with 0 Sakhis</td><td>${stats.boothsZeroSakhis} (${booth0Pct}% of ${pdfTotalBooths} booths)</td></tr>
+        <tr><td>Booths with 10+ Sakhis</td><td>${stats.boothsTenSakhis} (${booth10Pct}% of ${pdfTotalBooths} booths)</td></tr>
         <tr><td>Clusters with OTP verified Sakhi (at least 1)</td><td>${stats.otpVerifiedUniqueClusters}</td></tr>
         <tr><td>Clusters with 0 OTP verified Sakhi</td><td>${clustersZeroOtp}</td></tr>
         <tr><td>Cluster Coverage (OTP)</td><td>${stats.clusterCoveragePercent}% <span class="pdf-kpi-sub">(${stats.otpVerifiedUniqueClusters} / ${stats.clusterTotal} clusters covered)</span></td></tr>
