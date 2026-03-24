@@ -142,6 +142,15 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function csvEscapeCell(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  const s = String(val);
+  if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
 /** Safe filename for downloaded HTML fallback */
 function filenameFromTitle(title: string): string {
   const base = title.replace(/[^\w\u0900-\u0C7F\-]+/g, "_").slice(0, 80) || "report";
@@ -253,6 +262,25 @@ function DocLink({ src, label }: { src: string | null | undefined; label: string
 type BoothFilter = "gt1" | "zero" | "tenPlus" | "exactlyOne" | "";
 type UncoveredClusterFilter = "mapped" | "zero" | "";
 
+type CoveredClusterRow = MahilaSammanStats["coveredClusters"][number];
+
+/** Same logic as Covered Clusters table (filter + search). */
+function coveredClusterRowMatches(c: CoveredClusterRow, filter: UncoveredClusterFilter, search: string): boolean {
+  const matchesMapped =
+    filter === "mapped"
+      ? c.mappedSakhiCount > 0
+      : filter === "zero"
+        ? c.mappedSakhiCount === 0
+        : true;
+  const q = search.trim();
+  if (!q) return matchesMapped;
+  const qNum = Number(q);
+  const matchesBooth = (c.boothId || "").toLowerCase().includes(q.toLowerCase());
+  const matchesCluster =
+    Number.isFinite(qNum) && qNum > 0 ? c.clusterNo === qNum : String(c.clusterNo).includes(q);
+  return matchesMapped && (matchesBooth || matchesCluster);
+}
+
 export default function MahilaSammanAdminPage() {
   const { toast } = useToast();
   const [pageIndex, setPageIndex] = useState(0);
@@ -335,6 +363,51 @@ export default function MahilaSammanAdminPage() {
     } finally {
       setCsvExporting(false);
     }
+  };
+
+  const downloadSakhiVoterListCsv = () => {
+    if (!stats?.sakhiVoterListDetails?.length) return;
+    const header = ["Sakhi Name", "Mobile", "Voter ID", "Voter list Sr No", "Booth"];
+    const lines = stats.sakhiVoterListDetails.map((r) =>
+      [
+        r.sakhiName,
+        r.mobileNumber,
+        r.voterId ?? "",
+        r.voterMappingSlNo != null ? String(r.voterMappingSlNo) : r.voterListSrno ?? "",
+        r.boothId ?? "",
+      ]
+        .map(csvEscapeCell)
+        .join(","),
+    );
+    downloadCsv(
+      [header.join(","), ...lines].join("\n"),
+      `mahila_samman_sakhi_voter_list_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    toast({ title: "CSV downloaded" });
+  };
+
+  const downloadCoveredClustersCsv = () => {
+    if (!stats?.coveredClusters?.length) return;
+    const filtered = stats.coveredClusters.filter((c) =>
+      coveredClusterRowMatches(c, coveredClusterFilter, coveredClusterSearch),
+    );
+    const header = ["Booth", "Cluster #", "Serial Range", "OTP Sakhi Count", "Mapped Sakhi"];
+    const lines = filtered.map((c) =>
+      [
+        c.boothId,
+        c.clusterNo,
+        `${c.serialStart} - ${c.serialEnd}`,
+        c.otpSakhiCount,
+        c.mappedSakhiCount,
+      ]
+        .map(csvEscapeCell)
+        .join(","),
+    );
+    downloadCsv(
+      [header.join(","), ...lines].join("\n"),
+      `mahila_covered_clusters_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    toast({ title: "CSV downloaded" });
   };
 
   const openSubmissionDetail = (s: MahilaSammanSubmission) => {
@@ -696,6 +769,10 @@ export default function MahilaSammanAdminPage() {
                     placeholder="Search booth or cluster"
                     className="max-w-xs"
                   />
+                  <Button type="button" variant="outline" size="sm" onClick={downloadCoveredClustersCsv}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Download CSV
+                  </Button>
                 </div>
 
                 <div className="text-xs text-slate-600 mb-2">
@@ -716,26 +793,7 @@ export default function MahilaSammanAdminPage() {
                     </thead>
                     <tbody>
                       {stats.coveredClusters
-                        .filter((c) => {
-                          const matchesMapped =
-                            coveredClusterFilter === "mapped"
-                              ? c.mappedSakhiCount > 0
-                              : coveredClusterFilter === "zero"
-                                ? c.mappedSakhiCount === 0
-                                : true;
-
-                          const q = coveredClusterSearch.trim();
-                          if (!q) return matchesMapped;
-
-                          const qNum = Number(q);
-                          const matchesBooth = (c.boothId || "").toLowerCase().includes(q.toLowerCase());
-                          const matchesCluster =
-                            Number.isFinite(qNum) && qNum > 0
-                              ? c.clusterNo === qNum
-                              : String(c.clusterNo).includes(q);
-
-                          return matchesMapped && (matchesBooth || matchesCluster);
-                        })
+                        .filter((c) => coveredClusterRowMatches(c, coveredClusterFilter, coveredClusterSearch))
                         .map((c) => (
                           <tr key={`${c.boothId}-${c.clusterNo}`} className="border-b border-slate-100">
                             <td className="py-2 pr-2 font-mono text-xs">{c.boothId}</td>
@@ -874,7 +932,11 @@ export default function MahilaSammanAdminPage() {
                 <CardDescription>All added Sakhi. Voter list Sr No is from voter mapping.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex justify-end mb-2">
+                <div className="flex justify-end mb-2 gap-2 flex-wrap">
+                  <Button type="button" variant="outline" size="sm" onClick={downloadSakhiVoterListCsv}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Download CSV
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
