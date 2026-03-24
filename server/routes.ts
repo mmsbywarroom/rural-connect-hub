@@ -5384,14 +5384,9 @@ export async function registerRoutes(
         }
         return s;
       };
-      const formatUnitVillage = (villageId: string | null, villageName: string | null) => {
-        const a = (villageName || "").trim();
-        const b = (villageId || "").trim();
-        if (a && b) return `${a} (${b})`;
-        return a || b || "";
-      };
+      /** Display label only — no internal village UUID in CSV. */
+      const formatUnitVillage = (_villageId: string | null, villageName: string | null) => (villageName || "").trim();
       const headers = [
-        "Submission ID",
         "Sakhi Name",
         "Mobile",
         "Father/Husband Name",
@@ -5415,7 +5410,6 @@ export async function registerRoutes(
         headers.join(","),
         ...rows.map((r) =>
           [
-            r.id,
             r.sakhiName,
             r.mobileNumber,
             r.fatherHusbandName,
