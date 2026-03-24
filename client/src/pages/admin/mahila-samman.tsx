@@ -54,7 +54,6 @@ export interface MahilaSammanStats {
     serialEnd: number;
     sakhiCount: number;
   }[];
-  voterCardUploadedSakhis: number;
   aadhaarUploadedSakhis: number;
   boothKnownSakhis: number;
   boothsMoreThanOneSakhi: number;
@@ -85,6 +84,41 @@ function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Target Sakhis for Vidhansabha Patiala Rural PDF summary (percentages vs this number). */
+const MAHILA_PDF_TARGET_SAKHIS = 2580;
+
+function formatPct(numerator: number, denominator: number): string {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return "0.00";
+  return ((numerator / denominator) * 100).toFixed(2);
+}
+
+/** Ordered KPI block for print/PDF: Patiala Rural heading, then total booths → target → OTP/Voter % → counts → booth %. */
+function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
+  const totalBooths = stats.boothWise.length;
+  const target = MAHILA_PDF_TARGET_SAKHIS;
+  const otpPct = formatPct(stats.otpVerifiedSakhis, target);
+  const voterPct = formatPct(stats.voterIdMapped, target);
+  const booth0Pct = formatPct(stats.boothsZeroSakhis, totalBooths);
+  const booth10Pct = formatPct(stats.boothsTenSakhis, totalBooths);
+
+  return `
+    <h1>Vidhansabha Patiala Rural Mahila Samman Rashi</h1>
+    <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
+    <table class="pdf-kpi">
+      <tbody>
+        <tr><td>Total booths</td><td>${totalBooths}</td></tr>
+        <tr><td>Target</td><td>${target}</td></tr>
+        <tr><td>OTP verified Sakhi percentage (÷ ${target})</td><td>${otpPct}%</td></tr>
+        <tr><td>Total OTP verified Sakhis</td><td>${stats.otpVerifiedSakhis}</td></tr>
+        <tr><td>Has Voter ID percentage (÷ ${target})</td><td>${voterPct}%</td></tr>
+        <tr><td>Total has Voter ID</td><td>${stats.voterIdMapped}</td></tr>
+        <tr><td>Booths with 0 Sakhis</td><td>${stats.boothsZeroSakhis} (${booth0Pct}% of ${totalBooths} booths)</td></tr>
+        <tr><td>Booths with 10+ Sakhis</td><td>${stats.boothsTenSakhis} (${booth10Pct}% of ${totalBooths} booths)</td></tr>
+      </tbody>
+    </table>
+  `;
 }
 
 function downloadCsv(content: string, filename: string) {
@@ -136,6 +170,10 @@ function printToPdf(title: string, htmlContent: string) {
     .stat-item { padding: 8px 12px; background: linear-gradient(135deg,#eff6ff,#e0f2fe); border-radius: 8px; min-width: 150px; border: 1px solid #bfdbfe; }
     .stat-label { font-size: 0.70rem; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
     .stat-value { font-size: 1.1rem; font-weight: 700; color: #0f172a; }
+    .pdf-kpi { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.95rem; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .pdf-kpi td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .pdf-kpi tr:last-child td { border-bottom: none; }
+    .pdf-kpi td:first-child { font-weight: 600; width: 52%; background: #f8fafc; color: #334155; }
   </style>
 </head>
 <body>
@@ -342,12 +380,6 @@ export default function MahilaSammanAdminPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-4 pb-3 px-3">
-                <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Voter Card Uploaded Sakhis</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.voterCardUploadedSakhis}</p>
-              </CardContent>
-            </Card>
             <Card
               role="button"
               className="cursor-pointer hover:border-indigo-300"
@@ -415,32 +447,7 @@ export default function MahilaSammanAdminPage() {
               variant="default"
               size="sm"
               onClick={() => {
-                const summaryHtml = `
-                  <div class="section">
-                    <h2>1. Summary</h2>
-                    <div class="stat-block">
-                      <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
-                        <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
-                      </div>
-                      <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Aadhaar Uploaded Sakhis</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Voter Card Uploaded Sakhis</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
-                      </div>
-                      <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
-                        <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
-                      </div>
-                      <div class="stat-row">
-                        <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (at least 1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
-                        <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
-                        <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
-                      </div>
-                    </div>
-                  </div>
-                `;
+                const summaryHtml = buildVidhansabhaPatialaSummaryHtml(stats);
                 const boothRows = stats.boothWise.map((r) => `<tr><td>${r.boothId}</td><td>${r.count}</td></tr>`).join("");
                 const boothHtml = stats.boothWise.length > 0 ? `
                   <div class="section">
@@ -460,14 +467,8 @@ export default function MahilaSammanAdminPage() {
                     <table><thead><tr><th>Sakhi Name</th><th>Mobile</th><th>Voter ID</th><th>Voter list Sr No</th><th>Booth</th></tr></thead><tbody>${sakhiRows}</tbody></table>
                   </div>
                 ` : "";
-                const html = `
-                  <h1>Mahila Samman Rashi – Full Report</h1>
-                  <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
-                  ${summaryHtml}
-                  ${boothHtml}
-                  ${sakhiHtml}
-                `;
-                printToPdf("Mahila Samman Full Report", html);
+                const html = `${summaryHtml}${boothHtml}${sakhiHtml}`;
+                printToPdf("Vidhansabha Patiala Rural Mahila Samman Rashi – Full Report", html);
               }}
             >
               <Download className="h-4 w-4 mr-1" />
@@ -498,32 +499,7 @@ export default function MahilaSammanAdminPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                const html = `
-                  <h1>Mahila Samman Rashi – Summary</h1>
-                  <p class="meta">Generated on ${new Date().toLocaleString("en-IN")}</p>
-                  <div class="stat-block">
-                    <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">OTP Verified Sakhis</div><div class="stat-value">${stats.otpVerifiedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Has Voter ID</div><div class="stat-value">${stats.voterIdMapped}</div></div>
-                      <div class="stat-item"><div class="stat-label">No Voter ID</div><div class="stat-value">${stats.total - stats.voterIdMapped}</div></div>
-                    </div>
-                    <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Aadhaar Uploaded Sakhis</div><div class="stat-value">${stats.aadhaarUploadedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Voter Card Uploaded Sakhis</div><div class="stat-value">${stats.voterCardUploadedSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Booth Number Known Sakhis</div><div class="stat-value">${stats.boothKnownSakhis}</div></div>
-                    </div>
-                    <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Booths with 0 Sakhis</div><div class="stat-value">${stats.boothsZeroSakhis}</div></div>
-                      <div class="stat-item"><div class="stat-label">Booths with 10+ Sakhis</div><div class="stat-value">${stats.boothsTenSakhis}</div></div>
-                    </div>
-                    <div class="stat-row">
-                      <div class="stat-item"><div class="stat-label">Clusters with OTP verified Sakhi (at least 1)</div><div class="stat-value">${stats.otpVerifiedUniqueClusters}</div></div>
-                      <div class="stat-item"><div class="stat-label">Clusters with 0 OTP verified Sakhi</div><div class="stat-value">${stats.clusterTotal - stats.otpVerifiedUniqueClusters}</div></div>
-                      <div class="stat-item"><div class="stat-label">Cluster Coverage (OTP)</div><div class="stat-value">${stats.clusterCoveragePercent}%</div></div>
-                    </div>
-                  </div>
-                `;
-                printToPdf("Mahila Samman Summary", html);
+                printToPdf("Vidhansabha Patiala Rural Mahila Samman Rashi – Summary", buildVidhansabhaPatialaSummaryHtml(stats));
               }}
             >
               <Download className="h-4 w-4 mr-1" />
