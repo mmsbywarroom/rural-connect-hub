@@ -102,6 +102,7 @@ function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
   const voterPct = formatPct(stats.voterIdMapped, target);
   const booth0Pct = formatPct(stats.boothsZeroSakhis, totalBooths);
   const booth10Pct = formatPct(stats.boothsTenSakhis, totalBooths);
+  const clustersZeroOtp = stats.clusterTotal - stats.otpVerifiedUniqueClusters;
 
   return `
     <h1>Vidhansabha Patiala Rural Mahila Samman Rashi</h1>
@@ -114,8 +115,13 @@ function buildVidhansabhaPatialaSummaryHtml(stats: MahilaSammanStats): string {
         <tr><td>Total OTP verified Sakhis</td><td>${stats.otpVerifiedSakhis}</td></tr>
         <tr><td>Has Voter ID percentage (÷ ${target})</td><td>${voterPct}%</td></tr>
         <tr><td>Total has Voter ID</td><td>${stats.voterIdMapped}</td></tr>
+        <tr><td>Aadhaar Uploaded Sakhis</td><td>${stats.aadhaarUploadedSakhis}</td></tr>
         <tr><td>Booths with 0 Sakhis</td><td>${stats.boothsZeroSakhis} (${booth0Pct}% of ${totalBooths} booths)</td></tr>
         <tr><td>Booths with 10+ Sakhis</td><td>${stats.boothsTenSakhis} (${booth10Pct}% of ${totalBooths} booths)</td></tr>
+        <tr><td>Clusters with OTP verified Sakhi (at least 1)</td><td>${stats.otpVerifiedUniqueClusters}</td></tr>
+        <tr><td>Clusters with 0 OTP verified Sakhi</td><td>${clustersZeroOtp}</td></tr>
+        <tr><td>Cluster Coverage (OTP)</td><td>${stats.clusterCoveragePercent}% <span class="pdf-kpi-sub">(${stats.otpVerifiedUniqueClusters} / ${stats.clusterTotal} clusters covered)</span></td></tr>
+        <tr><td>Booth Number Known Sakhis</td><td>${stats.boothKnownSakhis}</td></tr>
       </tbody>
     </table>
   `;
@@ -174,6 +180,7 @@ function printToPdf(title: string, htmlContent: string) {
     .pdf-kpi td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
     .pdf-kpi tr:last-child td { border-bottom: none; }
     .pdf-kpi td:first-child { font-weight: 600; width: 52%; background: #f8fafc; color: #334155; }
+    .pdf-kpi-sub { font-weight: 400; color: #64748b; font-size: 0.88em; }
   </style>
 </head>
 <body>
