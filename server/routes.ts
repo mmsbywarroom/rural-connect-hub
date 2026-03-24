@@ -5370,6 +5370,88 @@ export async function registerRoutes(
     }
   });
 
+  /** Admin: full submission text fields as CSV (no images). Optional ?search= same as list. */
+  app.get("/api/admin/mahila-samman/export-csv", async (req, res) => {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const rows = await storage.getMahilaSammanSubmissionsCsvRows({ search });
+      const escCsv = (val: unknown) => {
+        if (val === null || val === undefined) return "";
+        if (typeof val === "boolean") return val ? "Yes" : "No";
+        const s = String(val);
+        if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+      const formatUnitVillage = (villageId: string | null, villageName: string | null) => {
+        const a = (villageName || "").trim();
+        const b = (villageId || "").trim();
+        if (a && b) return `${a} (${b})`;
+        return a || b || "";
+      };
+      const headers = [
+        "Submission ID",
+        "Sakhi Name",
+        "Mobile",
+        "Father/Husband Name",
+        "Unit / Village",
+        "Consent (50 women Sakhi)",
+        "OCR Aadhaar Name",
+        "OCR Aadhaar Number",
+        "OCR Aadhaar DOB",
+        "OCR Aadhaar Gender",
+        "OCR Aadhaar Address",
+        "Voter ID (document)",
+        "Voter Name (document)",
+        "Booth ID (match)",
+        "Name (match)",
+        "Father Name (match)",
+        "Village (match)",
+        "Status",
+        "Submitted At",
+      ];
+      const lines = [
+        headers.join(","),
+        ...rows.map((r) =>
+          [
+            r.id,
+            r.sakhiName,
+            r.mobileNumber,
+            r.fatherHusbandName,
+            formatUnitVillage(r.villageId, r.villageName),
+            r.consentServeSakhi50,
+            r.ocrAadhaarName,
+            r.ocrAadhaarNumber,
+            r.ocrAadhaarDob,
+            r.ocrAadhaarGender,
+            r.ocrAadhaarAddress,
+            r.ocrVoterId,
+            r.ocrVoterName,
+            r.voterMappingBoothId,
+            r.voterMappingName,
+            r.voterMappingFatherName,
+            r.voterMappingVillageName,
+            r.status,
+            r.createdAt ? new Date(r.createdAt).toISOString() : "",
+          ]
+            .map(escCsv)
+            .join(","),
+        ),
+      ];
+      const csv = lines.join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="mahila_samman_submissions_${new Date().toISOString().slice(0, 10)}.csv"`,
+      );
+      res.send("\uFEFF" + csv);
+    } catch (error) {
+      console.error("Admin Mahila Samman CSV export error:", error);
+      res.status(500).json({ error: "Failed to export CSV" });
+    }
+  });
+
   app.get("/api/admin/mahila-samman/:id", async (req, res) => {
     try {
       const row = await storage.getMahilaSammanSubmission(req.params.id);

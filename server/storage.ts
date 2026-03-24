@@ -121,6 +121,30 @@ export type MahilaSammanSubmissionsPage = {
   offset: number;
 };
 
+/** Columns selected for admin CSV (no image/base64 fields). */
+export type MahilaSammanCsvExportRow = {
+  id: string;
+  sakhiName: string | null;
+  mobileNumber: string;
+  fatherHusbandName: string | null;
+  villageId: string | null;
+  villageName: string | null;
+  consentServeSakhi50: boolean | null;
+  ocrAadhaarName: string | null;
+  ocrAadhaarNumber: string | null;
+  ocrAadhaarDob: string | null;
+  ocrAadhaarGender: string | null;
+  ocrAadhaarAddress: string | null;
+  ocrVoterId: string | null;
+  ocrVoterName: string | null;
+  voterMappingBoothId: string | null;
+  voterMappingName: string | null;
+  voterMappingFatherName: string | null;
+  voterMappingVillageName: string | null;
+  status: string | null;
+  createdAt: Date | null;
+};
+
 export interface IStorage {
   // Admin Roles
   getLoginPageConfig(): Promise<LoginPageConfig | null>;
@@ -464,6 +488,8 @@ export interface IStorage {
     offset?: number;
     search?: string;
   }): Promise<MahilaSammanSubmissionsPage>;
+  /** Text fields only — for admin CSV export (no base64 blobs). */
+  getMahilaSammanSubmissionsCsvRows(opts?: { search?: string }): Promise<MahilaSammanCsvExportRow[]>;
   getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]>;
   deleteMahilaSammanSubmission(id: string): Promise<void>;
   getMahilaSammanStats(): Promise<{
@@ -2040,6 +2066,53 @@ export class DatabaseStorage implements IStorage {
       limit,
       offset,
     };
+  }
+
+  async getMahilaSammanSubmissionsCsvRows(opts?: { search?: string }): Promise<MahilaSammanCsvExportRow[]> {
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+    const m = mahilaSammanSubmissions;
+    const base = mahilaSammanNotDeleted();
+    const whereClause =
+      safeSearch.length > 0
+        ? and(
+            base,
+            or(
+              ilike(m.sakhiName, `%${safeSearch}%`),
+              ilike(m.mobileNumber, `%${safeSearch}%`),
+              ilike(m.id, `%${safeSearch}%`),
+            ),
+          )
+        : base;
+
+    const rows = await db
+      .select({
+        id: m.id,
+        sakhiName: m.sakhiName,
+        mobileNumber: m.mobileNumber,
+        fatherHusbandName: m.fatherHusbandName,
+        villageId: m.villageId,
+        villageName: m.villageName,
+        consentServeSakhi50: m.consentServeSakhi50,
+        ocrAadhaarName: m.ocrAadhaarName,
+        ocrAadhaarNumber: m.ocrAadhaarNumber,
+        ocrAadhaarDob: m.ocrAadhaarDob,
+        ocrAadhaarGender: m.ocrAadhaarGender,
+        ocrAadhaarAddress: m.ocrAadhaarAddress,
+        ocrVoterId: m.ocrVoterId,
+        ocrVoterName: m.ocrVoterName,
+        voterMappingBoothId: m.voterMappingBoothId,
+        voterMappingName: m.voterMappingName,
+        voterMappingFatherName: m.voterMappingFatherName,
+        voterMappingVillageName: m.voterMappingVillageName,
+        status: m.status,
+        createdAt: m.createdAt,
+      })
+      .from(m)
+      .where(whereClause)
+      .orderBy(desc(m.createdAt));
+
+    return rows as MahilaSammanCsvExportRow[];
   }
 
   async getMahilaSammanSubmissionsByUser(appUserId: string): Promise<MahilaSammanSubmission[]> {

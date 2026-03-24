@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Loader2, Users, Calendar, Download, FileText, MapPin, ListOrdered } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { MahilaSammanSubmission } from "@shared/schema";
 
 export interface MahilaSammanStats {
@@ -253,9 +254,11 @@ type BoothFilter = "gt1" | "zero" | "tenPlus" | "exactlyOne" | "";
 type UncoveredClusterFilter = "mapped" | "zero" | "";
 
 export default function MahilaSammanAdminPage() {
+  const { toast } = useToast();
   const [pageIndex, setPageIndex] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [csvExporting, setCsvExporting] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput), 350);
@@ -301,6 +304,38 @@ export default function MahilaSammanAdminPage() {
   const [clusterWiseSearch, setClusterWiseSearch] = useState("");
   /** List API omits large base64 fields; fetch full row when opening detail. */
   const [detailLoading, setDetailLoading] = useState(false);
+
+  const downloadAllSubmissionsCsv = async () => {
+    setCsvExporting(true);
+    try {
+      const params = new URLSearchParams();
+      const q = debouncedSearch.trim();
+      if (q) params.set("search", q);
+      const res = await fetch(`/api/admin/mahila-samman/export-csv?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || res.statusText);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mahila_samman_submissions_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "CSV downloaded" });
+    } catch (e: unknown) {
+      toast({
+        title: "Export failed",
+        description: e instanceof Error ? e.message : "Could not download CSV",
+        variant: "destructive",
+      });
+    } finally {
+      setCsvExporting(false);
+    }
+  };
 
   const openSubmissionDetail = (s: MahilaSammanSubmission) => {
     setSelected(s);
@@ -1015,13 +1050,28 @@ export default function MahilaSammanAdminPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">All Submissions</CardTitle>
-          <Input
-            placeholder="Search by name, mobile, ID (server)"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="max-w-xs mt-2"
-          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-sm font-semibold">All Submissions</CardTitle>
+              <Input
+                placeholder="Search by name, mobile, ID (server)"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="max-w-xs mt-2"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={csvExporting}
+              onClick={() => void downloadAllSubmissionsCsv()}
+            >
+              {csvExporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+              All submissions CSV
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground mt-1">
             {listTotal === 0
               ? "0 submissions"
