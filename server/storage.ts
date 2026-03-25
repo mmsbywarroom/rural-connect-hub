@@ -480,6 +480,8 @@ export interface IStorage {
   getTirthYatraIdsByVoterIds(normalizedVoterIds: string[]): Promise<{ id: string; ocrVoterId: string }[]>;
 
   getVoterMappingByVoterId(voterId: string): Promise<VoterMappingMaster | null>;
+  /** One row per distinct booth (trimmed); empty/null booth grouped as "(no booth)". */
+  getVoterMappingBoothTotals(): Promise<{ boothId: string; totalVoters: number }[]>;
   createMahilaSammanSubmission(data: InsertMahilaSammanSubmission): Promise<MahilaSammanSubmission>;
   updateMahilaSammanSubmission(id: string, data: Partial<InsertMahilaSammanSubmission>): Promise<MahilaSammanSubmission | undefined>;
   getMahilaSammanSubmission(id: string): Promise<MahilaSammanSubmission | undefined>;
@@ -1293,6 +1295,28 @@ export class DatabaseStorage implements IStorage {
 
   async clearVoterMappingMaster(): Promise<void> {
     await db.delete(voterMappingMaster);
+  }
+
+  async getVoterMappingBoothTotals(): Promise<{ boothId: string; totalVoters: number }[]> {
+    const boothKeyExpr = sql`COALESCE(NULLIF(TRIM(${voterMappingMaster.boothId}), ''), '(no booth)')`;
+    const rawRows = await db
+      .select({
+        boothId: boothKeyExpr,
+        totalVoters: sql<number>`count(*)::int`,
+      })
+      .from(voterMappingMaster)
+      .groupBy(boothKeyExpr);
+    const sorted = [...rawRows].sort((a, b) => {
+      const aa = String(a.boothId);
+      const bb = String(b.boothId);
+      if (aa === "(no booth)") return 1;
+      if (bb === "(no booth)") return -1;
+      return aa.localeCompare(bb, undefined, { numeric: true });
+    });
+    return sorted.map((r) => ({
+      boothId: String(r.boothId),
+      totalVoters: Number(r.totalVoters),
+    }));
   }
 
   /** All distinct normalized (lowercase trim) voter ids that have at least one HSTC submission (for "has task" sort) */

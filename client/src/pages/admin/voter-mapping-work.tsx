@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,6 +30,12 @@ type VoterMappingResponse = {
   total: number;
   limit: number;
   offset: number;
+};
+
+type BoothTotalsResponse = {
+  rows: { boothId: string; totalVoters: number }[];
+  grandTotal: number;
+  distinctBooths: number;
 };
 
 function parseCSV(text: string): string[][] {
@@ -85,6 +91,10 @@ export default function VoterMappingWorkPage() {
     queryKey: [queryUrl],
   });
 
+  const { data: boothTotals, isLoading: boothTotalsLoading } = useQuery<BoothTotalsResponse>({
+    queryKey: ["/api/admin/voter-mapping/booth-totals"],
+  });
+
   const importMutation = useMutation({
     mutationFn: async (rows: any[]) => {
       const res = await apiRequest("POST", "/api/admin/voter-mapping/import", { rows });
@@ -93,6 +103,7 @@ export default function VoterMappingWorkPage() {
     onSuccess: (result) => {
       toast({ title: "Chunk imported", description: `${result.inserted} rows` });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/voter-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/voter-mapping/booth-totals"] });
     },
     onError: () => {
       toast({ title: "Import failed", variant: "destructive" });
@@ -106,6 +117,7 @@ export default function VoterMappingWorkPage() {
     onSuccess: () => {
       toast({ title: "Table cleared" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/voter-mapping"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/voter-mapping/booth-totals"] });
     },
     onError: () => toast({ title: "Failed to clear", variant: "destructive" }),
   });
@@ -166,6 +178,28 @@ export default function VoterMappingWorkPage() {
       setImporting(false);
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const boothRows = boothTotals?.rows ?? [];
+  const boothGrandTotal = boothTotals?.grandTotal ?? 0;
+  const boothDistinct = boothTotals?.distinctBooths ?? 0;
+
+  const boothSummaryCsv = useMemo(() => {
+    const header = ["Booth Number", "Total Voters"];
+    const lines = boothRows.map((r) => [r.boothId, String(r.totalVoters)].map(escapeCSVField).join(","));
+    const totalLine = ["Total (all booths)", String(boothGrandTotal)].map(escapeCSVField).join(",");
+    return "\uFEFF" + [header.map(escapeCSVField).join(","), ...lines, totalLine].join("\n");
+  }, [boothRows, boothGrandTotal]);
+
+  const handleDownloadBoothTotalsCsv = () => {
+    const csv = boothSummaryCsv;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `voter-mapping-booth-totals-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleDownloadCSV = () => {
@@ -250,6 +284,62 @@ export default function VoterMappingWorkPage() {
             <Trash2 className="h-4 w-4 mr-2" />
             Clear table
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center gap-2 justify-between">
+            <div>
+              <CardTitle className="text-sm">Booth-wise voter count</CardTitle>
+              <CardDescription className="text-xs mt-1">
+                Count of voter rows per booth number (BoothId, trimmed). Missing booth → &quot;(no booth)&quot;.
+                {boothDistinct > 0 && (
+                  <span className="block mt-1">
+                    Distinct booths: {boothDistinct} · Total voters (grand): {boothGrandTotal}
+                  </span>
+                )}
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0"
+              onClick={handleDownloadBoothTotalsCsv}
+              disabled={boothRows.length === 0}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              CSV (booth totals)
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {boothTotalsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : boothRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">Import CSV to see booth-wise totals.</p>
+          ) : (
+            <div className="overflow-x-auto max-h-[min(420px,50vh)] overflow-y-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Booth number</TableHead>
+                    <TableHead className="text-right">Total voters</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {boothRows.map((r) => (
+                    <TableRow key={r.boothId}>
+                      <TableCell className="font-mono text-sm">{r.boothId}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.totalVoters}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

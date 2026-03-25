@@ -3015,6 +3015,18 @@ export async function registerRoutes(
 
   // ===== Voter Mapping Work (admin): sheet import + match with task OCR voter IDs =====
   // Rows with at least one task match (Voter ID) are shown first; task names and links to open that submission
+  /** Booth number → total voter rows (voter mapping sheet), for summary + CSV */
+  app.get("/api/admin/voter-mapping/booth-totals", async (_req, res) => {
+    try {
+      const rows = await storage.getVoterMappingBoothTotals();
+      const grandTotal = rows.reduce((s, r) => s + r.totalVoters, 0);
+      res.json({ rows, grandTotal, distinctBooths: rows.length });
+    } catch (error) {
+      console.error("Voter mapping booth totals error:", error);
+      res.status(500).json({ error: "Failed to fetch booth totals" });
+    }
+  });
+
   app.get("/api/admin/voter-mapping", async (req, res) => {
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
