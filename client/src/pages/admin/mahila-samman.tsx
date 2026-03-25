@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -321,6 +321,14 @@ export default function MahilaSammanAdminPage() {
   const { data: stats, isLoading: statsLoading } = useQuery<MahilaSammanStats>({
     queryKey: ["/api/admin/mahila-samman/stats"],
   });
+
+  /** Booths in voter mapping with zero Sakhi nominations (same source as “Booths with 0 Sakhis” stat). */
+  const boothsWithNoSakhi = useMemo(() => {
+    if (!stats?.boothWise) return [];
+    return [...stats.boothWise]
+      .filter((b) => b.count === 0)
+      .sort((a, b) => a.boothId.localeCompare(b.boothId, undefined, { numeric: true }));
+  }, [stats]);
   const [selected, setSelected] = useState<MahilaSammanSubmission | null>(null);
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
@@ -406,6 +414,17 @@ export default function MahilaSammanAdminPage() {
     downloadCsv(
       [header.join(","), ...lines].join("\n"),
       `mahila_covered_clusters_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    toast({ title: "CSV downloaded" });
+  };
+
+  const downloadBoothsNoSakhiCsv = () => {
+    if (!stats) return;
+    const header = ["Booth Number", "Sakhi count"];
+    const lines = boothsWithNoSakhi.map((b) => [b.boothId, b.count].map(csvEscapeCell).join(","));
+    downloadCsv(
+      [header.join(","), ...lines].join("\n"),
+      `mahila_booths_no_sakhi_${new Date().toISOString().slice(0, 10)}.csv`,
     );
     toast({ title: "CSV downloaded" });
   };
@@ -612,6 +631,10 @@ export default function MahilaSammanAdminPage() {
               <Download className="h-4 w-4 mr-1" />
               Download CSV (Sakhis)
             </Button>
+            <Button type="button" variant="outline" size="sm" onClick={downloadBoothsNoSakhiCsv}>
+              <Download className="h-4 w-4 mr-1" />
+              Download CSV (Booths – no Sakhi)
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -623,6 +646,54 @@ export default function MahilaSammanAdminPage() {
               Download PDF (Summary)
             </Button>
           </div>
+
+          {/* Booths where no Sakhi has been added yet (count = 0 in voter mapping) */}
+          <Card className="border-amber-200 bg-amber-50/40">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-amber-700" />
+                    Booths with no Sakhi added
+                  </CardTitle>
+                  <CardDescription>
+                    Booth numbers from voter mapping where no Sakhi nomination is recorded yet (Sakhi count = 0).
+                  </CardDescription>
+                  <p className="text-xs text-amber-900/80 font-medium mt-2">
+                    Total: {boothsWithNoSakhi.length} booth{boothsWithNoSakhi.length === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={downloadBoothsNoSakhiCsv}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Download CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {boothsWithNoSakhi.length === 0 ? (
+                <p className="text-sm text-slate-600 py-2">Every booth has at least one Sakhi recorded, or mapping data is not loaded.</p>
+              ) : (
+                <div className="overflow-x-auto max-h-[360px] overflow-y-auto rounded-md border border-amber-100 bg-white">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-amber-50/90 border-b border-amber-100">
+                      <tr className="text-left text-slate-700">
+                        <th className="py-2 px-3 font-medium">Booth number</th>
+                        <th className="py-2 px-3 font-medium text-right">Sakhi count</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {boothsWithNoSakhi.map((row) => (
+                        <tr key={row.boothId} className="border-b border-slate-100 last:border-0">
+                          <td className="py-2 px-3 font-mono text-xs">{row.boothId}</td>
+                          <td className="py-2 px-3 text-right font-semibold text-amber-800">{row.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Booth-wise count (shown only when a filter card is clicked) */}
           {boothFilter && stats.boothWise.length > 0 && (
