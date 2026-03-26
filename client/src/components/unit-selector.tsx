@@ -203,6 +203,15 @@ interface UnitSubmissionHistoryProps {
 
 export function UnitSubmissionHistory({ userId, villageId, taskType, taskConfigId }: UnitSubmissionHistoryProps) {
   const { t } = useTranslation();
+  const formatSubmissionDate = (rawDate?: string | null) => {
+    if (!rawDate) return null;
+    const normalized = rawDate.includes(" ") && !rawDate.includes("T")
+      ? rawDate.replace(" ", "T")
+      : rawDate;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  };
   const endpoint = (() => {
     switch (taskType) {
       case "csc-report":
@@ -216,12 +225,13 @@ export function UnitSubmissionHistory({ userId, villageId, taskType, taskConfigI
     }
   })();
 
-  const { data, isLoading } = useQuery<SubmissionItem[] | { submissions: SubmissionItem[]; count: number }>({
+  const { data, isLoading, isError } = useQuery<SubmissionItem[] | { submissions: SubmissionItem[]; count: number }>({
     queryKey: [endpoint],
     enabled: !!userId && !!villageId,
+    retry: 1,
   });
 
-  const submissions = Array.isArray(data) ? data : (data as any)?.submissions || [];
+  const submissions = Array.isArray(data) ? data : (data as any)?.submissions || (data as any)?.items || [];
   const count = submissions.length;
 
   if (isLoading) {
@@ -229,6 +239,14 @@ export function UnitSubmissionHistory({ userId, villageId, taskType, taskConfigI
       <div className="space-y-2 mt-3">
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mt-3 text-xs text-amber-600">
+        {t('yourSubmissions')}: unable to load right now.
       </div>
     );
   }
@@ -265,7 +283,7 @@ export function UnitSubmissionHistory({ userId, villageId, taskType, taskConfigI
             </div>
             {s.createdAt && (
               <span className="text-slate-400 flex-shrink-0">
-                {new Date(s.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                {formatSubmissionDate(s.createdAt) ?? "—"}
               </span>
             )}
           </div>
