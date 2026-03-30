@@ -39,6 +39,7 @@ import {
   tirthYatraRequests,
   mahilaSammanSubmissions,
   mahilaSammanPunjabSubmissions,
+  voterMappingMaster,
   nvyReports, insertNvyReportSchema,
   roadReports, insertRoadReportSchema,
   blaSubmissions, insertBlaSubmissionSchema,
@@ -5529,7 +5530,6 @@ export async function registerRoutes(
 
       let mappingRows: any[] = [];
       if (normalizedVoterIds.length > 0) {
-        const inList = normalizedVoterIds.map((id) => sql`${id}`);
         mappingRows = await db
           .select({
             slNo: voterMappingMaster.slNo,
@@ -5541,7 +5541,10 @@ export async function registerRoutes(
           })
           .from(voterMappingMaster)
           .where(
-            sql`LOWER(TRIM(${voterMappingMaster.voterId})) IN (${sql.join(inList, sql`, `)})`,
+            sql`LOWER(TRIM(${voterMappingMaster.voterId})) IN (${sql.join(
+              normalizedVoterIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
           );
       }
 
@@ -5615,9 +5618,10 @@ export async function registerRoutes(
         `attachment; filename="mahila_samman_punjab_export_${new Date().toISOString().slice(0, 10)}.csv"`,
       );
       res.send("\uFEFF" + csv);
-    } catch (error) {
+    } catch (error: any) {
+      const details = error?.message ? String(error.message) : typeof error === "string" ? error : "Unknown error";
       console.error("Admin Mahila Samman Punjab CSV export error:", error);
-      res.status(500).json({ error: "Failed to export CSV" });
+      res.status(500).json({ error: "Failed to export CSV", details });
     }
   });
 

@@ -93,7 +93,13 @@ export default function MahilaSammanPunjabAdminPage() {
       });
       if (!res.ok) {
         const t = await res.text();
-        throw new Error(t || res.statusText);
+        try {
+          const j = JSON.parse(t);
+          const msg = j?.details ? `${j.error || "Failed"}: ${j.details}` : (j?.error || res.statusText);
+          throw new Error(msg);
+        } catch {
+          throw new Error(t || res.statusText);
+        }
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -106,7 +112,7 @@ export default function MahilaSammanPunjabAdminPage() {
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error("Punjab CSV export failed:", e);
-      alert("CSV download failed");
+      alert(e instanceof Error ? e.message : "CSV download failed");
     }
   };
 
