@@ -5555,6 +5555,50 @@ export async function registerRoutes(
         byVoterId.set(key, r);
       }
 
+      // Join voter_list for "NAME" + "Mobile" columns (voter_mapping_master does not contain mobile numbers).
+      const voterIdUpperList = Array.from(
+        new Set(
+          mappingRows
+            .map((r) => String(r.voterId || "").trim())
+            .filter(Boolean)
+            .map((v) => v.toUpperCase()),
+        ),
+      );
+      const voterListRows = voterIdUpperList.length
+        ? await db
+            .select({
+              vcardId: voterList.vcardId,
+              fullName: voterList.fullName,
+              mobileNo1: voterList.mobileNo1,
+              engFirstName: voterList.engFirstName,
+              engLastName: voterList.engLastName,
+            })
+            .from(voterList)
+            .where(inArray(voterList.vcardId, voterIdUpperList))
+        : [];
+      const voterListByVcardId = new Map<string, (typeof voterListRows)[number]>();
+      for (const r of voterListRows) {
+        const key = (r.vcardId || "").trim().toLowerCase();
+        if (!key) continue;
+        voterListByVcardId.set(key, r);
+      }
+
+      const enriched = submissions.map((s) => {
+        const normalizedVid = (s.ocrVoterId || "").trim().toLowerCase();
+        const mapping = normalizedVid ? byVoterId.get(normalizedVid) : undefined;
+        const boothId = (s.voterMappingBoothId || s.manualBoothId || mapping?.boothId || "").toString().trim();
+        const voterKey = (mapping?.voterId || "").trim().toLowerCase();
+        const voterRec = voterKey ? voterListByVcardId.get(voterKey) : undefined;
+        return { s, mapping, boothId, voterRec };
+      });
+
+      // "User" column in template: how many nominations/users have been added on this booth.
+      const userCountByBooth = new Map<string, number>();
+      for (const e of enriched) {
+        if (!e.boothId) continue;
+        userCountByBooth.set(e.boothId, (userCountByBooth.get(e.boothId) || 0) + 1);
+      }
+
       const headers = [
         "Booth No",
         "Voters",
@@ -5565,33 +5609,34 @@ export async function registerRoutes(
         "NAME",
         "Mobile",
         "Father/Husband Category",
-        "OCR Aadhaar Data",
+        "OCR Aadhaar Name",
+        "OCR Aadhaar DOB",
+        "OCR Aadhaar Number",
         "Voter ID & Match",
       ];
 
-      const rows = submissions.map((s) => {
-        const normalizedVid = (s.ocrVoterId || "").trim().toLowerCase();
-        const mapping = normalizedVid ? byVoterId.get(normalizedVid) : undefined;
-        const boothId = (s.voterMappingBoothId || s.manualBoothId || mapping?.boothId || "").toString().trim();
+      const rows = enriched.map(({ s, boothId, mapping, voterRec }) => {
         const voters = boothTotalsMap.get(boothId) ?? 0;
-        const userSlNo = mapping?.slNo ?? "";
+        const userCount = userCountByBooth.get(boothId) ?? 0;
 
-        const name = s.name ?? "";
-        const mobile = s.mobileNumber ?? "";
+        const sakhiName = `${s.name || ""}${s.id ? ` (${String(s.id).slice(0, 8)})` : ""}`;
+        const sakhiMobile = s.mobileNumber || "";
 
-        const ocrAadhaarData = [
-          s.ocrAadhaarName || "",
-          s.ocrAadhaarNumber || "",
-          s.ocrAadhaarDob || "",
-          // Gender/address might make the cell too large; keep compact and template-friendly.
-        ]
-          .filter(Boolean)
-          .join(" | ");
+        const unit = mapping?.villageName || s.villageName || "";
+
+        const voterName =
+          voterRec?.fullName ||
+          [voterRec?.engFirstName || "", voterRec?.engLastName || ""].join(" ").trim() ||
+          mapping?.name ||
+          "";
+        const voterMobile = voterRec?.mobileNo1 || "";
+
+        const fatherHusbandCategory = `${s.fatherHusbandName || ""}${s.category ? ` | ${s.category}` : ""}`;
 
         const voterIdMatch = [
           s.ocrVoterId || "",
           boothId ? `Booth:${boothId}` : "",
-          (s.voterMappingName || mapping?.name) ? `Match:${s.voterMappingName || mapping?.name}` : "",
+          mapping?.name ? `Match:${mapping.name}` : "",
         ]
           .filter(Boolean)
           .join(" | ");
@@ -5599,14 +5644,16 @@ export async function registerRoutes(
         return [
           boothId,
           voters,
-          userSlNo,
-          name,
-          mobile,
-          s.villageName || "",
-          name,
-          mobile,
-          `${s.fatherHusbandName || ""}${s.category ? ` | ${s.category}` : ""}`,
-          ocrAadhaarData,
+          userCount,
+          sakhiName,
+          sakhiMobile,
+          unit,
+          voterName,
+          voterMobile,
+          fatherHusbandCategory,
+          s.ocrAadhaarName || "",
+          s.ocrAadhaarDob || "",
+          s.ocrAadhaarNumber || "",
           voterIdMatch,
         ];
       });
