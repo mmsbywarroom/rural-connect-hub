@@ -11,7 +11,7 @@ import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, sendCustomSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
 import bcrypt from "bcryptjs";
-import { sql, count, eq, desc, gte, lte, and, inArray } from "drizzle-orm";
+import { sql, count, eq, desc, gte, lte, and, or, inArray, ilike } from "drizzle-orm";
 import {
   insertVillageSchema, insertIssueSchema, insertWingSchema, insertGovWingSchema, insertPositionSchema,
   insertDepartmentSchema, insertLeadershipFlagSchema, insertVolunteerSchema,
@@ -5458,6 +5458,169 @@ export async function registerRoutes(
     }
   });
 
+  /**
+   * Admin: Booth-wise CSV for "Mahila Samman Rashi through Punjab Gov".
+   * Format is designed to match the existing spreadsheet template:
+   * Booth No, Voters (from voter mapping master), User (voter mapping sl_no),
+   * Sakhi details (Punjab submissions), plus OCR Aadhaar + Voter ID match details.
+   */
+  app.get("/api/admin/mahila-samman-punjab/export-csv", async (req, res) => {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const escCsv = (val: unknown) => {
+        if (val === null || val === undefined) return "";
+        if (typeof val === "boolean") return val ? "Yes" : "No";
+        const s = String(val);
+        if (s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
+      const safeSearch = (search ?? "").trim().replace(/[%_\\]/g, "");
+      const whereClause =
+        safeSearch.length > 0
+          ? and(
+              or(
+                ilike(mahilaSammanPunjabSubmissions.name, `%${safeSearch}%`),
+                ilike(mahilaSammanPunjabSubmissions.mobileNumber, `%${safeSearch}%`),
+                ilike(mahilaSammanPunjabSubmissions.ocrVoterId, `%${safeSearch}%`),
+                ilike(mahilaSammanPunjabSubmissions.id, `%${safeSearch}%`),
+              ),
+            )
+          : undefined;
+
+      // Pull all submissions (admin export typically used for bulk download)
+      let submissionsQuery = db
+        .select({
+          id: mahilaSammanPunjabSubmissions.id,
+          name: mahilaSammanPunjabSubmissions.name,
+          mobileNumber: mahilaSammanPunjabSubmissions.mobileNumber,
+          fatherHusbandName: mahilaSammanPunjabSubmissions.fatherHusbandName,
+          category: mahilaSammanPunjabSubmissions.category,
+          villageName: mahilaSammanPunjabSubmissions.villageName,
+          ocrAadhaarName: mahilaSammanPunjabSubmissions.ocrAadhaarName,
+          ocrAadhaarNumber: mahilaSammanPunjabSubmissions.ocrAadhaarNumber,
+          ocrAadhaarDob: mahilaSammanPunjabSubmissions.ocrAadhaarDob,
+          ocrAadhaarGender: mahilaSammanPunjabSubmissions.ocrAadhaarGender,
+          ocrAadhaarAddress: mahilaSammanPunjabSubmissions.ocrAadhaarAddress,
+          ocrVoterId: mahilaSammanPunjabSubmissions.ocrVoterId,
+          ocrVoterName: mahilaSammanPunjabSubmissions.ocrVoterName,
+          voterMappingBoothId: mahilaSammanPunjabSubmissions.voterMappingBoothId,
+          voterMappingName: mahilaSammanPunjabSubmissions.voterMappingName,
+          manualBoothId: mahilaSammanPunjabSubmissions.manualBoothId,
+          createdAt: mahilaSammanPunjabSubmissions.createdAt,
+        })
+        .from(mahilaSammanPunjabSubmissions);
+      if (whereClause) submissionsQuery = submissionsQuery.where(whereClause);
+      const submissions = await submissionsQuery;
+
+      const normalizedVoterIds = Array.from(
+        new Set(
+          (submissions || [])
+            .map((s) => (s.ocrVoterId || "").trim().toLowerCase())
+            .filter((v) => !!v),
+        ),
+      );
+
+      // voter mapping master: to get Booth-wise voter totals + voter mapping sl_no ("User" column)
+      const boothTotals = await storage.getVoterMappingBoothTotals();
+      const boothTotalsMap = new Map<string, number>(boothTotals.map((r) => [String(r.boothId).trim(), Number(r.totalVoters)]));
+
+      let mappingRows: any[] = [];
+      if (normalizedVoterIds.length > 0) {
+        const inList = normalizedVoterIds.map((id) => sql`${id}`);
+        mappingRows = await db
+          .select({
+            slNo: voterMappingMaster.slNo,
+            boothId: voterMappingMaster.boothId,
+            name: voterMappingMaster.name,
+            fatherName: voterMappingMaster.fatherName,
+            villageName: voterMappingMaster.villageName,
+            voterId: voterMappingMaster.voterId,
+          })
+          .from(voterMappingMaster)
+          .where(
+            sql`LOWER(TRIM(${voterMappingMaster.voterId})) IN (${sql.join(inList, sql`, `)})`,
+          );
+      }
+
+      const byVoterId = new Map<string, (typeof mappingRows)[number]>();
+      for (const r of mappingRows) {
+        const key = (r.voterId || "").trim().toLowerCase();
+        if (!key) continue;
+        byVoterId.set(key, r);
+      }
+
+      const headers = [
+        "Booth No",
+        "Voters",
+        "User",
+        "Sakhi Name",
+        "Sakhi Mobile Number",
+        "Unit",
+        "NAME",
+        "Mobile",
+        "Father/Husband Category",
+        "OCR Aadhaar Data",
+        "Voter ID & Match",
+      ];
+
+      const rows = submissions.map((s) => {
+        const normalizedVid = (s.ocrVoterId || "").trim().toLowerCase();
+        const mapping = normalizedVid ? byVoterId.get(normalizedVid) : undefined;
+        const boothId = (s.voterMappingBoothId || s.manualBoothId || mapping?.boothId || "").toString().trim();
+        const voters = boothTotalsMap.get(boothId) ?? 0;
+        const userSlNo = mapping?.slNo ?? "";
+
+        const name = s.name ?? "";
+        const mobile = s.mobileNumber ?? "";
+
+        const ocrAadhaarData = [
+          s.ocrAadhaarName || "",
+          s.ocrAadhaarNumber || "",
+          s.ocrAadhaarDob || "",
+          // Gender/address might make the cell too large; keep compact and template-friendly.
+        ]
+          .filter(Boolean)
+          .join(" | ");
+
+        const voterIdMatch = [
+          s.ocrVoterId || "",
+          boothId ? `Booth:${boothId}` : "",
+          (s.voterMappingName || mapping?.name) ? `Match:${s.voterMappingName || mapping?.name}` : "",
+        ]
+          .filter(Boolean)
+          .join(" | ");
+
+        return [
+          boothId,
+          voters,
+          userSlNo,
+          name,
+          mobile,
+          s.villageName || "",
+          name,
+          mobile,
+          `${s.fatherHusbandName || ""}${s.category ? ` | ${s.category}` : ""}`,
+          ocrAadhaarData,
+          voterIdMatch,
+        ];
+      });
+
+      const csv = [headers.join(","), ...rows.map((r) => r.map(escCsv).join(","))].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="mahila_samman_punjab_export_${new Date().toISOString().slice(0, 10)}.csv"`,
+      );
+      res.send("\uFEFF" + csv);
+    } catch (error) {
+      console.error("Admin Mahila Samman Punjab CSV export error:", error);
+      res.status(500).json({ error: "Failed to export CSV" });
+    }
+  });
+
   app.get("/api/admin/mahila-samman/:id", async (req, res) => {
     try {
       const row = await storage.getMahilaSammanSubmission(req.params.id);
@@ -5592,12 +5755,37 @@ export async function registerRoutes(
         voterMappingVillageName,
         manualBoothId,
         category,
+        qualification,
+        bankName,
+        bankAccountNumber,
+        bankAccountNumberConfirm,
+        bankIfscCode,
+        bankDocument,
         sakhiPhoto,
         declarationChecked,
       } = body;
       if (!appUserId || !name?.trim() || !mobileNumber?.trim() || !mobileVerified) {
         return res.status(400).json({ error: "Name and verified mobile required" });
       }
+
+      // Prevent duplicate submissions per mobile number (same task)
+      const mobileTrim = String(mobileNumber || "").trim();
+      const normalizedMobile = normalizeMobile(mobileTrim);
+      const existingByTrim = await db.select({ id: mahilaSammanPunjabSubmissions.id })
+        .from(mahilaSammanPunjabSubmissions)
+        .where(eq(mahilaSammanPunjabSubmissions.mobileNumber, mobileTrim));
+      if (existingByTrim.length > 0) {
+        return res.status(409).json({ error: "DUPLICATE", message: "You have already submitted this application for this mobile number" });
+      }
+      if (normalizedMobile && normalizedMobile !== mobileTrim) {
+        const existingByNormalized = await db.select({ id: mahilaSammanPunjabSubmissions.id })
+          .from(mahilaSammanPunjabSubmissions)
+          .where(eq(mahilaSammanPunjabSubmissions.mobileNumber, normalizedMobile));
+        if (existingByNormalized.length > 0) {
+          return res.status(409).json({ error: "DUPLICATE", message: "You have already submitted this application for this mobile number" });
+        }
+      }
+
       if (!fatherHusbandName?.trim()) {
         return res.status(400).json({ error: "Father/Husband name required" });
       }
@@ -5617,6 +5805,40 @@ export async function registerRoutes(
       if (!category || !["general", "obc", "sc", "st"].includes(String(category).toLowerCase())) {
         return res.status(400).json({ error: "Category required (General, OBC, SC, ST)" });
       }
+
+      if (!qualification?.trim()) {
+        return res.status(400).json({ error: "Qualification required" });
+      }
+
+      if (!bankName?.trim()) {
+        return res.status(400).json({ error: "Bank name required" });
+      }
+
+      const account = String(bankAccountNumber || "").replace(/\s/g, "");
+      const accountConfirm = String(bankAccountNumberConfirm || "").replace(/\s/g, "");
+      if (!account) {
+        return res.status(400).json({ error: "Account number required" });
+      }
+      if (!accountConfirm) {
+        return res.status(400).json({ error: "Confirm account number required" });
+      }
+      if (account !== accountConfirm) {
+        return res.status(400).json({ error: "Account number does not match" });
+      }
+      if (!/^\d{9,18}$/.test(account)) {
+        return res.status(400).json({ error: "Account number must be 9-18 digits" });
+      }
+
+      const ifsc = String(bankIfscCode || "").trim().toUpperCase();
+      // IFSC: 4 letters + 0 + 6 alphanumeric
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        return res.status(400).json({ error: "Valid IFSC code required" });
+      }
+
+      if (!bankDocument) {
+        return res.status(400).json({ error: "Bank document upload required" });
+      }
+
       if (!sakhiPhoto) {
         return res.status(400).json({ error: "Sakhi live photo required" });
       }
@@ -5628,7 +5850,7 @@ export async function registerRoutes(
         villageId: villageId || null,
         villageName: villageName || null,
         name: String(name).trim(),
-        mobileNumber: String(mobileNumber).trim(),
+        mobileNumber: normalizedMobile || String(mobileNumber).trim(),
         mobileVerified: true,
         fatherHusbandName: String(fatherHusbandName).trim(),
         aadhaarFront: aadhaarFront || null,
@@ -5647,6 +5869,11 @@ export async function registerRoutes(
         voterMappingVillageName: voterMappingVillageName || null,
         manualBoothId: manualBoothId ? String(manualBoothId).trim() : null,
         category: String(category).toLowerCase(),
+        qualification: String(qualification).trim(),
+        bankName: String(bankName).trim(),
+        bankAccountNumber: account,
+        bankIfscCode: ifsc,
+        bankDocument: bankDocument || null,
         sakhiPhoto: sakhiPhoto || null,
         declarationChecked: !!declarationChecked,
         status: "pending",

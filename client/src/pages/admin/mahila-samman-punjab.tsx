@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Calendar, FileText } from "lucide-react";
+import { Loader2, Users, Calendar, FileText, Download } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MahilaSammanPunjabSubmission } from "@shared/schema";
 
@@ -65,6 +65,12 @@ export default function MahilaSammanPunjabAdminPage() {
   const [status, setStatus] = useState<string>("pending");
   const [adminNote, setAdminNote] = useState("");
   const [search, setSearch] = useState("");
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const updateMutation = useMutation({
     mutationFn: async () => {
@@ -78,6 +84,32 @@ export default function MahilaSammanPunjabAdminPage() {
     },
   });
 
+  const downloadCsv = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      const res = await fetch(`/api/admin/mahila-samman-punjab/export-csv?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || res.statusText);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mahila_samman_punjab_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Punjab CSV export failed:", e);
+      alert("CSV download failed");
+    }
+  };
+
   const sorted = list.slice().sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime());
   const filtered = !search.trim()
     ? sorted
@@ -88,6 +120,12 @@ export default function MahilaSammanPunjabAdminPage() {
           (s.ocrVoterId || "").toLowerCase().includes(search.toLowerCase()) ||
           (s.id || "").toLowerCase().includes(search.toLowerCase())
       );
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const startIndex = (pageSafe - 1) * PAGE_SIZE;
+  const pageItems = filtered.slice(startIndex, startIndex + PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -101,13 +139,23 @@ export default function MahilaSammanPunjabAdminPage() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">All Submissions (serial-wise)</CardTitle>
-          <Input
-            placeholder="Search by name, mobile, voter ID"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs mt-2"
-          />
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-sm font-semibold">All Submissions (serial-wise)</CardTitle>
+              <Input
+                placeholder="Search by name, mobile, voter ID"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="max-w-xs mt-2"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => void downloadCsv()}>
+                <Download className="h-4 w-4 mr-1" />
+                Download CSV
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {isLoading ? (
@@ -117,7 +165,7 @@ export default function MahilaSammanPunjabAdminPage() {
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No submissions yet.</p>
           ) : (
-            filtered.map((s, idx) => {
+            pageItems.map((s, idx) => {
               const created = s.createdAt ? new Date(s.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
               const badgeClass = STATUS_COLORS[s.status || "pending"] || STATUS_COLORS.pending;
               return (
@@ -132,7 +180,7 @@ export default function MahilaSammanPunjabAdminPage() {
                   className="w-full text-left border border-slate-200 rounded-lg px-3 py-2.5 flex items-center gap-3 hover:bg-slate-50"
                 >
                   <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 font-semibold text-purple-700 text-sm">
-                    {idx + 1}
+                    {startIndex + idx + 1}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">
@@ -161,6 +209,32 @@ export default function MahilaSammanPunjabAdminPage() {
             })
           )}
         </CardContent>
+
+        {!isLoading && filtered.length > 0 && (
+          <div className="flex items-center justify-between px-6 pb-4 pt-3">
+            <div className="text-xs text-muted-foreground">
+              Page {pageSafe} of {totalPages} • Showing {pageItems.length} of {totalItems}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={pageSafe <= 1}
+              >
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={pageSafe >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
@@ -190,6 +264,22 @@ export default function MahilaSammanPunjabAdminPage() {
                 <div>
                   <p className="font-semibold text-slate-600 text-xs">Unit / Village</p>
                   <p className="text-slate-800">{selected.villageName || "—"}</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-600 text-xs">Qualification</p>
+                  <p className="text-slate-800">{selected.qualification || "—"}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700 mb-1">Bank Details</p>
+                <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-slate-600">Bank Name:</span>
+                  <span>{selected.bankName || "—"}</span>
+                  <span className="text-slate-600">Account No:</span>
+                  <span>{selected.bankAccountNumber || "—"}</span>
+                  <span className="text-slate-600">IFSC Code:</span>
+                  <span className="break-all">{selected.bankIfscCode || "—"}</span>
                 </div>
               </div>
 
@@ -225,6 +315,7 @@ export default function MahilaSammanPunjabAdminPage() {
                   <div><DocLink src={selected.aadhaarFront} label="Aadhaar Front" /></div>
                   <div><DocLink src={selected.aadhaarBack} label="Aadhaar Back" /></div>
                   <div><DocLink src={selected.sakhiPhoto} label="Sakhi Live Photo" /></div>
+                  <div><DocLink src={selected.bankDocument} label="Bank Document" /></div>
                 </div>
               </div>
 

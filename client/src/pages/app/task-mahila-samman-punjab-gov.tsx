@@ -89,6 +89,12 @@ const labels: Record<string, { en: string; hi: string; pa: string }> = {
   close: { en: "Close", hi: "बंद करें", pa: "ਬੰਦ ਕਰੋ" },
   reading: { en: "Reading...", hi: "पढ़ रहा है...", pa: "ਪੜ੍ਹ ਰਿਹਾ ਹੈ..." },
   category: { en: "Category (Caste)", hi: "श्रेणी (जाति)", pa: "ਸ਼੍ਰੇਣੀ (ਜਾਤ)" },
+  qualification: { en: "Qualification", hi: "योग्यता", pa: "ਯੋਗਤਾ" },
+  bankName: { en: "Bank Name", hi: "बैंक का नाम", pa: "ਬੈਂਕ ਦਾ ਨਾਮ" },
+  accountNumber: { en: "Account Number", hi: "खाता संख्या", pa: "ਖਾਤਾ ਨੰਬਰ" },
+  confirmAccountNumber: { en: "Confirm Account Number", hi: "खाता संख्या की पुष्टि", pa: "ਖਾਤਾ ਨੰਬਰ ਦੀ ਪੁਸ਼ਟੀ" },
+  ifscCode: { en: "IFSC Code", hi: "आईएफएससी कोड", pa: "ਆਈਐਫਐਸਸੀ ਕੋਡ" },
+  bankDocument: { en: "Bank Document (Passbook/Cheque)", hi: "बैंक दस्तावेज़ (पासबुक/चेक)", pa: "ਬੈਂਕ ਦਸਤਾਵੇਜ਼ (ਪਾਸਬੁੱਕ/ਚੈਕ)" },
 };
 
 function L(key: string, lang: string): string {
@@ -134,6 +140,15 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
   const [manualBoothId, setManualBoothId] = useState("");
 
   const [category, setCategory] = useState<string>("");
+
+  const [qualification, setQualification] = useState<string>("");
+
+  const [bankName, setBankName] = useState<string>("");
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>("");
+  const [bankAccountNumberConfirm, setBankAccountNumberConfirm] = useState<string>("");
+  const [bankIfscCode, setBankIfscCode] = useState<string>("");
+  const [bankDocument, setBankDocument] = useState<string | null>(null);
+
   const [sakhiPhoto, setSakhiPhoto] = useState<string | null>(null);
   const [declarationChecked, setDeclarationChecked] = useState(false);
 
@@ -145,6 +160,9 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
   const voterIdFileRef = useRef<HTMLInputElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
+
+  const bankDocRef = useRef<HTMLInputElement>(null);
+  const bankDocFileRef = useRef<HTMLInputElement>(null);
 
   const { processImage, processingType } = useOcr();
 
@@ -289,6 +307,12 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
         voterMappingVillageName: voterMatch?.villageName || null,
         manualBoothId: manualBoothId.trim() || null,
         category: category || "general",
+        qualification: qualification.trim(),
+        bankName: bankName.trim(),
+        bankAccountNumber: bankAccountNumber.trim(),
+        bankAccountNumberConfirm: bankAccountNumberConfirm.trim(),
+        bankIfscCode: bankIfscCode.trim().toUpperCase(),
+        bankDocument,
         sakhiPhoto,
         declarationChecked: true,
       };
@@ -303,6 +327,11 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
       toast({ title: "Submitted successfully" });
     },
     onError: (e: any) => {
+      const msg = String(e?.message || "");
+      if (msg.includes("409") && msg.toUpperCase().includes("DUPLICATE")) {
+        toast({ title: "Already submitted", description: "This mobile number has already submitted for Mahila Samman Rashi (Punjab Gov).", variant: "destructive" });
+        return;
+      }
       toast({ title: "Error", description: e?.message || "Failed to submit", variant: "destructive" });
     },
   });
@@ -328,11 +357,22 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
     setVoterMatch(null);
     setManualBoothId("");
     setCategory("");
+    setQualification("");
+    setBankName("");
+    setBankAccountNumber("");
+    setBankAccountNumberConfirm("");
+    setBankIfscCode("");
+    setBankDocument(null);
     setSakhiPhoto(null);
     setDeclarationChecked(false);
   }
 
   const hasVoterBooth = !!(voterMatch?.boothId || manualBoothId.trim());
+  const accountMatches =
+    bankAccountNumber.trim() &&
+    bankAccountNumberConfirm.trim() &&
+    bankAccountNumber.trim() === bankAccountNumberConfirm.trim();
+  const ifscOk = /^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankIfscCode.trim().toUpperCase());
   const canSubmit =
     name.trim() &&
     mobileVerified &&
@@ -343,6 +383,11 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
     ocrVoterId.trim() &&
     hasVoterBooth &&
     category &&
+    qualification.trim() &&
+    bankName.trim() &&
+    accountMatches &&
+    ifscOk &&
+    bankDocument &&
     sakhiPhoto &&
     declarationChecked;
 
@@ -441,9 +486,21 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
                       <p className="font-semibold text-slate-600 text-xs">{L("category", language)}</p>
                       <p className="text-slate-800">{categoryLabel(sub.category || "", language)}</p>
                     </div>
+                    <div>
+                      <p className="font-semibold text-slate-600 text-xs">{L("qualification", language)}</p>
+                      <p className="text-slate-800">{sub.qualification || "—"}</p>
+                    </div>
                     <div className="sm:col-span-2">
                       <p className="font-semibold text-slate-600 text-xs">Unit / Village</p>
                       <p className="text-slate-800">{sub.villageName || "—"}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-700 mb-1">Bank Details</p>
+                    <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
+                      <span className="text-slate-600">Bank Name:</span><span>{sub.bankName || "—"}</span>
+                      <span className="text-slate-600">Account No:</span><span>{sub.bankAccountNumber || "—"}</span>
+                      <span className="text-slate-600">IFSC Code:</span><span className="break-all">{sub.bankIfscCode || "—"}</span>
                     </div>
                   </div>
                   <div>
@@ -632,6 +689,118 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
                 ))}
               </SelectContent>
             </Select>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <label className="block text-xs font-medium text-slate-600 mb-1">{L("qualification", language)}</label>
+            <Input
+              value={qualification}
+              onChange={(e) => setQualification(e.target.value)}
+              placeholder={L("qualification", language)}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("bankName", language)}</label>
+              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder={L("bankName", language)} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("accountNumber", language)}</label>
+              <Input
+                inputMode="numeric"
+                maxLength={18}
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder={L("accountNumber", language)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("confirmAccountNumber", language)}</label>
+              <Input
+                inputMode="numeric"
+                maxLength={18}
+                value={bankAccountNumberConfirm}
+                onChange={(e) => setBankAccountNumberConfirm(e.target.value.replace(/\D/g, ""))}
+                placeholder={L("confirmAccountNumber", language)}
+              />
+              {bankAccountNumberConfirm.trim() &&
+                bankAccountNumber.trim() &&
+                bankAccountNumber !== bankAccountNumberConfirm && (
+                  <p className="text-xs text-red-600 mt-1">Account numbers do not match</p>
+                )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("ifscCode", language)}</label>
+              <Input
+                value={bankIfscCode}
+                onChange={(e) => setBankIfscCode(e.target.value.toUpperCase())}
+                placeholder="e.g. SBIN0001234"
+                maxLength={11}
+                className="uppercase"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{L("bankDocument", language)}</label>
+              <input
+                ref={bankDocRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                disabled={!!processingType}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  try {
+                    const base64 = await compressImage(f);
+                    setBankDocument(base64);
+                  } catch {
+                    toast({ title: "Failed to load image", variant: "destructive" });
+                    setBankDocument(null);
+                  }
+                  if (bankDocRef.current) bankDocRef.current.value = "";
+                  if (bankDocFileRef.current) bankDocFileRef.current.value = "";
+                }}
+              />
+              <input
+                ref={bankDocFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={!!processingType}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  try {
+                    const base64 = await compressImage(f);
+                    setBankDocument(base64);
+                  } catch {
+                    toast({ title: "Failed to load image", variant: "destructive" });
+                    setBankDocument(null);
+                  }
+                  if (bankDocRef.current) bankDocRef.current.value = "";
+                  if (bankDocFileRef.current) bankDocFileRef.current.value = "";
+                }}
+              />
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => bankDocRef.current?.click()} disabled={!!processingType}>
+                  <Camera className="h-4 w-4 mr-1" /> {L("camera", language)}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => bankDocFileRef.current?.click()} disabled={!!processingType}>
+                  <Upload className="h-4 w-4 mr-1" /> {L("chooseFile", language)}
+                </Button>
+              </div>
+              {bankDocument && <img src={bankDocument} alt="" className="mt-2 h-24 rounded border object-cover" />}
+            </div>
           </CardContent>
         </Card>
 

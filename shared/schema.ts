@@ -1337,7 +1337,12 @@ export const mahilaSammanPunjabSubmissions = pgTable("mahila_samman_punjab_submi
   voterMappingVillageName: text("voter_mapping_village_name"),
   manualBoothId: text("manual_booth_id"),
   category: text("category"), // general, obc, sc, st
+  qualification: text("qualification"),
   sakhiPhoto: text("sakhi_photo"),
+  bankAccountNumber: text("bank_account_number"),
+  bankName: text("bank_name"),
+  bankIfscCode: text("bank_ifsc_code"),
+  bankDocument: text("bank_document"),
   declarationChecked: boolean("declaration_checked").default(false),
   status: text("status").default("pending").notNull(),
   adminNote: text("admin_note"),

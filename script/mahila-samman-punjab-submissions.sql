@@ -31,3 +31,42 @@ CREATE TABLE IF NOT EXISTS mahila_samman_punjab_submissions (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Add columns (safe re-run)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'mahila_samman_punjab_submissions' AND column_name = 'qualification'
+  ) THEN
+    ALTER TABLE mahila_samman_punjab_submissions ADD COLUMN qualification TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'mahila_samman_punjab_submissions' AND column_name = 'bank_account_number'
+  ) THEN
+    ALTER TABLE mahila_samman_punjab_submissions ADD COLUMN bank_account_number TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'mahila_samman_punjab_submissions' AND column_name = 'bank_name'
+  ) THEN
+    ALTER TABLE mahila_samman_punjab_submissions ADD COLUMN bank_name TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'mahila_samman_punjab_submissions' AND column_name = 'bank_ifsc_code'
+  ) THEN
+    ALTER TABLE mahila_samman_punjab_submissions ADD COLUMN bank_ifsc_code TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'mahila_samman_punjab_submissions' AND column_name = 'bank_document'
+  ) THEN
+    ALTER TABLE mahila_samman_punjab_submissions ADD COLUMN bank_document TEXT;
+  END IF;
+END $$;
