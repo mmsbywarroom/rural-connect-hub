@@ -45,7 +45,7 @@ interface TaskHomeProps {
   onProfile: () => void;
 }
 
-/** MSRP Punjab – voter map / women registration (shown to every app user on dashboard). */
+/** MSRP Punjab voter mapping (VMAP); shown to every app user on dashboard. */
 const MSRP_PUNJAB_VMAP_URL = "https://msrpunjab.replit.app/vmap";
 
 const taskTranslations: Record<string, { hi: string; pa: string; descHi: string; descPa: string }> = {
@@ -704,10 +704,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               <MapPin className="h-4 w-4 shrink-0 text-indigo-600" />
               <span className="flex-1 text-left truncate">
                 {language === "hi"
-                  ? "महिला पंजीकरण कार्यक्रम (VMAP)"
+                  ? "मतदाता मैपिंग"
                   : language === "pa"
-                  ? "ਮਹਿਲਾ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਪ੍ਰੋਗਰਾਮ (VMAP)"
-                  : "Women Registration Program (VMAP)"}
+                  ? "ਵੋਟਰ ਮੈਪਿੰਗ"
+                  : "Voter Mapping"}
               </span>
               <ExternalLink className="h-4 w-4 shrink-0 text-slate-500" />
             </Button>
