@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle, Vote } from "lucide-react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle, Vote, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -44,6 +44,9 @@ interface TaskHomeProps {
   onLogout: () => void;
   onProfile: () => void;
 }
+
+/** MSRP Punjab – voter map / women registration (shown to every app user on dashboard). */
+const MSRP_PUNJAB_VMAP_URL = "https://msrpunjab.replit.app/vmap";
 
 const taskTranslations: Record<string, { hi: string; pa: string; descHi: string; descPa: string }> = {
   "CSC/Camp Report": { hi: "सीएससी/कैंप रिपोर्ट", pa: "CSC/ਕੈਂਪ ਰਿਪੋਰਟ", descHi: "सामान्य सेवा केंद्रों और कैंप कार्यालयों की स्थिति रिपोर्ट करें", descPa: "ਕਾਮਨ ਸਰਵਿਸ ਸੈਂਟਰਾਂ ਅਤੇ ਕੈਂਪ ਦਫ਼ਤਰਾਂ ਦੀ ਸਥਿਤੀ ਰਿਪੋਰਟ ਕਰੋ" },
@@ -684,6 +687,31 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
+        </div>
+        <div className="relative mt-4">
+          <a
+            href={MSRP_PUNJAB_VMAP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block"
+            data-testid="link-msrp-punjab-vmap"
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full bg-white/95 text-slate-800 hover:bg-white shadow-md border-0 font-semibold gap-2"
+            >
+              <MapPin className="h-4 w-4 shrink-0 text-indigo-600" />
+              <span className="flex-1 text-left truncate">
+                {language === "hi"
+                  ? "महिला पंजीकरण कार्यक्रम (VMAP)"
+                  : language === "pa"
+                  ? "ਮਹਿਲਾ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਪ੍ਰੋਗਰਾਮ (VMAP)"
+                  : "Women Registration Program (VMAP)"}
+              </span>
+              <ExternalLink className="h-4 w-4 shrink-0 text-slate-500" />
+            </Button>
+          </a>
         </div>
       </header>
 
