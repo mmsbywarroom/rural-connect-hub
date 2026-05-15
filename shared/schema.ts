@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, date, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, date, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1376,6 +1376,39 @@ export const insertBlaMasterSchema = createInsertSchema(blaMaster).omit({
 
 export type InsertBlaMaster = z.infer<typeof insertBlaMasterSchema>;
 export type BlaMaster = typeof blaMaster.$inferSelect;
+
+// Daily BLA / BLO present–absent (one row per BLA per calendar date)
+export const blaAttendance = pgTable(
+  "bla_attendance",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    blaMasterId: varchar("bla_master_id")
+      .notNull()
+      .references(() => blaMaster.id),
+    appUserId: varchar("app_user_id")
+      .notNull()
+      .references(() => appUsers.id),
+    boothNumber: text("booth_number").notNull(),
+    bloName: text("blo_name").notNull(),
+    bloMobileNumber: text("blo_mobile_number").notNull(),
+    attendanceDate: text("attendance_date").notNull(),
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("bla_attendance_master_date_idx").on(table.blaMasterId, table.attendanceDate),
+  ],
+);
+
+export const insertBlaAttendanceSchema = createInsertSchema(blaAttendance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertBlaAttendance = z.infer<typeof insertBlaAttendanceSchema>;
+export type BlaAttendance = typeof blaAttendance.$inferSelect;
 
 // Booth Level Agent (BLA) Submissions
 export const blaSubmissions = pgTable("bla_submissions", {

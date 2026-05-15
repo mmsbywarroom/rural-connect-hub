@@ -84,10 +84,13 @@ import {
 import {
   blaMaster,
   blaSubmissions,
+  blaAttendance,
   type BlaMaster,
   type BlaSubmission,
+  type BlaAttendance,
   type InsertBlaMaster,
   type InsertBlaSubmission,
+  type InsertBlaAttendance,
 } from "@shared/schema";
 
 /** Admin list only — avoids loading multi‑MB base64 blobs and OOM on small hosts (e.g. Render). */
@@ -533,13 +536,19 @@ export interface IStorage {
   replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]>;
   getBlaMasterList(): Promise<BlaMaster[]>;
   getBlaMasterByBooth(boothNumber: string): Promise<BlaMaster[]>;
-  getBlaMasterByBoothWithStatus(boothNumber: string): Promise<
+  getBlaMasterByBoothWithStatus(
+    boothNumber: string,
+    attendanceDate?: string,
+  ): Promise<
     (BlaMaster & {
       completionPercentage: number;
       status: string;
       submissionId: string | null;
+      todayAttendance: "present" | "absent" | null;
     })[]
   >;
+  upsertBlaAttendance(data: InsertBlaAttendance): Promise<BlaAttendance>;
+  getBlaAttendanceByDate(attendanceDate: string): Promise<BlaAttendance[]>;
   createBlaMasterEntry(data: { name: string; mobileNumber: string; boothNumber: string }): Promise<BlaMaster>;
   getBlaMasterById(id: string): Promise<BlaMaster | undefined>;
   createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
@@ -2579,14 +2588,31 @@ export class DatabaseStorage implements IStorage {
       .orderBy(blaMaster.serialNumber);
   }
 
-  async getBlaMasterByBoothWithStatus(boothNumber: string) {
+  async getBlaMasterByBoothWithStatus(boothNumber: string, attendanceDate?: string) {
     const masters = await this.getBlaMasterByBooth(boothNumber);
     if (masters.length === 0) return [];
     const masterIds = masters.map((m) => m.id);
-    const subs = await db.select().from(blaSubmissions)
-      .where(inArray(blaSubmissions.blaMasterId, masterIds));
+    const dateKey = attendanceDate?.trim() || new Date().toISOString().slice(0, 10);
+    const [subs, attendanceRows] = await Promise.all([
+      db.select().from(blaSubmissions).where(inArray(blaSubmissions.blaMasterId, masterIds)),
+      db
+        .select()
+        .from(blaAttendance)
+        .where(
+          and(
+            inArray(blaAttendance.blaMasterId, masterIds),
+            eq(blaAttendance.attendanceDate, dateKey),
+          ),
+        ),
+    ]);
     const subByMaster = new Map(
       subs.filter((s) => s.blaMasterId).map((s) => [s.blaMasterId!, s]),
+    );
+    const attByMaster = new Map(
+      attendanceRows.map((a) => [
+        a.blaMasterId,
+        a.status === "present" || a.status === "absent" ? (a.status as "present" | "absent") : null,
+      ]),
     );
     return masters.map((m) => {
       const sub = subByMaster.get(m.id);
@@ -2595,8 +2621,53 @@ export class DatabaseStorage implements IStorage {
         completionPercentage: sub?.completionPercentage ?? 0,
         status: sub?.status ?? "incomplete",
         submissionId: sub?.id ?? null,
+        todayAttendance: attByMaster.get(m.id) ?? null,
       };
     });
+  }
+
+  async upsertBlaAttendance(data: InsertBlaAttendance): Promise<BlaAttendance> {
+    const dateKey = data.attendanceDate.trim();
+    const status = data.status === "present" || data.status === "absent" ? data.status : "absent";
+    const [existing] = await db
+      .select()
+      .from(blaAttendance)
+      .where(
+        and(
+          eq(blaAttendance.blaMasterId, data.blaMasterId),
+          eq(blaAttendance.attendanceDate, dateKey),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      const [row] = await db
+        .update(blaAttendance)
+        .set({
+          status,
+          appUserId: data.appUserId,
+          boothNumber: data.boothNumber,
+          bloName: data.bloName,
+          bloMobileNumber: data.bloMobileNumber,
+          updatedAt: new Date(),
+        })
+        .where(eq(blaAttendance.id, existing.id))
+        .returning();
+      return row;
+    }
+    const [row] = await db
+      .insert(blaAttendance)
+      .values({ ...data, attendanceDate: dateKey, status })
+      .returning();
+    return row;
+  }
+
+  async getBlaAttendanceByDate(attendanceDate: string): Promise<BlaAttendance[]> {
+    const dateKey = attendanceDate.trim();
+    return db
+      .select()
+      .from(blaAttendance)
+      .where(eq(blaAttendance.attendanceDate, dateKey))
+      .orderBy(asc(blaAttendance.boothNumber), asc(blaAttendance.bloName));
   }
 
   async createBlaMasterEntry(data: {

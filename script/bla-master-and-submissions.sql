@@ -60,3 +60,20 @@ BEGIN
     ALTER TABLE bla_submissions ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
   END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS bla_attendance (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  bla_master_id VARCHAR NOT NULL REFERENCES bla_master(id),
+  app_user_id VARCHAR NOT NULL REFERENCES app_users(id),
+  booth_number TEXT NOT NULL,
+  blo_name TEXT NOT NULL,
+  blo_mobile_number TEXT NOT NULL,
+  attendance_date TEXT NOT NULL,
+  status TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (bla_master_id, attendance_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bla_attendance_date ON bla_attendance(attendance_date);
+CREATE INDEX IF NOT EXISTS idx_bla_attendance_booth_date ON bla_attendance(booth_number, attendance_date);

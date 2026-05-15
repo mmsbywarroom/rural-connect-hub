@@ -5183,8 +5183,10 @@ export async function registerRoutes(
       const booth = String(req.params.boothNumber || "").trim();
       if (!booth) return res.json([]);
       const withStatus = req.query.withStatus === "1" || req.query.withStatus === "true";
+      const attendanceDate =
+        typeof req.query.attendanceDate === "string" ? req.query.attendanceDate.trim() : undefined;
       const list = withStatus
-        ? await storage.getBlaMasterByBoothWithStatus(booth)
+        ? await storage.getBlaMasterByBoothWithStatus(booth, attendanceDate)
         : await storage.getBlaMasterByBooth(booth);
       res.json(list);
     } catch (error: any) {
@@ -5225,6 +5227,59 @@ export async function registerRoutes(
       res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch BLA" });
+    }
+  });
+
+  app.post("/api/bla/attendance", async (req, res) => {
+    try {
+      const { blaMasterId, appUserId, boothNumber, bloName, bloMobileNumber, status, attendanceDate } =
+        req.body as {
+          blaMasterId?: string;
+          appUserId?: string;
+          boothNumber?: string;
+          bloName?: string;
+          bloMobileNumber?: string;
+          status?: string;
+          attendanceDate?: string;
+        };
+      if (!blaMasterId || !appUserId || !boothNumber?.trim() || !bloName?.trim() || !bloMobileNumber?.trim()) {
+        return res.status(400).json({ error: "BLA, user, booth, name and mobile are required" });
+      }
+      if (status !== "present" && status !== "absent") {
+        return res.status(400).json({ error: "Status must be present or absent" });
+      }
+      const dateKey =
+        attendanceDate?.trim() && /^\d{4}-\d{2}-\d{2}$/.test(attendanceDate.trim())
+          ? attendanceDate.trim()
+          : new Date().toISOString().slice(0, 10);
+      const row = await storage.upsertBlaAttendance({
+        blaMasterId,
+        appUserId,
+        boothNumber: boothNumber.trim(),
+        bloName: bloName.trim(),
+        bloMobileNumber: bloMobileNumber.trim(),
+        attendanceDate: dateKey,
+        status,
+      });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[BLA Attendance] mark error:", error.message);
+      res.status(500).json({ error: "Failed to save attendance" });
+    }
+  });
+
+  app.get("/api/admin/bla-attendance", async (req, res) => {
+    try {
+      const dateParam = typeof req.query.date === "string" ? req.query.date.trim() : "";
+      const attendanceDate =
+        dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+          ? dateParam
+          : new Date().toISOString().slice(0, 10);
+      const rows = await storage.getBlaAttendanceByDate(attendanceDate);
+      res.json({ date: attendanceDate, rows });
+    } catch (error: any) {
+      console.error("[BLA Attendance] admin list error:", error.message);
+      res.status(500).json({ error: "Failed to fetch attendance" });
     }
   });
 

@@ -46,7 +46,13 @@ type BlaMasterWithStatus = BlaMaster & {
   completionPercentage: number;
   status: string;
   submissionId: string | null;
+  todayAttendance: "present" | "absent" | null;
 };
+
+function localDateYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
 
@@ -104,6 +110,8 @@ export default function TaskBla({ user }: Props) {
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
   const voterCardRef = useRef<HTMLInputElement>(null);
 
+  const attendanceDate = useMemo(() => localDateYmd(), []);
+
   const filteredBooths = useMemo(() => {
     const q = boothSearch.trim();
     if (!q) return BOOTH_OPTIONS;
@@ -115,16 +123,42 @@ export default function TaskBla({ user }: Props) {
     isLoading: loadingBlas,
     refetch: refetchBoothBlas,
   } = useQuery<BlaMasterWithStatus[]>({
-    queryKey: ["/api/bla/master/by-booth", selectedBooth, "withStatus"],
+    queryKey: ["/api/bla/master/by-booth", selectedBooth, "withStatus", attendanceDate],
     enabled: step === "select_bla" && !!selectedBooth,
     queryFn: async () => {
       const res = await fetch(
-        `/api/bla/master/by-booth/${encodeURIComponent(selectedBooth)}?withStatus=true`,
+        `/api/bla/master/by-booth/${encodeURIComponent(selectedBooth)}?withStatus=true&attendanceDate=${encodeURIComponent(attendanceDate)}`,
         { credentials: "include" },
       );
       if (!res.ok) throw new Error("Failed to load BLAs");
       return res.json();
     },
+  });
+
+  const attendanceMutation = useMutation({
+    mutationFn: async ({
+      master,
+      status,
+    }: {
+      master: BlaMasterWithStatus;
+      status: "present" | "absent";
+    }) => {
+      const res = await apiRequest("POST", "/api/bla/attendance", {
+        blaMasterId: master.id,
+        appUserId: user.id,
+        boothNumber: selectedBooth,
+        bloName: master.name,
+        bloMobileNumber: master.mobileNumber,
+        status,
+        attendanceDate,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: t("attendanceMarked") });
+      refetchBoothBlas();
+    },
+    onError: () => toast({ title: t("attendanceFailed"), variant: "destructive" }),
   });
 
   const addBlaMutation = useMutation({
@@ -490,12 +524,12 @@ export default function TaskBla({ user }: Props) {
             </Card>
           ) : (
             boothBlas.map((m, idx) => (
-              <Card
-                key={m.id}
-                className="cursor-pointer hover:border-indigo-300 hover:shadow-sm"
-                onClick={() => openBlaForm(m)}
-              >
-                <CardContent className="p-4 flex justify-between items-center gap-3">
+              <Card key={m.id} className="hover:border-indigo-300 hover:shadow-sm">
+                <CardContent className="p-4 space-y-3">
+                  <div
+                    className="flex justify-between items-center gap-3 cursor-pointer"
+                    onClick={() => openBlaForm(m)}
+                  >
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-slate-800">
                       BLA {idx + 1}: {m.name}
@@ -507,6 +541,40 @@ export default function TaskBla({ user }: Props) {
                   <div className="flex items-center gap-2 shrink-0">
                     {statusBadge(m)}
                     <ChevronRight className="h-5 w-5 text-indigo-500" />
+                  </div>
+                  </div>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <p className="text-[11px] font-medium text-slate-600 mb-1.5">{t("attendanceToday")}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={m.todayAttendance === "present" ? "default" : "outline"}
+                        className={
+                          m.todayAttendance === "present"
+                            ? "flex-1 bg-green-600 hover:bg-green-700"
+                            : "flex-1"
+                        }
+                        disabled={attendanceMutation.isPending}
+                        onClick={() => attendanceMutation.mutate({ master: m, status: "present" })}
+                      >
+                        {t("present")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={m.todayAttendance === "absent" ? "default" : "outline"}
+                        className={
+                          m.todayAttendance === "absent"
+                            ? "flex-1 bg-red-600 hover:bg-red-700"
+                            : "flex-1"
+                        }
+                        disabled={attendanceMutation.isPending}
+                        onClick={() => attendanceMutation.mutate({ master: m, status: "absent" })}
+                      >
+                        {t("absent")}
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
