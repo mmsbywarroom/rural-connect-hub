@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import {
   translateCompletionMissing,
   BLA_RELIGION_VALUES,
 } from "@/lib/bla-i18n";
+import { getBlaCommunityOptions, blaCommunityLabel } from "@/lib/bla-religion-communities";
 import type { AppUser, BlaMaster, BlaSubmission } from "@shared/schema";
 
 interface Props {
@@ -98,6 +99,7 @@ export default function TaskBla({ user }: Props) {
   const [healthCardMade, setHealthCardMade] = useState("");
   const [msrRegistered, setMsrRegistered] = useState("");
   const [blaRelation, setBlaRelation] = useState("");
+  const [religionCommunity, setReligionCommunity] = useState("");
   const [casteCategory, setCasteCategory] = useState("");
   const [computerDataEntry, setComputerDataEntry] = useState("");
 
@@ -111,6 +113,17 @@ export default function TaskBla({ user }: Props) {
   const voterCardRef = useRef<HTMLInputElement>(null);
 
   const attendanceDate = useMemo(() => localDateYmd(), []);
+
+  const communityOptions = useMemo(
+    () => getBlaCommunityOptions(blaRelation, casteCategory),
+    [blaRelation, casteCategory],
+  );
+
+  useEffect(() => {
+    if (!religionCommunity) return;
+    const valid = communityOptions.some((c) => c.value === religionCommunity);
+    if (!valid) setReligionCommunity("");
+  }, [communityOptions, religionCommunity]);
 
   const filteredBooths = useMemo(() => {
     const q = boothSearch.trim();
@@ -196,6 +209,7 @@ export default function TaskBla({ user }: Props) {
         healthCardMade,
         msrRegistered,
         blaRelation,
+        religionCommunity,
         casteCategory,
         computerDataEntry,
       }),
@@ -211,6 +225,7 @@ export default function TaskBla({ user }: Props) {
       healthCardMade,
       msrRegistered,
       blaRelation,
+      religionCommunity,
       casteCategory,
       computerDataEntry,
     ],
@@ -260,6 +275,7 @@ export default function TaskBla({ user }: Props) {
         healthCardMade: showHealthCard ? healthCardMade || null : null,
         msrRegistered: showMsr ? msrRegistered || null : null,
         blaRelation: blaRelation || null,
+        religionCommunity: religionCommunity || null,
         casteCategory: casteCategory || null,
         computerDataEntry: computerDataEntry || null,
         completionPercentage: completion.percentage,
@@ -314,6 +330,7 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade("");
     setMsrRegistered("");
     setBlaRelation("");
+    setReligionCommunity("");
     setCasteCategory("");
     setComputerDataEntry("");
   };
@@ -334,6 +351,7 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade(s.healthCardMade || "");
     setMsrRegistered(s.msrRegistered || "");
     setBlaRelation(s.blaRelation || "");
+    setReligionCommunity(s.religionCommunity || "");
     setCasteCategory(s.casteCategory || "");
     setComputerDataEntry(
       s.computerDataEntry ||
@@ -408,6 +426,7 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade("");
     setMsrRegistered("");
     setBlaRelation("");
+    setReligionCommunity("");
     setCasteCategory("");
     setBlaLivePhoto(null);
     setComputerDataEntry("");
@@ -832,7 +851,13 @@ export default function TaskBla({ user }: Props) {
             )}
 
             <label className="text-sm font-medium">{t("religion")}</label>
-            <Select value={blaRelation} onValueChange={setBlaRelation}>
+            <Select
+              value={blaRelation}
+              onValueChange={(v) => {
+                setBlaRelation(v);
+                setReligionCommunity("");
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={t("selectReligion")} />
               </SelectTrigger>
@@ -845,8 +870,32 @@ export default function TaskBla({ user }: Props) {
               </SelectContent>
             </Select>
 
+            {blaRelation && (
+              <>
+                <label className="text-sm font-medium">{t("religionCommunity")}</label>
+                <Select value={religionCommunity} onValueChange={setReligionCommunity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("selectCommunity")} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {communityOptions.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>
+                        {blaCommunityLabel(c.value, blaRelation, casteCategory, language)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
             <label className="text-sm font-medium">{t("casteCategory")}</label>
-            <Select value={casteCategory} onValueChange={setCasteCategory}>
+            <Select
+              value={casteCategory}
+              onValueChange={(v) => {
+                setCasteCategory(v);
+                setReligionCommunity("");
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={t("castePlaceholder")} />
               </SelectTrigger>

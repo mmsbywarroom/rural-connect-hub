@@ -2572,6 +2572,9 @@ export class DatabaseStorage implements IStorage {
 
   // BLA Master + Submissions
   async replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]> {
+    // Clear FK references so master list can be replaced without constraint errors
+    await db.delete(blaAttendance);
+    await db.update(blaSubmissions).set({ blaMasterId: null });
     await db.delete(blaMaster);
     if (rows.length === 0) return [];
     return db.insert(blaMaster).values(rows).returning();

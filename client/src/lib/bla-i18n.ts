@@ -76,6 +76,16 @@ const labels: Record<string, L10n> = {
   yesNo: { en: "Yes / No", hi: "हाँ / नहीं", pa: "ਹਾਂ / ਨਹੀਂ" },
   religion: { en: "Religion", hi: "धर्म", pa: "ਧਰਮ" },
   selectReligion: { en: "Select religion", hi: "धर्म चुनें", pa: "ਧਰਮ ਚੁਣੋ" },
+  religionCommunity: {
+    en: "Community / caste (by religion)",
+    hi: "समुदाय / जाति (धर्म के अनुसार)",
+    pa: "ਸਮੁਦਾਇ / ਜਾਤਿ (ਧਰਮ ਅਨੁਸਾਰ)",
+  },
+  selectCommunity: {
+    en: "Select community",
+    hi: "समुदाय चुनें",
+    pa: "ਸਮੁਦਾਇ ਚੁਣੋ",
+  },
   casteCategory: { en: "Caste category", hi: "जाति श्रेणी", pa: "ਜਾਤਿ ਸ਼੍ਰੇਣੀ" },
   castePlaceholder: { en: "GEN / OBC / SC / ST", hi: "GEN / OBC / SC / ST", pa: "GEN / OBC / SC / ST" },
   computerDataEntry: {
@@ -96,6 +106,11 @@ const labels: Record<string, L10n> = {
   fieldHealthCard: { en: "Health card", hi: "हेल्थ कार्ड", pa: "ਹੈਲਥ ਕਾਰਡ" },
   fieldMsr: { en: "MSR registration", hi: "MSR रजिस्ट्रेशन", pa: "MSR ਰਜਿਸਟ੍ਰੇਸ਼ਨ" },
   fieldReligion: { en: "Religion", hi: "धर्म", pa: "ਧਰਮ" },
+  fieldReligionCommunity: {
+    en: "Community / caste",
+    hi: "समुदाय / जाति",
+    pa: "ਸਮੁਦਾਇ / ਜਾਤਿ",
+  },
   fieldCaste: { en: "Caste category", hi: "जाति श्रेणी", pa: "ਜਾਤਿ ਸ਼੍ਰੇਣੀ" },
   fieldComputerDataEntry: {
     en: "Computer data entry",
@@ -134,6 +149,7 @@ export const COMPLETION_LABEL_KEY: Record<string, keyof typeof labels> = {
   "Health card": "fieldHealthCard",
   "MSR registration": "fieldMsr",
   Religion: "fieldReligion",
+  "Community / caste": "fieldReligionCommunity",
   "Caste category": "fieldCaste",
   "Computer data entry": "fieldComputerDataEntry",
 };

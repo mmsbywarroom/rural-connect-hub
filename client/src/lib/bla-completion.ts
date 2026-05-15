@@ -10,6 +10,7 @@ export type BlaCompletionInput = {
   healthCardMade?: string | null;
   msrRegistered?: string | null;
   blaRelation?: string | null;
+  religionCommunity?: string | null;
   casteCategory?: string | null;
   computerDataEntry?: string | null;
 };
@@ -46,6 +47,7 @@ function getBlaFieldChecks(data: BlaCompletionInput): FieldCheck[] {
 
   checks.push(
     { label: "Religion", test: (d) => !!d.blaRelation?.trim() },
+    { label: "Community / caste", test: (d) => !!d.religionCommunity?.trim() },
     { label: "Caste category", test: (d) => !!d.casteCategory?.trim() },
     { label: "Computer data entry", test: (d) => !!d.computerDataEntry?.trim() },
   );

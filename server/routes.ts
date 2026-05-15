@@ -5047,6 +5047,7 @@ export async function registerRoutes(
     healthCardMade?: string | null;
     msrRegistered?: string | null;
     blaRelation?: string | null;
+    religionCommunity?: string | null;
     casteCategory?: string | null;
     computerDataEntry?: string | null;
   }) {
@@ -5069,6 +5070,7 @@ export async function registerRoutes(
     }
     checks.push(
       !!data.blaRelation?.trim(),
+      !!data.religionCommunity?.trim(),
       !!data.casteCategory?.trim(),
       !!data.computerDataEntry?.trim(),
     );
@@ -5078,8 +5080,28 @@ export async function registerRoutes(
     return { percentage, status: filled === total ? "complete" : "incomplete" as const };
   }
 
+  function normalizeBlaCsvHeader(h: string): string {
+    return h
+      .replace(/^\uFEFF/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+  }
+
+  function parseBlaMasterMobile(raw: string): string {
+    let digits = String(raw ?? "").trim();
+    if (/e\+?/i.test(digits)) {
+      const n = Number(digits);
+      if (Number.isFinite(n)) digits = String(Math.round(n));
+    }
+    digits = digits.replace(/\D/g, "");
+    if (digits.length >= 12 && digits.startsWith("91")) digits = digits.slice(2);
+    if (digits.length > 10) digits = digits.slice(-10);
+    return digits;
+  }
+
   function parseBlaMasterCsv(text: string): { name: string; mobileNumber: string; boothNumber: string }[] {
-    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const cleaned = text.replace(/^\uFEFF/, "").trim();
+    const lines = cleaned.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return [];
     const splitRow = (line: string) => {
       const out: string[] = [];
@@ -5101,22 +5123,55 @@ export async function registerRoutes(
       out.push(cur.trim());
       return out;
     };
-    const headerCells = splitRow(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ""));
-    const nameIdx = headerCells.findIndex((h) => h === "name" || h.includes("name"));
-    const mobileIdx = headerCells.findIndex((h) => h.includes("mobile"));
+    const headerCells = splitRow(lines[0]).map(normalizeBlaCsvHeader);
+    const isSerialCol = (h: string) =>
+      h === "sno" || h === "srno" || h === "serial" || h === "serialno" || h === "slno" || h === "id";
+    const nameIdx = headerCells.findIndex(
+      (h) => h === "name" || h === "blaname" || h === "bloname" || h === "fullname",
+    );
+    const mobileIdx = headerCells.findIndex(
+      (h) => h.includes("mobile") || h.includes("phone") || h.includes("contact") || h === "mobileno",
+    );
     const boothIdx = headerCells.findIndex((h) => h.includes("booth"));
-    const start = nameIdx >= 0 && mobileIdx >= 0 && boothIdx >= 0 ? 1 : 0;
-    const ni = start === 1 ? nameIdx : 0;
-    const mi = start === 1 ? mobileIdx : 1;
-    const bi = start === 1 ? boothIdx : 2;
+    const hasHeader = nameIdx >= 0 && mobileIdx >= 0 && boothIdx >= 0;
+    const start = hasHeader ? 1 : 0;
+
+    let ni: number;
+    let mi: number;
+    let bi: number;
+    if (hasHeader) {
+      ni = nameIdx;
+      mi = mobileIdx;
+      bi = boothIdx;
+    } else if (headerCells.length >= 4 && isSerialCol(headerCells[0])) {
+      ni = 1;
+      mi = 2;
+      bi = 3;
+    } else {
+      ni = 0;
+      mi = 1;
+      bi = 2;
+    }
+
     const rows: { name: string; mobileNumber: string; boothNumber: string }[] = [];
+    const skipped: string[] = [];
     for (let i = start; i < lines.length; i++) {
       const cells = splitRow(lines[i]);
       const name = (cells[ni] || "").trim();
-      const mobileRaw = (cells[mi] || "").replace(/\D/g, "").replace(/^91/, "").slice(0, 10);
+      const mobileNumber = parseBlaMasterMobile(cells[mi] || "");
       const boothNumber = (cells[bi] || "").trim();
-      if (!name || mobileRaw.length !== 10 || !boothNumber) continue;
-      rows.push({ name, mobileNumber: mobileRaw, boothNumber });
+      if (!name || mobileNumber.length !== 10 || !boothNumber) {
+        if (cells.some((c) => c.trim())) {
+          skipped.push(`Row ${i + 1}: invalid name/mobile/booth`);
+        }
+        continue;
+      }
+      rows.push({ name, mobileNumber, boothNumber });
+    }
+    if (rows.length === 0 && skipped.length > 0) {
+      throw new Error(
+        `No valid rows. ${skipped.slice(0, 3).join("; ")}${skipped.length > 3 ? "…" : ""}. Use columns: NAME, Mobile Number, Booth No (10-digit mobile).`,
+      );
     }
     return rows;
   }
@@ -5136,6 +5191,7 @@ export async function registerRoutes(
       healthCardMade: body.healthCardMade as string | null,
       msrRegistered: body.msrRegistered as string | null,
       blaRelation: body.blaRelation as string | null,
+      religionCommunity: body.religionCommunity as string | null,
       casteCategory: body.casteCategory as string | null,
       computerDataEntry,
     });

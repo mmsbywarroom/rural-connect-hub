@@ -18,6 +18,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, Download, Trash2, Eye } from "lucide-react";
 import type { BlaSubmission } from "@shared/schema";
+import { blaCommunityLabel } from "@/lib/bla-religion-communities";
+import { blaReligionLabel } from "@/lib/bla-i18n";
 
 function escapeCSVField(value: string): string {
   const s = String(value ?? "").replace(/"/g, '""');
@@ -292,8 +294,19 @@ export default function BlaSubmissionsPage() {
                   <p>Gender: {selected.gender || "—"}</p>
                   <p>Health: {selected.healthCardMade || "—"}</p>
                   <p>MSR: {selected.msrRegistered || "—"}</p>
-                  <p>Caste: {selected.casteCategory || "—"}</p>
-                  <p>Religion: {selected.blaRelation || "—"}</p>
+                  <p>Religion: {selected.blaRelation ? blaReligionLabel(selected.blaRelation, "en") : "—"}</p>
+                  <p>
+                    Community:{" "}
+                    {selected.religionCommunity && selected.blaRelation
+                      ? blaCommunityLabel(
+                          selected.religionCommunity,
+                          selected.blaRelation,
+                          selected.casteCategory || "",
+                          "en",
+                        )
+                      : "—"}
+                  </p>
+                  <p>Caste category: {selected.casteCategory || "—"}</p>
                   <p>Computer data entry: {selected.computerDataEntry || "—"}</p>
                   <p>Aadhaar #: {selected.aadhaarNumber || selected.ocrAadhaarNumber || "—"}</p>
                 </div>

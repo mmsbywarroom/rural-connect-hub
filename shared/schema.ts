@@ -1440,6 +1440,7 @@ export const blaSubmissions = pgTable("bla_submissions", {
   healthCardMade: text("health_card_made"),
   msrRegistered: text("msr_registered"),
   blaRelation: text("bla_relation"),
+  religionCommunity: text("religion_community"),
   casteCategory: text("caste_category"),
   computerDataEntry: text("computer_data_entry"),
   digitalSkills: jsonb("digital_skills").$type<string[] | null>(),

@@ -28,8 +28,16 @@ export default function BlaUploadCsvPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bla-master"] });
       refetch();
     },
-    onError: () => {
-      toast({ title: "Upload failed", variant: "destructive" });
+    onError: async (err: unknown) => {
+      let msg = "Upload failed";
+      try {
+        const res = (err as { response?: Response })?.response;
+        if (res) {
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
