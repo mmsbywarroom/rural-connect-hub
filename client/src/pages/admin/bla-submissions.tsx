@@ -307,7 +307,9 @@ export default function BlaSubmissionsPage() {
                       : "—"}
                   </p>
                   <p>Caste category: {selected.casteCategory || "—"}</p>
-                  <p>Computer data entry: {selected.computerDataEntry || "—"}</p>
+                  <p>Date of birth: {selected.dob || "—"}</p>
+                  <p>Anniversary: {selected.anniversaryDate || "—"}</p>
+                  <p>Computer / mobile data entry: {selected.computerDataEntry || "—"}</p>
                   <p>Aadhaar #: {selected.aadhaarNumber || selected.ocrAadhaarNumber || "—"}</p>
                 </div>
                 {selected.blaLivePhoto && (

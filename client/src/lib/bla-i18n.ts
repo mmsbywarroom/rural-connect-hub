@@ -93,11 +93,13 @@ const labels: Record<string, L10n> = {
     pa: "ਸਮੁਦਾਇ ਚੁਣੋ",
   },
   casteCategory: { en: "Caste category", hi: "जाति श्रेणी", pa: "ਜਾਤਿ ਸ਼੍ਰੇਣੀ" },
-  castePlaceholder: { en: "GEN / OBC / SC / ST", hi: "GEN / OBC / SC / ST", pa: "GEN / OBC / SC / ST" },
+  castePlaceholder: { en: "GEN / OBC / BC / SC / ST", hi: "GEN / OBC / BC / SC / ST", pa: "GEN / OBC / BC / SC / ST" },
+  dob: { en: "Date of birth", hi: "जन्म तिथि", pa: "ਜਨਮ ਤਾਰੀਖ" },
+  anniversaryDate: { en: "Anniversary date", hi: "वर्षगाँठ की तारीख", pa: "ਵਿਸ਼ਾ ਤਾਰੀਖ" },
   computerDataEntry: {
-    en: "Can you do data entry on computer?",
-    hi: "कंप्यूटर में डेटा एंट्री करना आता है?",
-    pa: "ਕੰਪਿਊਟਰ ਵਿੱਚ ਡਾਟਾ ਐਂਟਰੀ ਕਰਨੀ ਆਉਂਦੀ ਹੈ?",
+    en: "Can you do data entry on computer and mobile?",
+    hi: "कंप्यूटर और मोबाइल में डेटा एंट्री करना आता है?",
+    pa: "ਕੰਪਿਊਟਰ ਅਤੇ ਮੋਬਾਈਲ ਵਿੱਚ ਡਾਟਾ ਐਂਟਰੀ ਕਰਨੀ ਆਉਂਦੀ ਹੈ?",
   },
   saveSubmit: { en: "Save & Submit", hi: "सहेजें और सबमिट करें", pa: "ਸੰਭਾਲੋ ਅਤੇ ਜਮ੍ਹਾਂ ਕਰੋ" },
   // Completion field labels
@@ -118,10 +120,12 @@ const labels: Record<string, L10n> = {
     pa: "ਸਮੁਦਾਇ / ਜਾਤਿ",
   },
   fieldCaste: { en: "Caste category", hi: "जाति श्रेणी", pa: "ਜਾਤਿ ਸ਼੍ਰੇਣੀ" },
+  fieldDob: { en: "Date of birth", hi: "जन्म तिथि", pa: "ਜਨਮ ਤਾਰੀਖ" },
+  fieldAnniversary: { en: "Anniversary date", hi: "वर्षगाँठ की तारीख", pa: "ਵਿਸ਼ਾ ਤਾਰੀਖ" },
   fieldComputerDataEntry: {
-    en: "Computer data entry",
-    hi: "कंप्यूटर डेटा एंट्री",
-    pa: "ਕੰਪਿਊਟਰ ਡਾਟਾ ਐਂਟਰੀ",
+    en: "Computer / mobile data entry",
+    hi: "कंप्यूटर / मोबाइल डेटा एंट्री",
+    pa: "ਕੰਪਿਊਟਰ / ਮੋਬਾਈਲ ਡਾਟਾ ਐਂਟਰੀ",
   },
 };
 
@@ -138,6 +142,7 @@ const RELIGION_LABELS: Record<string, L10n> = {
 const CASTE_LABELS: Record<string, L10n> = {
   GEN: { en: "General (GEN)", hi: "सामान्य (GEN)", pa: "ਆਮ (GEN)" },
   OBC: { en: "OBC", hi: "OBC", pa: "OBC" },
+  BC: { en: "BC", hi: "BC", pa: "BC" },
   SC: { en: "SC", hi: "SC", pa: "SC" },
   ST: { en: "ST", hi: "ST", pa: "ST" },
 };
@@ -157,7 +162,9 @@ export const COMPLETION_LABEL_KEY: Record<string, keyof typeof labels> = {
   Religion: "fieldReligion",
   "Community / caste": "fieldReligionCommunity",
   "Caste category": "fieldCaste",
-  "Computer data entry": "fieldComputerDataEntry",
+  "Date of birth": "fieldDob",
+  "Anniversary date": "fieldAnniversary",
+  "Computer / mobile data entry": "fieldComputerDataEntry",
 };
 
 export function blaT(key: keyof typeof labels, language: Language, vars?: Record<string, string>): string {

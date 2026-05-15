@@ -12,6 +12,8 @@ export type BlaCompletionInput = {
   blaRelation?: string | null;
   religionCommunity?: string | null;
   casteCategory?: string | null;
+  dob?: string | null;
+  anniversaryDate?: string | null;
   computerDataEntry?: string | null;
 };
 
@@ -49,7 +51,9 @@ function getBlaFieldChecks(data: BlaCompletionInput): FieldCheck[] {
     { label: "Religion", test: (d) => !!d.blaRelation?.trim() },
     { label: "Community / caste", test: (d) => !!d.religionCommunity?.trim() },
     { label: "Caste category", test: (d) => !!d.casteCategory?.trim() },
-    { label: "Computer data entry", test: (d) => !!d.computerDataEntry?.trim() },
+    { label: "Date of birth", test: (d) => !!d.dob?.trim() },
+    { label: "Anniversary date", test: (d) => !!d.anniversaryDate?.trim() },
+    { label: "Computer / mobile data entry", test: (d) => !!d.computerDataEntry?.trim() },
   );
 
   return checks;

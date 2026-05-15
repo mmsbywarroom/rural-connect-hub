@@ -1442,6 +1442,8 @@ export const blaSubmissions = pgTable("bla_submissions", {
   blaRelation: text("bla_relation"),
   religionCommunity: text("religion_community"),
   casteCategory: text("caste_category"),
+  dob: text("dob"),
+  anniversaryDate: text("anniversary_date"),
   computerDataEntry: text("computer_data_entry"),
   digitalSkills: jsonb("digital_skills").$type<string[] | null>(),
   completionPercentage: integer("completion_percentage").default(0),

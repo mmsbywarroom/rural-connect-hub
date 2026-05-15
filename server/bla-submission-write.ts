@@ -4,6 +4,8 @@ import type { InsertBlaSubmission } from "@shared/schema";
 const EXTENDED_KEYS = [
   "blaLivePhoto",
   "religionCommunity",
+  "dob",
+  "anniversaryDate",
   "computerDataEntry",
   "digitalSkills",
 ] as const;

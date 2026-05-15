@@ -75,6 +75,7 @@ const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
 const CASTE_OPTIONS = [
   { value: "GEN", en: "General (GEN)" },
   { value: "OBC", en: "OBC" },
+  { value: "BC", en: "BC" },
   { value: "SC", en: "SC" },
   { value: "ST", en: "ST" },
 ];
@@ -116,6 +117,8 @@ export default function TaskBla({ user }: Props) {
   const [blaRelation, setBlaRelation] = useState("");
   const [religionCommunity, setReligionCommunity] = useState("");
   const [casteCategory, setCasteCategory] = useState("");
+  const [dob, setDob] = useState("");
+  const [anniversaryDate, setAnniversaryDate] = useState("");
   const [computerDataEntry, setComputerDataEntry] = useState("");
 
   const [addBlaOpen, setAddBlaOpen] = useState(false);
@@ -227,6 +230,8 @@ export default function TaskBla({ user }: Props) {
         blaRelation,
         religionCommunity,
         casteCategory,
+        dob,
+        anniversaryDate,
         computerDataEntry,
       }),
     [
@@ -243,6 +248,8 @@ export default function TaskBla({ user }: Props) {
       blaRelation,
       religionCommunity,
       casteCategory,
+      dob,
+      anniversaryDate,
       computerDataEntry,
     ],
   );
@@ -293,6 +300,8 @@ export default function TaskBla({ user }: Props) {
         blaRelation: blaRelation || null,
         religionCommunity: religionCommunity || null,
         casteCategory: casteCategory || null,
+        dob: dob || null,
+        anniversaryDate: anniversaryDate || null,
         computerDataEntry: computerDataEntry || null,
         completionPercentage: completion.percentage,
         status: completion.isComplete ? "complete" : "incomplete",
@@ -344,6 +353,8 @@ export default function TaskBla({ user }: Props) {
     setBlaRelation("");
     setReligionCommunity("");
     setCasteCategory("");
+    setDob("");
+    setAnniversaryDate("");
     setComputerDataEntry("");
   };
 
@@ -365,6 +376,8 @@ export default function TaskBla({ user }: Props) {
     setBlaRelation(s.blaRelation || "");
     setReligionCommunity(s.religionCommunity || "");
     setCasteCategory(s.casteCategory || "");
+    setDob(s.dob || "");
+    setAnniversaryDate(s.anniversaryDate || "");
     setComputerDataEntry(
       s.computerDataEntry ||
         (Array.isArray(s.digitalSkills) && s.digitalSkills.length > 0 ? "yes" : ""),
@@ -934,6 +947,27 @@ export default function TaskBla({ user }: Props) {
                 ))}
               </SelectContent>
             </Select>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("dob")}</label>
+                <Input
+                  type="date"
+                  className="h-10"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">{t("anniversaryDate")}</label>
+                <Input
+                  type="date"
+                  className="h-10"
+                  value={anniversaryDate}
+                  onChange={(e) => setAnniversaryDate(e.target.value)}
+                />
+              </div>
+            </div>
 
             <label className="text-sm font-medium">{t("computerDataEntry")}</label>
             <Select value={computerDataEntry} onValueChange={setComputerDataEntry}>

@@ -134,7 +134,7 @@ const RELIGION_COMMUNITIES: Record<string, BlaCommunityOption[]> = {
 
 /** Community list for religion + reservation category (OBC/SC use dedicated lists). */
 export function getBlaCommunityOptions(religion: string, casteCategory: string): BlaCommunityOption[] {
-  if (casteCategory === "OBC") return OBC_COMMUNITIES;
+  if (casteCategory === "OBC" || casteCategory === "BC") return OBC_COMMUNITIES;
   if (casteCategory === "SC") return SC_COMMUNITIES;
   return RELIGION_COMMUNITIES[religion] ?? OTHER_COMMUNITIES;
 }

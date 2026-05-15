@@ -5050,6 +5050,8 @@ export async function registerRoutes(
     blaRelation?: string | null;
     religionCommunity?: string | null;
     casteCategory?: string | null;
+    dob?: string | null;
+    anniversaryDate?: string | null;
     computerDataEntry?: string | null;
   }) {
     const checks: boolean[] = [
@@ -5073,6 +5075,8 @@ export async function registerRoutes(
       !!data.blaRelation?.trim(),
       !!data.religionCommunity?.trim(),
       !!data.casteCategory?.trim(),
+      !!data.dob?.trim(),
+      !!data.anniversaryDate?.trim(),
       !!data.computerDataEntry?.trim(),
     );
     const filled = checks.filter(Boolean).length;
@@ -5194,6 +5198,8 @@ export async function registerRoutes(
       blaRelation: body.blaRelation as string | null,
       religionCommunity: body.religionCommunity as string | null,
       casteCategory: body.casteCategory as string | null,
+      dob: body.dob as string | null,
+      anniversaryDate: body.anniversaryDate as string | null,
       computerDataEntry,
     });
     return { computerDataEntry, completionPercentage: completion.percentage, status: completion.status };
