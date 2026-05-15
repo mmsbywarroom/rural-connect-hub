@@ -2605,14 +2605,36 @@ export class DatabaseStorage implements IStorage {
     if (masters.length === 0) return [];
     const masterIds = masters.map((m) => m.id);
     const dateKey = attendanceDate?.trim() || new Date().toISOString().slice(0, 10);
-    const subs = await db
-      .select()
-      .from(blaSubmissions)
-      .where(inArray(blaSubmissions.blaMasterId, masterIds));
-    let attendanceRows: BlaAttendance[] = [];
+
+    // Light columns only — avoid loading multi-MB base64 photos for every booth list
+    type SubStatus = {
+      id: string;
+      blaMasterId: string | null;
+      completionPercentage: number | null;
+      status: string;
+    };
+    let subs: SubStatus[] = [];
+    try {
+      subs = await db
+        .select({
+          id: blaSubmissions.id,
+          blaMasterId: blaSubmissions.blaMasterId,
+          completionPercentage: blaSubmissions.completionPercentage,
+          status: blaSubmissions.status,
+        })
+        .from(blaSubmissions)
+        .where(inArray(blaSubmissions.blaMasterId, masterIds));
+    } catch (e) {
+      console.warn("[BLA Master] submission status lookup skipped:", (e as Error).message);
+    }
+
+    let attendanceRows: { blaMasterId: string; status: string }[] = [];
     try {
       attendanceRows = await db
-        .select()
+        .select({
+          blaMasterId: blaAttendance.blaMasterId,
+          status: blaAttendance.status,
+        })
         .from(blaAttendance)
         .where(
           and(
@@ -2623,6 +2645,7 @@ export class DatabaseStorage implements IStorage {
     } catch (e) {
       console.warn("[BLA Master] attendance lookup skipped:", (e as Error).message);
     }
+
     const subByMaster = new Map(
       subs.filter((s) => s.blaMasterId).map((s) => [s.blaMasterId!, s]),
     );

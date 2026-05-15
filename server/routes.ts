@@ -5242,9 +5242,27 @@ export async function registerRoutes(
       const withStatus = req.query.withStatus === "1" || req.query.withStatus === "true";
       const attendanceDate =
         typeof req.query.attendanceDate === "string" ? req.query.attendanceDate.trim() : undefined;
-      const list = withStatus
-        ? await storage.getBlaMasterByBoothWithStatus(booth, attendanceDate)
-        : await storage.getBlaMasterByBooth(booth);
+
+      if (withStatus) {
+        try {
+          const list = await storage.getBlaMasterByBoothWithStatus(booth, attendanceDate);
+          return res.json(list);
+        } catch (statusErr: any) {
+          console.error("[BLA Master] by booth withStatus failed, fallback:", statusErr.message);
+          const masters = await storage.getBlaMasterByBooth(booth);
+          return res.json(
+            masters.map((m) => ({
+              ...m,
+              completionPercentage: 0,
+              status: "incomplete",
+              submissionId: null,
+              todayAttendance: null,
+            })),
+          );
+        }
+      }
+
+      const list = await storage.getBlaMasterByBooth(booth);
       res.json(list);
     } catch (error: any) {
       console.error("[BLA Master] by booth error:", error.message);
