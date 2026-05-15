@@ -5363,7 +5363,8 @@ export async function registerRoutes(
       const sub = await storage.getBlaSubmissionByMasterId(req.params.blaMasterId);
       res.json(sub || null);
     } catch (error: any) {
-      res.status(500).json({ error: "Failed to fetch submission" });
+      console.error("[BLA] submission-by-master error:", error.message);
+      res.status(500).json({ error: error.message || "Failed to fetch submission" });
     }
   });
 

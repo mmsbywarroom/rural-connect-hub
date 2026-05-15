@@ -2762,10 +2762,83 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBlaSubmissionByMasterId(blaMasterId: string): Promise<BlaSubmission | undefined> {
-    const [row] = await db.select().from(blaSubmissions)
-      .where(eq(blaSubmissions.blaMasterId, blaMasterId))
-      .limit(1);
-    return row;
+    const where = eq(blaSubmissions.blaMasterId, blaMasterId);
+    const coreSelect = {
+      id: blaSubmissions.id,
+      appUserId: blaSubmissions.appUserId,
+      blaMasterId: blaSubmissions.blaMasterId,
+      boothNumber: blaSubmissions.boothNumber,
+      villageId: blaSubmissions.villageId,
+      villageName: blaSubmissions.villageName,
+      bloName: blaSubmissions.bloName,
+      bloMobileNumber: blaSubmissions.bloMobileNumber,
+      bloMobileVerified: blaSubmissions.bloMobileVerified,
+      aadhaarFront: blaSubmissions.aadhaarFront,
+      aadhaarBack: blaSubmissions.aadhaarBack,
+      aadhaarNumber: blaSubmissions.aadhaarNumber,
+      ocrAadhaarName: blaSubmissions.ocrAadhaarName,
+      ocrAadhaarNumber: blaSubmissions.ocrAadhaarNumber,
+      ocrAadhaarDob: blaSubmissions.ocrAadhaarDob,
+      ocrAadhaarGender: blaSubmissions.ocrAadhaarGender,
+      ocrAadhaarAddress: blaSubmissions.ocrAadhaarAddress,
+      voterCardImage: blaSubmissions.voterCardImage,
+      epicNumber: blaSubmissions.epicNumber,
+      ocrVoterId: blaSubmissions.ocrVoterId,
+      ocrVoterName: blaSubmissions.ocrVoterName,
+      gender: blaSubmissions.gender,
+      healthCardMade: blaSubmissions.healthCardMade,
+      msrRegistered: blaSubmissions.msrRegistered,
+      blaRelation: blaSubmissions.blaRelation,
+      casteCategory: blaSubmissions.casteCategory,
+      completionPercentage: blaSubmissions.completionPercentage,
+      status: blaSubmissions.status,
+      voterMappingBoothId: blaSubmissions.voterMappingBoothId,
+      voterMappingName: blaSubmissions.voterMappingName,
+      voterMappingFatherName: blaSubmissions.voterMappingFatherName,
+      voterMappingVillageName: blaSubmissions.voterMappingVillageName,
+      manualBoothId: blaSubmissions.manualBoothId,
+      createdAt: blaSubmissions.createdAt,
+      updatedAt: blaSubmissions.updatedAt,
+    };
+
+    try {
+      const [row] = await db.select().from(blaSubmissions).where(where).limit(1);
+      if (row) return row;
+    } catch (e) {
+      console.warn("[BLA] full submission fetch failed, retrying:", (e as Error).message);
+    }
+
+    try {
+      const [row] = await db
+        .select({
+          ...coreSelect,
+          blaLivePhoto: blaSubmissions.blaLivePhoto,
+          religionCommunity: blaSubmissions.religionCommunity,
+          computerDataEntry: blaSubmissions.computerDataEntry,
+          digitalSkills: blaSubmissions.digitalSkills,
+        })
+        .from(blaSubmissions)
+        .where(where)
+        .limit(1);
+      if (row) return row as BlaSubmission;
+    } catch (e) {
+      console.warn("[BLA] extended submission fetch failed, retrying core:", (e as Error).message);
+    }
+
+    try {
+      const [row] = await db.select(coreSelect).from(blaSubmissions).where(where).limit(1);
+      if (!row) return undefined;
+      return {
+        ...row,
+        blaLivePhoto: null,
+        religionCommunity: null,
+        computerDataEntry: null,
+        digitalSkills: null,
+      } as BlaSubmission;
+    } catch (e) {
+      console.error("[BLA] submission by master failed:", (e as Error).message);
+      return undefined;
+    }
   }
 
   async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {

@@ -356,7 +356,7 @@ export default function TaskBla({ user }: Props) {
     setCasteCategory(s.casteCategory || "");
     setComputerDataEntry(
       s.computerDataEntry ||
-        (s.digitalSkills && s.digitalSkills.length > 0 ? "yes" : ""),
+        (Array.isArray(s.digitalSkills) && s.digitalSkills.length > 0 ? "yes" : ""),
     );
     setStep("form");
   };
@@ -397,22 +397,28 @@ export default function TaskBla({ user }: Props) {
     setOtpSent(false);
     setOtp("");
     try {
-      const res = await fetch(`/api/bla/submission-by-master/${m.id}`, {
+      const res = await fetch(`/api/bla/submission-by-master/${encodeURIComponent(m.id)}`, {
         credentials: "include",
       });
-      const existing = (await res.json()) as BlaSubmission | null;
-      if (existing) {
-        loadSubmissionIntoForm(existing);
-      } else {
-        setEditingId(null);
-        resetFormFieldsOnly();
-        setBlaName(m.name);
-        setBlaMobile(m.mobileNumber);
-        setSelectedBooth(m.boothNumber);
-        setStep("form");
+      if (res.ok) {
+        const existing = (await res.json()) as BlaSubmission | null;
+        if (existing?.id) {
+          loadSubmissionIntoForm(existing);
+          return;
+        }
       }
+      setEditingId(null);
+      resetFormFieldsOnly();
+      setBlaName(m.name);
+      setBlaMobile(m.mobileNumber);
+      setSelectedBooth(m.boothNumber);
+      setStep("form");
     } catch {
       setEditingId(null);
+      resetFormFieldsOnly();
+      setBlaName(m.name);
+      setBlaMobile(m.mobileNumber);
+      setSelectedBooth(m.boothNumber);
       setStep("form");
     }
   };
@@ -677,11 +683,11 @@ export default function TaskBla({ user }: Props) {
               <span className="font-bold text-indigo-600">{completion.percentage}%</span>
             </div>
             <Progress value={completion.percentage} className="h-2" />
-            {!completion.isComplete && completion.missingFields.length > 0 && (
+            {!completion.isComplete && (completion.missingFields?.length ?? 0) > 0 && (
               <p className="text-[11px] text-slate-500">
                 {t("remaining")}{" "}
-                {translateCompletionMissing(completion.missingFields, language).slice(0, 4).join(", ")}
-                {completion.missingFields.length > 4 ? "…" : ""}
+                {translateCompletionMissing(completion.missingFields ?? [], language).slice(0, 4).join(", ")}
+                {(completion.missingFields?.length ?? 0) > 4 ? "…" : ""}
               </p>
             )}
           </CardContent>
