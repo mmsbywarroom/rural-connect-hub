@@ -5414,29 +5414,35 @@ export async function registerRoutes(
     }
   });
 
-  // Create BLA submission
+  // Create or update BLA submission (upsert by blaMasterId when provided)
   app.post("/api/bla/submit", async (req, res) => {
     try {
       const body = req.body as Record<string, unknown>;
       const { computerDataEntry, completionPercentage, status } = enrichBlaPayload(body);
-      if (body.blaMasterId) {
-        const existing = await storage.getBlaSubmissionByMasterId(String(body.blaMasterId));
-        if (existing) {
-          return res.status(409).json({ error: "BLA already submitted for this person", submissionId: existing.id });
-        }
-      }
-      const data = insertBlaSubmissionSchema.parse({
+      const parsed = insertBlaSubmissionSchema.parse({
         ...body,
         computerDataEntry,
         completionPercentage,
         status,
         epicNumber: body.epicNumber || body.ocrVoterId || null,
       });
-      const submission = await storage.createBlaSubmission(data);
+
+      if (parsed.blaMasterId) {
+        const existing = await storage.getBlaSubmissionByMasterId(parsed.blaMasterId);
+        if (existing) {
+          const updated = await storage.updateBlaSubmission(existing.id, parsed);
+          return res.json(updated);
+        }
+      }
+
+      const submission = await storage.createBlaSubmission(parsed);
       res.json(submission);
     } catch (error: any) {
       console.error("[BLA] Submit error:", error.message);
-      res.status(400).json({ error: "Invalid BLA submission data", details: error.message });
+      res.status(400).json({
+        error: error.message || "Invalid BLA submission data",
+        details: error.message,
+      });
     }
   });
 
@@ -5468,8 +5474,10 @@ export async function registerRoutes(
       const body = req.body as Record<string, unknown>;
       const existing = await storage.getBlaSubmission(req.params.id);
       if (!existing) return res.status(404).json({ error: "Submission not found" });
-      const merged = { ...existing, ...body };
-      const { computerDataEntry, completionPercentage, status } = enrichBlaPayload(merged);
+      const { computerDataEntry, completionPercentage, status } = enrichBlaPayload({
+        ...existing,
+        ...body,
+      });
       const updated = await storage.updateBlaSubmission(req.params.id, {
         ...(body as Partial<InsertBlaSubmission>),
         computerDataEntry,

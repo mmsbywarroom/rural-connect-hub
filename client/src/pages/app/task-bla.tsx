@@ -55,6 +55,21 @@ function localDateYmd() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function parseApiErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return "";
+  const msg = err.message;
+  const jsonStart = msg.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      const body = JSON.parse(msg.slice(jsonStart)) as { error?: string; details?: string };
+      return body.details || body.error || msg;
+    } catch {
+      /* ignore */
+    }
+  }
+  return msg.replace(/^\d+:\s*/, "");
+}
+
 const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
 
 const CASTE_OPTIONS = [
@@ -299,16 +314,12 @@ export default function TaskBla({ user }: Props) {
       setStep("booth");
       resetForm();
     },
-    onError: async (err: unknown) => {
-      let msg = t("submitFailed");
-      try {
-        const res = (err as { response?: Response })?.response;
-        if (res) {
-          const body = await res.json();
-          if (body?.error) msg = body.error;
-        }
-      } catch {}
-      toast({ title: msg, variant: "destructive" });
+    onError: (err: unknown) => {
+      const detail = parseApiErrorMessage(err);
+      toast({
+        title: detail || t("submitFailed"),
+        variant: "destructive",
+      });
     },
   });
 

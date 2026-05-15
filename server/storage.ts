@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { normalizeBoothNumber } from "./bla-booth";
+import { mergeBlaSubmissionRow, splitBlaSubmissionWrite } from "./bla-submission-write";
 import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
 import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
@@ -2742,8 +2743,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission> {
-    const [row] = await db.insert(blaSubmissions).values(data).returning();
-    return row;
+    const { core, extended } = splitBlaSubmissionWrite(data);
+    try {
+      const [row] = await db.insert(blaSubmissions).values(data).returning();
+      return row;
+    } catch (e) {
+      console.warn("[BLA] full insert failed, retrying core columns:", (e as Error).message);
+      const [row] = await db
+        .insert(blaSubmissions)
+        .values(core as InsertBlaSubmission)
+        .returning();
+      return mergeBlaSubmissionRow(row, extended) as BlaSubmission;
+    }
   }
 
   async getBlaSubmissions(): Promise<BlaSubmission[]> {
@@ -2842,11 +2853,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {
-    const [row] = await db.update(blaSubmissions)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(blaSubmissions.id, id))
-      .returning();
-    return row;
+    const { core, extended } = splitBlaSubmissionWrite(data as InsertBlaSubmission);
+    const patch = { ...data, updatedAt: new Date() };
+    try {
+      const [row] = await db
+        .update(blaSubmissions)
+        .set(patch)
+        .where(eq(blaSubmissions.id, id))
+        .returning();
+      return row;
+    } catch (e) {
+      console.warn("[BLA] full update failed, retrying core columns:", (e as Error).message);
+      const [row] = await db
+        .update(blaSubmissions)
+        .set({ ...(core as Partial<InsertBlaSubmission>), updatedAt: new Date() })
+        .where(eq(blaSubmissions.id, id))
+        .returning();
+      if (!row) return undefined;
+      return mergeBlaSubmissionRow(row, extended) as BlaSubmission;
+    }
   }
 
   async deleteBlaSubmission(id: string): Promise<void> {
