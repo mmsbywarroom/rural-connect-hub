@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, Download, Trash2, Eye } from "lucide-react";
 import type { BlaSubmission } from "@shared/schema";
 
@@ -198,26 +199,37 @@ export default function BlaSubmissionsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>#</TableHead>
-                    <TableHead>BLO Name</TableHead>
+                    <TableHead>BLA Name</TableHead>
                     <TableHead>Mobile</TableHead>
-                    <TableHead>Village</TableHead>
-                    <TableHead>Booth (final)</TableHead>
-                    <TableHead>Voter ID</TableHead>
+                    <TableHead>Booth</TableHead>
+                    <TableHead>Completion</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>EPIC</TableHead>
                     <TableHead>Created At</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((s, idx) => {
-                    const booth = (s.voterMappingBoothId || s.manualBoothId || "").trim();
+                    const booth = (s.boothNumber || s.voterMappingBoothId || s.manualBoothId || "").trim();
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="text-sm font-medium">{s.bloName}</TableCell>
                         <TableCell className="text-sm">{s.bloMobileNumber}</TableCell>
-                        <TableCell className="text-sm">{s.villageName ?? "—"}</TableCell>
                         <TableCell className="text-sm">{booth || "—"}</TableCell>
-                        <TableCell className="text-xs font-mono">{s.ocrVoterId ?? "—"}</TableCell>
+                        <TableCell className="text-sm min-w-[100px]">
+                          <div className="flex items-center gap-2">
+                            <Progress value={s.completionPercentage ?? 0} className="h-1.5 flex-1" />
+                            <span className="text-xs">{s.completionPercentage ?? 0}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={s.status === "complete" ? "default" : "secondary"}>
+                            {s.status === "complete" ? "Complete" : "Incomplete"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">{s.epicNumber || s.ocrVoterId || "—"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                           {s.createdAt ? new Date(s.createdAt).toLocaleString() : "—"}
                         </TableCell>
@@ -264,10 +276,25 @@ export default function BlaSubmissionsPage() {
               </DialogHeader>
               <div className="space-y-3 text-sm">
                 <div>
-                  <p className="font-semibold">BLO</p>
+                  <p className="font-semibold">BLA</p>
                   <p>
                     {selected.bloName} &middot; {selected.bloMobileNumber}
                   </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold">Completion</p>
+                  <Progress value={selected.completionPercentage ?? 0} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {selected.completionPercentage ?? 0}% · {selected.status === "complete" ? "Complete" : "Incomplete"}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <p>Gender: {selected.gender || "—"}</p>
+                  <p>Health: {selected.healthCardMade || "—"}</p>
+                  <p>MSR: {selected.msrRegistered || "—"}</p>
+                  <p>Caste: {selected.casteCategory || "—"}</p>
+                  <p>Relation: {selected.blaRelation || "—"}</p>
+                  <p>Aadhaar #: {selected.aadhaarNumber || selected.ocrAadhaarNumber || "—"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -275,8 +302,8 @@ export default function BlaSubmissionsPage() {
                     <p>{selected.villageName || "—"}</p>
                   </div>
                   <div>
-                    <p className="font-semibold">Booth (final)</p>
-                    <p>{(selected.voterMappingBoothId || selected.manualBoothId || "—").toString()}</p>
+                    <p className="font-semibold">Booth</p>
+                    <p>{(selected.boothNumber || selected.voterMappingBoothId || selected.manualBoothId || "—").toString()}</p>
                   </div>
                 </div>
                 <div>
@@ -361,4 +388,5 @@ export default function BlaSubmissionsPage() {
     </div>
   );
 }
+
 

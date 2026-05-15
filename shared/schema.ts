@@ -1359,10 +1359,30 @@ export const insertMahilaSammanPunjabSubmissionSchema = createInsertSchema(mahil
 export type InsertMahilaSammanPunjabSubmission = z.infer<typeof insertMahilaSammanPunjabSubmissionSchema>;
 export type MahilaSammanPunjabSubmission = typeof mahilaSammanPunjabSubmissions.$inferSelect;
 
+// BLA master roster (admin CSV: NAME, Mobile, Booth No)
+export const blaMaster = pgTable("bla_master", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: integer("serial_number").notNull(),
+  name: text("name").notNull(),
+  mobileNumber: text("mobile_number").notNull(),
+  boothNumber: text("booth_number").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBlaMasterSchema = createInsertSchema(blaMaster).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBlaMaster = z.infer<typeof insertBlaMasterSchema>;
+export type BlaMaster = typeof blaMaster.$inferSelect;
+
 // Booth Level Agent (BLA) Submissions
 export const blaSubmissions = pgTable("bla_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   appUserId: varchar("app_user_id").notNull().references(() => appUsers.id),
+  blaMasterId: varchar("bla_master_id").references(() => blaMaster.id),
+  boothNumber: text("booth_number"),
   villageId: varchar("village_id"),
   villageName: text("village_name"),
   bloName: text("blo_name").notNull(),
@@ -1371,6 +1391,7 @@ export const blaSubmissions = pgTable("bla_submissions", {
   // Aadhaar documents + OCR
   aadhaarFront: text("aadhaar_front"),
   aadhaarBack: text("aadhaar_back"),
+  aadhaarNumber: text("aadhaar_number"),
   ocrAadhaarName: text("ocr_aadhaar_name"),
   ocrAadhaarNumber: text("ocr_aadhaar_number"),
   ocrAadhaarDob: text("ocr_aadhaar_dob"),
@@ -1378,15 +1399,25 @@ export const blaSubmissions = pgTable("bla_submissions", {
   ocrAadhaarAddress: text("ocr_aadhaar_address"),
   // Voter card + OCR
   voterCardImage: text("voter_card_image"),
+  epicNumber: text("epic_number"),
   ocrVoterId: text("ocr_voter_id"),
   ocrVoterName: text("ocr_voter_name"),
-  // Voter mapping match / booth details
+  gender: text("gender"),
+  healthCardMade: text("health_card_made"),
+  msrRegistered: text("msr_registered"),
+  blaRelation: text("bla_relation"),
+  casteCategory: text("caste_category"),
+  digitalSkills: jsonb("digital_skills").$type<string[] | null>(),
+  completionPercentage: integer("completion_percentage").default(0),
+  status: text("status").default("incomplete").notNull(),
+  // Voter mapping match / booth details (legacy)
   voterMappingBoothId: text("voter_mapping_booth_id"),
   voterMappingName: text("voter_mapping_name"),
   voterMappingFatherName: text("voter_mapping_father_name"),
   voterMappingVillageName: text("voter_mapping_village_name"),
   manualBoothId: text("manual_booth_id"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertBlaSubmissionSchema = createInsertSchema(blaSubmissions).omit({

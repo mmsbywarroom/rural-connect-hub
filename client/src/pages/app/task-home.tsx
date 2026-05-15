@@ -874,6 +874,33 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           <div className="space-y-2.5">
+          <Link href="/task/bla">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200 border-2 border-indigo-100" data-testid="task-card-bla-priority">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-600 to-violet-600 shadow-sm">
+                  <Vote className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800">
+                    {language === "hi" ? "Booth Level Agent (BLA)" : language === "pa" ? "Booth Level Agent (BLA)" : "Booth Level Agent (BLA)"}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    {language === "hi"
+                      ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
+                      : language === "pa"
+                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਅਤੇ ਦਸਤਾਵੇਜ਼ ਨਾਲ ਰਜਿਸਟਰ"
+                      : "Select booth & BLA, verify mobile, upload documents"}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-indigo-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
           {/* Mahila Samman Rashi through Punjab Gov – only for Mahila Sakhis */}
           {isMahilaSakhi && (
           <Link href="/task/mahila-samman-punjab-gov">

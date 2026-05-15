@@ -42,7 +42,8 @@ import {
   voterMappingMaster,
   nvyReports, insertNvyReportSchema,
   roadReports, insertRoadReportSchema,
-  blaSubmissions, insertBlaSubmissionSchema,
+  blaMaster, blaSubmissions, insertBlaSubmissionSchema, insertBlaMasterSchema,
+  type InsertBlaSubmission,
   type InsertOfficeManager,
 } from "@shared/schema";
 
@@ -5034,7 +5035,172 @@ export async function registerRoutes(
 
   // ===== Booth Level Agent (BLA) Routes =====
 
-  // Send OTP for BLO mobile verification (BLA)
+  function computeBlaCompletionServer(data: {
+    bloMobileVerified?: boolean | null;
+    aadhaarFront?: string | null;
+    aadhaarBack?: string | null;
+    aadhaarNumber?: string | null;
+    voterCardImage?: string | null;
+    epicNumber?: string | null;
+    gender?: string | null;
+    healthCardMade?: string | null;
+    msrRegistered?: string | null;
+    blaRelation?: string | null;
+    casteCategory?: string | null;
+    digitalSkills?: string[] | null;
+  }) {
+    const checks = [
+      !!data.bloMobileVerified,
+      !!data.aadhaarFront?.trim(),
+      !!data.aadhaarBack?.trim(),
+      !!data.aadhaarNumber?.trim(),
+      !!data.voterCardImage?.trim(),
+      !!data.epicNumber?.trim(),
+      !!data.gender?.trim(),
+      !!data.healthCardMade?.trim(),
+      !!data.msrRegistered?.trim(),
+      !!data.blaRelation?.trim(),
+      !!data.casteCategory?.trim(),
+      Array.isArray(data.digitalSkills) && data.digitalSkills.some((s) => s.trim().length > 0),
+    ];
+    const filled = checks.filter(Boolean).length;
+    const total = checks.length;
+    const percentage = total === 0 ? 0 : Math.round((filled / total) * 100);
+    return { percentage, status: filled === total ? "complete" : "incomplete" as const };
+  }
+
+  function parseBlaMasterCsv(text: string): { name: string; mobileNumber: string; boothNumber: string }[] {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+    const splitRow = (line: string) => {
+      const out: string[] = [];
+      let cur = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          inQuotes = !inQuotes;
+          continue;
+        }
+        if (ch === "," && !inQuotes) {
+          out.push(cur.trim());
+          cur = "";
+          continue;
+        }
+        cur += ch;
+      }
+      out.push(cur.trim());
+      return out;
+    };
+    const headerCells = splitRow(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ""));
+    const nameIdx = headerCells.findIndex((h) => h === "name" || h.includes("name"));
+    const mobileIdx = headerCells.findIndex((h) => h.includes("mobile"));
+    const boothIdx = headerCells.findIndex((h) => h.includes("booth"));
+    const start = nameIdx >= 0 && mobileIdx >= 0 && boothIdx >= 0 ? 1 : 0;
+    const ni = start === 1 ? nameIdx : 0;
+    const mi = start === 1 ? mobileIdx : 1;
+    const bi = start === 1 ? boothIdx : 2;
+    const rows: { name: string; mobileNumber: string; boothNumber: string }[] = [];
+    for (let i = start; i < lines.length; i++) {
+      const cells = splitRow(lines[i]);
+      const name = (cells[ni] || "").trim();
+      const mobileRaw = (cells[mi] || "").replace(/\D/g, "").replace(/^91/, "").slice(0, 10);
+      const boothNumber = (cells[bi] || "").trim();
+      if (!name || mobileRaw.length !== 10 || !boothNumber) continue;
+      rows.push({ name, mobileNumber: mobileRaw, boothNumber });
+    }
+    return rows;
+  }
+
+  function enrichBlaPayload(body: Record<string, unknown>) {
+    const digitalSkills = Array.isArray(body.digitalSkills)
+      ? (body.digitalSkills as string[]).map((s) => String(s).trim()).filter(Boolean)
+      : [];
+    const completion = computeBlaCompletionServer({
+      bloMobileVerified: !!body.bloMobileVerified,
+      aadhaarFront: body.aadhaarFront as string | null,
+      aadhaarBack: body.aadhaarBack as string | null,
+      aadhaarNumber: body.aadhaarNumber as string | null,
+      voterCardImage: body.voterCardImage as string | null,
+      epicNumber: body.epicNumber as string | null,
+      gender: body.gender as string | null,
+      healthCardMade: body.healthCardMade as string | null,
+      msrRegistered: body.msrRegistered as string | null,
+      blaRelation: body.blaRelation as string | null,
+      casteCategory: body.casteCategory as string | null,
+      digitalSkills,
+    });
+    return { digitalSkills, completionPercentage: completion.percentage, status: completion.status };
+  }
+
+  app.get("/api/admin/bla-master", async (_req, res) => {
+    try {
+      const list = await storage.getBlaMasterList();
+      res.json(list);
+    } catch (error: any) {
+      console.error("[BLA Master] list error:", error.message);
+      res.status(500).json({ error: "Failed to fetch BLA master list" });
+    }
+  });
+
+  app.post("/api/admin/bla-master/upload-csv", async (req, res) => {
+    try {
+      const { csvText } = req.body as { csvText?: string };
+      if (!csvText?.trim()) {
+        return res.status(400).json({ error: "CSV text is required" });
+      }
+      const parsed = parseBlaMasterCsv(csvText);
+      if (parsed.length === 0) {
+        return res.status(400).json({ error: "No valid rows. Use columns: NAME, Mobile Number, Booth No" });
+      }
+      const rows = parsed.map((r, i) =>
+        insertBlaMasterSchema.parse({
+          serialNumber: i + 1,
+          name: r.name,
+          mobileNumber: r.mobileNumber,
+          boothNumber: r.boothNumber,
+        }),
+      );
+      const inserted = await storage.replaceBlaMaster(rows);
+      res.json({ success: true, count: inserted.length, rows: inserted });
+    } catch (error: any) {
+      console.error("[BLA Master] upload error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to upload CSV" });
+    }
+  });
+
+  app.get("/api/bla/master/by-booth/:boothNumber", async (req, res) => {
+    try {
+      const booth = String(req.params.boothNumber || "").trim();
+      if (!booth) return res.json([]);
+      const list = await storage.getBlaMasterByBooth(booth);
+      res.json(list);
+    } catch (error: any) {
+      console.error("[BLA Master] by booth error:", error.message);
+      res.status(500).json({ error: "Failed to fetch BLAs for booth" });
+    }
+  });
+
+  app.get("/api/bla/master/:id", async (req, res) => {
+    try {
+      const row = await storage.getBlaMasterById(req.params.id);
+      if (!row) return res.status(404).json({ error: "BLA not found" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch BLA" });
+    }
+  });
+
+  app.get("/api/bla/submission-by-master/:blaMasterId", async (req, res) => {
+    try {
+      const sub = await storage.getBlaSubmissionByMasterId(req.params.blaMasterId);
+      res.json(sub || null);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch submission" });
+    }
+  });
+
+  // Send OTP for BLA mobile verification
   app.post("/api/bla/send-otp", async (req, res) => {
     try {
       const { mobileNumber } = req.body;
@@ -5083,12 +5249,26 @@ export async function registerRoutes(
   // Create BLA submission
   app.post("/api/bla/submit", async (req, res) => {
     try {
-      const data = insertBlaSubmissionSchema.parse(req.body);
+      const body = req.body as Record<string, unknown>;
+      const { digitalSkills, completionPercentage, status } = enrichBlaPayload(body);
+      if (body.blaMasterId) {
+        const existing = await storage.getBlaSubmissionByMasterId(String(body.blaMasterId));
+        if (existing) {
+          return res.status(409).json({ error: "BLA already submitted for this person", submissionId: existing.id });
+        }
+      }
+      const data = insertBlaSubmissionSchema.parse({
+        ...body,
+        digitalSkills,
+        completionPercentage,
+        status,
+        epicNumber: body.epicNumber || body.ocrVoterId || null,
+      });
       const submission = await storage.createBlaSubmission(data);
       res.json(submission);
     } catch (error: any) {
       console.error("[BLA] Submit error:", error.message);
-      res.status(400).json({ error: "Invalid BLA submission data" });
+      res.status(400).json({ error: "Invalid BLA submission data", details: error.message });
     }
   });
 
@@ -5117,8 +5297,17 @@ export async function registerRoutes(
   // Admin: update BLA submission
   app.patch("/api/bla/submissions/:id", async (req, res) => {
     try {
-      const updateData = req.body as Partial<InsertBlaSubmission>;
-      const updated = await storage.updateBlaSubmission(req.params.id, updateData);
+      const body = req.body as Record<string, unknown>;
+      const existing = await storage.getBlaSubmission(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Submission not found" });
+      const merged = { ...existing, ...body };
+      const { digitalSkills, completionPercentage, status } = enrichBlaPayload(merged);
+      const updated = await storage.updateBlaSubmission(req.params.id, {
+        ...(body as Partial<InsertBlaSubmission>),
+        digitalSkills,
+        completionPercentage,
+        status,
+      });
       if (!updated) {
         return res.status(404).json({ error: "Submission not found" });
       }
@@ -5126,6 +5315,16 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[BLA] Update error:", error.message);
       res.status(400).json({ error: "Failed to update submission" });
+    }
+  });
+
+  app.get("/api/bla/submissions/:id", async (req, res) => {
+    try {
+      const row = await storage.getBlaSubmission(req.params.id);
+      if (!row) return res.status(404).json({ error: "Not found" });
+      res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch submission" });
     }
   });
 

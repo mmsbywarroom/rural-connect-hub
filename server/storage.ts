@@ -82,8 +82,11 @@ import {
   type MahilaSammanPunjabSubmission, type InsertMahilaSammanPunjabSubmission,
 } from "@shared/schema";
 import {
+  blaMaster,
   blaSubmissions,
+  type BlaMaster,
   type BlaSubmission,
+  type InsertBlaMaster,
   type InsertBlaSubmission,
 } from "@shared/schema";
 
@@ -526,10 +529,16 @@ export interface IStorage {
   getMahilaSammanPunjabSubmissions(): Promise<MahilaSammanPunjabSubmission[]>;
   getMahilaSammanPunjabSubmissionsByUser(appUserId: string): Promise<MahilaSammanPunjabSubmission[]>;
 
-  // BLA Submissions
+  // BLA Master + Submissions
+  replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]>;
+  getBlaMasterList(): Promise<BlaMaster[]>;
+  getBlaMasterByBooth(boothNumber: string): Promise<BlaMaster[]>;
+  getBlaMasterById(id: string): Promise<BlaMaster | undefined>;
   createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
   getBlaSubmissions(): Promise<BlaSubmission[]>;
+  getBlaSubmission(id: string): Promise<BlaSubmission | undefined>;
   getBlaSubmissionsByUser(appUserId: string): Promise<BlaSubmission[]>;
+  getBlaSubmissionByMasterId(blaMasterId: string): Promise<BlaSubmission | undefined>;
   updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined>;
   deleteBlaSubmission(id: string): Promise<void>;
 }
@@ -2544,7 +2553,29 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(mahilaSammanPunjabSubmissions.createdAt));
   }
 
-  // BLA Submissions
+  // BLA Master + Submissions
+  async replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]> {
+    await db.delete(blaMaster);
+    if (rows.length === 0) return [];
+    return db.insert(blaMaster).values(rows).returning();
+  }
+
+  async getBlaMasterList(): Promise<BlaMaster[]> {
+    return db.select().from(blaMaster).orderBy(blaMaster.serialNumber);
+  }
+
+  async getBlaMasterByBooth(boothNumber: string): Promise<BlaMaster[]> {
+    const booth = boothNumber.trim();
+    return db.select().from(blaMaster)
+      .where(eq(blaMaster.boothNumber, booth))
+      .orderBy(blaMaster.serialNumber);
+  }
+
+  async getBlaMasterById(id: string): Promise<BlaMaster | undefined> {
+    const [row] = await db.select().from(blaMaster).where(eq(blaMaster.id, id)).limit(1);
+    return row;
+  }
+
   async createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission> {
     const [row] = await db.insert(blaSubmissions).values(data).returning();
     return row;
@@ -2554,14 +2585,29 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(blaSubmissions).orderBy(desc(blaSubmissions.createdAt));
   }
 
+  async getBlaSubmission(id: string): Promise<BlaSubmission | undefined> {
+    const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, id)).limit(1);
+    return row;
+  }
+
   async getBlaSubmissionsByUser(appUserId: string): Promise<BlaSubmission[]> {
     return db.select().from(blaSubmissions)
       .where(eq(blaSubmissions.appUserId, appUserId))
       .orderBy(desc(blaSubmissions.createdAt));
   }
 
+  async getBlaSubmissionByMasterId(blaMasterId: string): Promise<BlaSubmission | undefined> {
+    const [row] = await db.select().from(blaSubmissions)
+      .where(eq(blaSubmissions.blaMasterId, blaMasterId))
+      .limit(1);
+    return row;
+  }
+
   async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {
-    const [row] = await db.update(blaSubmissions).set(data).where(eq(blaSubmissions.id, id)).returning();
+    const [row] = await db.update(blaSubmissions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(blaSubmissions.id, id))
+      .returning();
     return row;
   }
 

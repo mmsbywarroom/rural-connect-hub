@@ -1,24 +1,58 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
-import { ArrowLeft, Loader2, Phone, CheckCircle, Camera, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, Phone, CheckCircle, Camera, Upload, Plus, Trash2, ChevronRight } from "lucide-react";
 import { useLocation } from "wouter";
-import { UnitSelector } from "@/components/unit-selector";
 import { compressImage } from "@/lib/image-compress";
 import { useOcr } from "@/hooks/use-ocr";
-import type { AppUser, BlaSubmission } from "@shared/schema";
+import { computeBlaCompletion } from "@/lib/bla-completion";
+import type { AppUser, BlaMaster, BlaSubmission } from "@shared/schema";
 
 interface Props {
   user: AppUser;
 }
 
-type Step = "description" | "select_unit" | "form";
+type Step = "booth" | "select_bla" | "form";
+
+const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
+
+const CASTE_OPTIONS = [
+  { value: "GEN", en: "General (GEN)" },
+  { value: "OBC", en: "OBC" },
+  { value: "SC", en: "SC" },
+  { value: "ST", en: "ST" },
+];
+
+const RELATION_OPTIONS = [
+  "Self",
+  "Spouse",
+  "Father",
+  "Mother",
+  "Son",
+  "Daughter",
+  "Brother",
+  "Sister",
+  "Other",
+];
+
+const YES_NO = [
+  { value: "yes", en: "Yes", hi: "हाँ", pa: "ਹਾਂ" },
+  { value: "no", en: "No", hi: "नहीं", pa: "ਨਹੀਂ" },
+];
 
 export default function TaskBla({ user }: Props) {
   const { toast } = useToast();
@@ -26,98 +60,134 @@ export default function TaskBla({ user }: Props) {
   const { language } = useTranslation();
   const { processingType, processImage } = useOcr();
 
-  const [step, setStep] = useState<Step>("description");
-  const [selectedVillageId, setSelectedVillageId] = useState("");
-  const [selectedVillageName, setSelectedVillageName] = useState("");
+  const [step, setStep] = useState<Step>("booth");
+  const [boothSearch, setBoothSearch] = useState("");
+  const [selectedBooth, setSelectedBooth] = useState("");
+  const [selectedMaster, setSelectedMaster] = useState<BlaMaster | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [bloName, setBloName] = useState("");
-  const [bloMobile, setBloMobile] = useState("");
-  const [bloOtpSent, setBloOtpSent] = useState(false);
-  const [bloOtp, setBloOtp] = useState("");
-  const [bloVerified, setBloVerified] = useState(false);
+  const [blaName, setBlaName] = useState("");
+  const [blaMobile, setBlaMobile] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [mobileVerified, setMobileVerified] = useState(false);
 
   const [aadhaarFront, setAadhaarFront] = useState<string | null>(null);
   const [aadhaarBack, setAadhaarBack] = useState<string | null>(null);
-  const [ocrAadhaarName, setOcrAadhaarName] = useState("");
-  const [ocrAadhaarNumber, setOcrAadhaarNumber] = useState("");
-  const [ocrAadhaarDob, setOcrAadhaarDob] = useState("");
-  const [ocrAadhaarGender, setOcrAadhaarGender] = useState("");
-  const [ocrAadhaarAddress, setOcrAadhaarAddress] = useState("");
+  const [aadhaarNumber, setAadhaarNumber] = useState("");
 
   const [voterCardImage, setVoterCardImage] = useState<string | null>(null);
-  const [ocrVoterId, setOcrVoterId] = useState("");
-  const [ocrVoterName, setOcrVoterName] = useState("");
-  const [voterMatch, setVoterMatch] = useState<{
-    boothId: string | null;
-    name: string | null;
-    fatherName: string | null;
-    villageName: string | null;
-  } | null>(null);
-  const [manualBoothId, setManualBoothId] = useState("");
+  const [epicNumber, setEpicNumber] = useState("");
+  const [gender, setGender] = useState("");
+  const [healthCardMade, setHealthCardMade] = useState("");
+  const [msrRegistered, setMsrRegistered] = useState("");
+  const [blaRelation, setBlaRelation] = useState("");
+  const [casteCategory, setCasteCategory] = useState("");
+  const [digitalSkills, setDigitalSkills] = useState<string[]>([""]);
 
-  const aadhaarFrontInputRef = useRef<HTMLInputElement | null>(null);
-  const aadhaarBackInputRef = useRef<HTMLInputElement | null>(null);
-  const voterCardInputRef = useRef<HTMLInputElement | null>(null);
+  const aadhaarFrontRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackRef = useRef<HTMLInputElement>(null);
+  const voterCardRef = useRef<HTMLInputElement>(null);
 
-  const { data: mySubmissions } = useQuery<BlaSubmission[]>({
-    queryKey: ["/api/bla/my-submissions", user.id],
-    enabled: !!user.id,
+  const filteredBooths = useMemo(() => {
+    const q = boothSearch.trim();
+    if (!q) return BOOTH_OPTIONS;
+    return BOOTH_OPTIONS.filter((b) => b.includes(q));
+  }, [boothSearch]);
+
+  const { data: boothBlas, isLoading: loadingBlas } = useQuery<BlaMaster[]>({
+    queryKey: ["/api/bla/master/by-booth", selectedBooth],
+    enabled: step === "select_bla" && !!selectedBooth,
+    queryFn: async () => {
+      const res = await fetch(`/api/bla/master/by-booth/${encodeURIComponent(selectedBooth)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load BLAs");
+      return res.json();
+    },
   });
 
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const completion = useMemo(
+    () =>
+      computeBlaCompletion({
+        bloMobileVerified: mobileVerified,
+        aadhaarFront,
+        aadhaarBack,
+        aadhaarNumber,
+        voterCardImage,
+        epicNumber,
+        gender,
+        healthCardMade,
+        msrRegistered,
+        blaRelation,
+        casteCategory,
+        digitalSkills,
+      }),
+    [
+      mobileVerified,
+      aadhaarFront,
+      aadhaarBack,
+      aadhaarNumber,
+      voterCardImage,
+      epicNumber,
+      gender,
+      healthCardMade,
+      msrRegistered,
+      blaRelation,
+      casteCategory,
+      digitalSkills,
+    ],
+  );
 
   const sendOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/bla/send-otp", { mobileNumber: bloMobile });
+      const res = await apiRequest("POST", "/api/bla/send-otp", { mobileNumber: blaMobile });
       return res.json();
     },
     onSuccess: () => {
-      setBloOtpSent(true);
-      toast({ title: "OTP sent", description: bloMobile });
+      setOtpSent(true);
+      toast({ title: language === "hi" ? "OTP भेजा गया" : "OTP sent" });
     },
-    onError: () => {
-      toast({ title: "Failed to send OTP", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Failed to send OTP", variant: "destructive" }),
   });
 
   const verifyOtpMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/bla/verify-otp", { mobileNumber: bloMobile, otp: bloOtp });
+      const res = await apiRequest("POST", "/api/bla/verify-otp", { mobileNumber: blaMobile, otp });
       return res.json();
     },
     onSuccess: () => {
-      setBloVerified(true);
-      toast({ title: "Mobile verified" });
+      setMobileVerified(true);
+      toast({ title: language === "hi" ? "मोबाइल सत्यापित" : "Mobile verified" });
     },
-    onError: () => {
-      toast({ title: "Invalid or expired OTP", variant: "destructive" });
-    },
+    onError: () => toast({ title: "Invalid OTP", variant: "destructive" }),
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      const skills = digitalSkills.map((s) => s.trim()).filter(Boolean);
       const payload = {
         appUserId: user.id,
-        villageId: selectedVillageId || null,
-        villageName: selectedVillageName || null,
-        bloName: bloName.trim(),
-        bloMobileNumber: bloMobile.trim(),
-        bloMobileVerified: bloVerified,
+        blaMasterId: selectedMaster?.id ?? null,
+        boothNumber: selectedBooth,
+        bloName: blaName.trim(),
+        bloMobileNumber: blaMobile.trim(),
+        bloMobileVerified: mobileVerified,
         aadhaarFront,
         aadhaarBack,
-        ocrAadhaarName: ocrAadhaarName.trim() || null,
-        ocrAadhaarNumber: ocrAadhaarNumber.trim() || null,
-        ocrAadhaarDob: ocrAadhaarDob.trim() || null,
-        ocrAadhaarGender: ocrAadhaarGender.trim() || null,
-        ocrAadhaarAddress: ocrAadhaarAddress.trim() || null,
+        aadhaarNumber: aadhaarNumber.trim() || null,
         voterCardImage,
-        ocrVoterId: ocrVoterId.trim() || null,
-        ocrVoterName: ocrVoterName.trim() || null,
-        voterMappingBoothId: (voterMatch?.boothId || manualBoothId.trim()) || null,
-        voterMappingName: voterMatch?.name || null,
-        voterMappingFatherName: voterMatch?.fatherName || null,
-        voterMappingVillageName: voterMatch?.villageName || null,
-        manualBoothId: manualBoothId.trim() || null,
+        epicNumber: epicNumber.trim() || null,
+        ocrVoterId: epicNumber.trim() || null,
+        gender: gender || null,
+        healthCardMade: healthCardMade || null,
+        msrRegistered: msrRegistered || null,
+        blaRelation: blaRelation || null,
+        casteCategory: casteCategory || null,
+        digitalSkills: skills,
+        completionPercentage: completion.percentage,
+        status: completion.isComplete ? "complete" : "incomplete",
+        manualBoothId: selectedBooth,
       };
       if (editingId) {
         const res = await apiRequest("PATCH", `/api/bla/submissions/${editingId}`, payload);
@@ -127,702 +197,464 @@ export default function TaskBla({ user }: Props) {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: language === "hi" ? "BLA सहेजा गया" : language === "pa" ? "BLA ਸੰਭਾਲਿਆ ਗਿਆ" : "BLA saved" });
-      setStep("description");
-      setEditingId(null);
+      toast({
+        title: completion.isComplete
+          ? language === "hi"
+            ? "BLA सबमिट हो गया"
+            : "BLA submitted"
+          : language === "hi"
+          ? "अधूरा सहेजा गया"
+          : "Saved as incomplete",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/bla/my-submissions", user.id] });
+      setStep("booth");
       resetForm();
     },
-    onError: () => {
-      toast({
-        title: language === "hi" ? "सबमिट असफल" : language === "pa" ? "ਸਬਮਿਟ ਅਸਫਲ" : "Failed to submit",
-        variant: "destructive",
-      });
+    onError: async (err: unknown) => {
+      let msg = "Submit failed";
+      try {
+        const res = (err as { response?: Response })?.response;
+        if (res) {
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
   const resetForm = () => {
-    setSelectedVillageId("");
-    setSelectedVillageName("");
-    setBloName("");
-    setBloMobile("");
-    setBloOtpSent(false);
-    setBloOtp("");
-    setBloVerified(false);
+    setSelectedBooth("");
+    setSelectedMaster(null);
+    setEditingId(null);
+    setBlaName("");
+    setBlaMobile("");
+    setOtpSent(false);
+    setOtp("");
+    setMobileVerified(false);
     setAadhaarFront(null);
     setAadhaarBack(null);
-    setOcrAadhaarName("");
-    setOcrAadhaarNumber("");
-    setOcrAadhaarDob("");
-    setOcrAadhaarGender("");
-    setOcrAadhaarAddress("");
+    setAadhaarNumber("");
     setVoterCardImage(null);
-    setOcrVoterId("");
-    setOcrVoterName("");
-    setVoterMatch(null);
-    setManualBoothId("");
-    setEditingId(null);
+    setEpicNumber("");
+    setGender("");
+    setHealthCardMade("");
+    setMsrRegistered("");
+    setBlaRelation("");
+    setCasteCategory("");
+    setDigitalSkills([""]);
   };
 
-  const handleBack = () => {
-    if (step === "description") {
-      setLocation("/app");
-    } else if (step === "select_unit") {
-      setStep("description");
-    } else {
-      setStep("select_unit");
-    }
+  const loadSubmissionIntoForm = (s: BlaSubmission) => {
+    setEditingId(s.id);
+    setSelectedBooth(s.boothNumber || s.manualBoothId || "");
+    setBlaName(s.bloName);
+    setBlaMobile(s.bloMobileNumber);
+    setMobileVerified(!!s.bloMobileVerified);
+    setAadhaarFront(s.aadhaarFront || null);
+    setAadhaarBack(s.aadhaarBack || null);
+    setAadhaarNumber(s.aadhaarNumber || s.ocrAadhaarNumber || "");
+    setVoterCardImage(s.voterCardImage || null);
+    setEpicNumber(s.epicNumber || s.ocrVoterId || "");
+    setGender(s.gender || "");
+    setHealthCardMade(s.healthCardMade || "");
+    setMsrRegistered(s.msrRegistered || "");
+    setBlaRelation(s.blaRelation || "");
+    setCasteCategory(s.casteCategory || "");
+    setDigitalSkills(
+      s.digitalSkills && s.digitalSkills.length > 0 ? s.digitalSkills : [""],
+    );
+    setStep("form");
   };
 
-  const handleCaptureImage = async (
-    ref: React.RefObject<HTMLInputElement>,
-    setter: (val: string | null) => void,
-    ocrType: "aadhaarFront" | "aadhaarBack" | "voterId",
-    afterOcr?: (result: Awaited<ReturnType<typeof processImage>> | null) => void,
+  const pickImage = async (
+    input: HTMLInputElement | null,
+    setter: (v: string | null) => void,
+    ocrType?: "aadhaarFront" | "aadhaarBack" | "voterId",
+    after?: (r: Awaited<ReturnType<typeof processImage>> | null) => void,
   ) => {
-    const input = ref.current;
-    if (!input || !input.files || !input.files[0]) return;
-    const file = input.files[0];
+    const file = input?.files?.[0];
+    if (!file) return;
     try {
       const base64 = await compressImage(file);
       setter(base64);
       if (ocrType && base64) {
         const result = await processImage(ocrType, base64);
-        afterOcr?.(result);
+        after?.(result);
       }
     } catch {
-      setter(null);
-      toast({ title: "Image not clear", variant: "destructive" });
+      toast({ title: "Image error", variant: "destructive" });
     } finally {
-      input.value = "";
+      if (input) input.value = "";
     }
   };
 
-  const handleAadhaarFrontChange = () => {
-    handleCaptureImage(aadhaarFrontInputRef, setAadhaarFront, "aadhaarFront", (result) => {
-      if (!result) return;
-      setOcrAadhaarName(result.name || "");
-      setOcrAadhaarNumber(result.aadhaarNumber || "");
-      setOcrAadhaarDob(result.dob || "");
-      setOcrAadhaarGender(result.gender || "");
-      setOcrAadhaarAddress(result.address || "");
-    });
+  const handleBack = () => {
+    if (step === "booth") setLocation("/app");
+    else if (step === "select_bla") setStep("booth");
+    else setStep("select_bla");
   };
 
-  const handleAadhaarBackChange = () => {
-    handleCaptureImage(aadhaarBackInputRef, setAadhaarBack, "aadhaarBack", (result) => {
-      if (!result) return;
-      if (result.address && !ocrAadhaarAddress.trim()) {
-        setOcrAadhaarAddress(result.address.trim());
-      }
-      if (result.name && !ocrAadhaarName.trim()) {
-        setOcrAadhaarName(result.name);
-      }
-      if (result.aadhaarNumber && !ocrAadhaarNumber.trim()) {
-        setOcrAadhaarNumber(result.aadhaarNumber);
-      }
-      if (result.dob && !ocrAadhaarDob.trim()) {
-        setOcrAadhaarDob(result.dob);
-      }
-      if (result.gender && !ocrAadhaarGender.trim()) {
-        setOcrAadhaarGender(result.gender);
-      }
-    });
+  const yesNoLabel = (v: string) => {
+    const o = YES_NO.find((x) => x.value === v);
+    if (!o) return v;
+    return language === "hi" ? o.hi : language === "pa" ? o.pa : o.en;
   };
 
-  const handleVoterCardChange = () => {
-    handleCaptureImage(voterCardInputRef, setVoterCardImage, "voterId", async (result) => {
-      if (!result) return;
-      const vid = (result.voterId || "").trim();
-      const vname = (result.name || "").trim();
-      setOcrVoterId(vid);
-      setOcrVoterName(vname);
-      if (vid) {
-        try {
-          const res = await fetch(`/api/mahila-samman/voter-match?voterId=${encodeURIComponent(vid)}`, { credentials: "include" });
-          const data = await res.json();
-          setVoterMatch(data.match || null);
-          setManualBoothId("");
-        } catch {
-          setVoterMatch(null);
-          toast({ title: "Failed to match voter", variant: "destructive" });
-        }
-      } else {
-        setVoterMatch(null);
-        setManualBoothId("");
-      }
-    });
-  };
+  const headerTitle =
+    step === "booth"
+      ? language === "hi"
+        ? "बूथ चुनें (1–258)"
+        : language === "pa"
+        ? "ਬੂਥ ਚੁਣੋ (1–258)"
+        : "Select Booth (1–258)"
+      : step === "select_bla"
+      ? language === "hi"
+        ? `बूथ ${selectedBooth} – BLA चुनें`
+        : `Booth ${selectedBooth} – Select BLA`
+      : language === "hi"
+      ? "BLA पंजीकरण फॉर्म"
+      : "BLA Registration Form";
 
-  const fieldLabel = (key: "bloName" | "bloMobile" | "aadhaar" | "voterCard" | "booth"): string => {
-    if (language === "hi") {
-      switch (key) {
-        case "bloName": return "BLO नाम";
-        case "bloMobile": return "BLO मोबाइल (OTP)";
-        case "aadhaar": return "आधार (फ्रंट/बैक)";
-        case "voterCard": return "वोटर कार्ड";
-        case "booth": return "बूथ नंबर";
-      }
-    }
-    if (language === "pa") {
-      switch (key) {
-        case "bloName": return "BLO ਨਾਮ";
-        case "bloMobile": return "BLO ਮੋਬਾਈਲ (OTP)";
-        case "aadhaar": return "ਆਧਾਰ (ਅੱਗੇ/ਪਿੱਛੇ)";
-        case "voterCard": return "ਵੋਟਰ ਕਾਰਡ";
-        case "booth": return "ਬੂਥ ਨੰਬਰ";
-      }
-    }
-    switch (key) {
-      case "bloName": return "BLO Name";
-      case "bloMobile": return "BLO Mobile (OTP)";
-      case "aadhaar": return "Aadhaar (Front/Back)";
-      case "voterCard": return "Voter Card";
-      case "booth": return "Booth Number";
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const missing: string[] = [];
-    if (!bloName.trim()) missing.push(fieldLabel("bloName"));
-    if (!bloVerified) missing.push(fieldLabel("bloMobile"));
-    if (!aadhaarFront || !aadhaarBack) missing.push(fieldLabel("aadhaar"));
-    if (!ocrVoterId.trim()) missing.push(fieldLabel("voterCard"));
-    if (!(voterMatch?.boothId || manualBoothId.trim())) missing.push(fieldLabel("booth"));
-
-    if (missing.length) {
-      const title =
-        language === "hi"
-          ? "कृपया ये फ़ील्ड भरें"
-          : language === "pa"
-          ? "ਕਿਰਪਾ ਕਰਕੇ ਇਹ ਫੀਲਡ ਭਰੋ"
-          : "Please fill these fields";
-      toast({
-        title,
-        description: missing.join(", "),
-        variant: "destructive",
-      });
-      return false;
-    }
-    return true;
-  };
-
-  if (step === "description") {
+  if (step === "booth") {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white no-default-hover-elevate"
-            onClick={() => setLocation("/app")}
-            data-testid="button-back"
-          >
+          <Button variant="ghost" size="icon" className="text-white" onClick={() => setLocation("/app")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">
-            {language === "hi"
-              ? "Booth Level Agent (BLA)"
-              : language === "pa"
-              ? "Booth Level Agent (BLA)"
-              : "Booth Level Agent (BLA)"}
-          </h1>
+          <h1 className="text-lg font-semibold">{headerTitle}</h1>
         </header>
-
-        <div className="p-4 space-y-4 flex-1">
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <p className="text-sm text-slate-700">
-                {language === "hi"
-                  ? "Booth Level Agents (BLA) को Aadhaar और Voter Card से verify करके booth wise register करें। Voter ID voter mapping से match होगी।"
-                  : language === "pa"
-                  ? "Booth Level Agents (BLA) ਨੂੰ ਆਧਾਰ ਅਤੇ ਵੋਟਰ ਕਾਰਡ ਨਾਲ ਤਸਦੀਕ ਕਰਕੇ ਬੂਥ ਵਾਇਜ਼ ਰਜਿਸਟਰ ਕਰੋ। ਵੋਟਰ ID voter mapping ਨਾਲ ਮਿਲਾਈ ਜਾਵੇਗੀ।"
-                  : "Register Booth Level Agents (BLA) with Aadhaar and Voter Card verification. Voter ID will be matched with Voter Mapping Work and booth will be highlighted."}
-              </p>
-              <Button className="w-full mt-2" onClick={() => setStep("select_unit")} data-testid="button-new-bla">
-                {language === "hi" ? "BLA फॉर्म शुरू करें" : language === "pa" ? "BLA ਫਾਰਮ ਸ਼ੁਰੂ ਕਰੋ" : "Start BLA Form"}
+        <div className="p-4 space-y-3 flex-1">
+          <Input
+            placeholder={language === "hi" ? "बूथ नंबर खोजें..." : "Search booth number..."}
+            value={boothSearch}
+            onChange={(e) => setBoothSearch(e.target.value.replace(/\D/g, "").slice(0, 3))}
+          />
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-[65vh] overflow-y-auto">
+            {filteredBooths.map((b) => (
+              <Button
+                key={b}
+                variant="outline"
+                className="h-10"
+                onClick={() => {
+                  setSelectedBooth(b);
+                  setStep("select_bla");
+                }}
+              >
+                {b}
               </Button>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    {language === "hi"
-                      ? "आपके BLA सबमिशन"
-                      : language === "pa"
-                      ? "ਤੁਹਾਡੇ BLA ਸਬਮਿਸ਼ਨ"
-                      : "Your BLA submissions"}
-                  </span>
-              <Button size="icon" variant="outline" onClick={() => resetForm()} className="h-7 w-7">
-                <RefreshCw className="h-3 w-3" />
-              </Button>
-            </div>
-            {mySubmissions && mySubmissions.length === 0 && (
-              <p className="text-xs text-slate-400">
-                {language === "hi" ? "अभी कोई सबमिशन नहीं।" : language === "pa" ? "ਹਾਲੇ ਕੋਈ ਸਬਮਿਸ਼ਨ ਨਹੀਂ।" : "No submissions yet."}
-              </p>
-            )}
-            {mySubmissions && mySubmissions.length > 0 && (
-              <div className="space-y-2">
-                {mySubmissions.map((s, idx) => (
-                  <Card key={s.id}>
-                    <CardContent className="p-3 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">
-                          {idx + 1}. {s.bloName} – {s.bloMobileNumber}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {s.villageName || "—"} {s.voterMappingBoothId ? `· Booth ${s.voterMappingBoothId}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {s.bloMobileVerified && (
-                          <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />{" "}
-                            {language === "hi" ? "सत्यापित" : language === "pa" ? "ਤਸਦੀਕਿਤ" : "Verified"}
-                          </Badge>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => {
-                            setEditingId(s.id);
-                            setSelectedVillageId(s.villageId || "");
-                            setSelectedVillageName(s.villageName || "");
-                            setBloName(s.bloName);
-                            setBloMobile(s.bloMobileNumber);
-                            setBloVerified(s.bloMobileVerified);
-                            setAadhaarFront(s.aadhaarFront || null);
-                            setAadhaarBack(s.aadhaarBack || null);
-                            setOcrAadhaarName(s.ocrAadhaarName || "");
-                            setOcrAadhaarNumber(s.ocrAadhaarNumber || "");
-                            setOcrAadhaarDob(s.ocrAadhaarDob || "");
-                            setOcrAadhaarGender(s.ocrAadhaarGender || "");
-                            setOcrAadhaarAddress(s.ocrAadhaarAddress || "");
-                            setVoterCardImage(s.voterCardImage || null);
-                            setOcrVoterId(s.ocrVoterId || "");
-                            setOcrVoterName(s.ocrVoterName || "");
-                            setVoterMatch(
-                              s.voterMappingBoothId
-                                ? {
-                                    boothId: s.voterMappingBoothId,
-                                    name: s.voterMappingName,
-                                    fatherName: s.voterMappingFatherName,
-                                    villageName: s.voterMappingVillageName,
-                                  }
-                                : null,
-                            );
-                            setManualBoothId(s.manualBoothId || "");
-                            setStep("form");
-                          }}
-                        >
-                          {language === "hi" ? "एडिट" : language === "pa" ? "ਸੰਪਾਦਨ" : "Edit"}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  if (step === "select_unit") {
+  if (step === "select_bla") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-50 flex flex-col">
         <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white no-default-hover-elevate"
-            onClick={handleBack}
-            data-testid="button-back"
-          >
+          <Button variant="ghost" size="icon" className="text-white" onClick={handleBack}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">
-            {language === "hi" ? "यूनिट चुनें" : language === "pa" ? "ਯੂਨਿਟ ਚੁਣੋ" : "Select Unit"}
-          </h1>
+          <h1 className="text-lg font-semibold">{headerTitle}</h1>
         </header>
-        <div className="p-4">
-          <UnitSelector
-            onSelect={(unit) => {
-              setSelectedVillageId(unit.villageId);
-              setSelectedVillageName(unit.villageName);
-              setStep("form");
-            }}
-            title={
-              language === "hi"
-                ? "यूनिट चुनें"
-                : language === "pa"
-                ? "ਯੂਨਿਟ ਚੁਣੋ"
-                : "Select Unit"
-            }
-            subtitle={
-              language === "hi"
-                ? "इस BLA के लिए गांव/वार्ड चुनें"
-                : language === "pa"
-                ? "ਇਸ BLA ਲਈ ਪਿੰਡ/ਵਾਰਡ ਚੁਣੋ"
-                : "Choose the village/ward for this BLA"
-            }
-            defaultVillageId={user.mappedAreaId || undefined}
-          />
+        <div className="p-4 space-y-3 flex-1">
+          {loadingBlas ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+            </div>
+          ) : !boothBlas?.length ? (
+            <Card>
+              <CardContent className="p-4 text-sm text-slate-600">
+                {language === "hi"
+                  ? "इस बूथ के लिए कोई BLA नहीं मिला। Admin से CSV अपलोड करवाएं।"
+                  : "No BLA found for this booth. Ask admin to upload CSV."}
+              </CardContent>
+            </Card>
+          ) : (
+            boothBlas.map((m, idx) => (
+              <Card
+                key={m.id}
+                className="cursor-pointer hover:border-indigo-300"
+                onClick={async () => {
+                  setSelectedMaster(m);
+                  setBlaName(m.name);
+                  setBlaMobile(m.mobileNumber);
+                  setMobileVerified(false);
+                  setOtpSent(false);
+                  setOtp("");
+                  try {
+                    const res = await fetch(`/api/bla/submission-by-master/${m.id}`, {
+                      credentials: "include",
+                    });
+                    const existing = (await res.json()) as BlaSubmission | null;
+                    if (existing) {
+                      setSelectedMaster(m);
+                      loadSubmissionIntoForm(existing);
+                    } else {
+                      setEditingId(null);
+                      setStep("form");
+                    }
+                  } catch {
+                    setStep("form");
+                  }
+                }}
+              >
+                <CardContent className="p-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-semibold text-slate-800">
+                      BLA {idx + 1}: {m.name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {m.mobileNumber} · Booth {m.boothNumber}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-indigo-500" />
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white no-default-hover-elevate"
-          onClick={handleBack}
-          data-testid="button-back"
-        >
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
+        <Button variant="ghost" size="icon" className="text-white" onClick={handleBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-lg font-semibold">
-            {language === "hi"
-              ? "Booth Level Agent (BLA)"
-              : language === "pa"
-              ? "Booth Level Agent (BLA)"
-              : "Booth Level Agent (BLA)"}
-          </h1>
-          <p className="text-xs text-white/80 truncate">{selectedVillageName}</p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-lg font-semibold truncate">{headerTitle}</h1>
+          <p className="text-xs text-white/80 truncate">
+            Booth {selectedBooth} · {blaName}
+          </p>
         </div>
       </header>
+
+      <div className="px-4 pt-3">
+        <Card className="mb-3">
+          <CardContent className="p-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="font-medium">
+                {completion.isComplete
+                  ? language === "hi"
+                    ? "पूर्ण"
+                    : "Complete"
+                  : language === "hi"
+                  ? "अधूरा"
+                  : "Incomplete"}
+              </span>
+              <span className="font-bold text-indigo-600">{completion.percentage}%</span>
+            </div>
+            <Progress value={completion.percentage} className="h-2" />
+            {!completion.isComplete && completion.missingFields.length > 0 && (
+              <p className="text-[11px] text-slate-500">
+                {language === "hi" ? "बाकी:" : "Remaining:"} {completion.missingFields.slice(0, 4).join(", ")}
+                {completion.missingFields.length > 4 ? "…" : ""}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="p-4 space-y-4">
         <Card>
           <CardContent className="p-4 space-y-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                {language === "hi" ? "BLO नाम *" : language === "pa" ? "BLO ਨਾਮ *" : "BLO Name *"}
-              </label>
+            <label className="text-sm font-medium">{language === "hi" ? "BLA नाम" : "BLA Name"}</label>
+            <Input value={blaName} onChange={(e) => setBlaName(e.target.value)} />
+            <label className="text-sm font-medium">{language === "hi" ? "बूथ नंबर" : "Booth Number"}</label>
+            <Input value={selectedBooth} onChange={(e) => setSelectedBooth(e.target.value)} />
+            <label className="text-sm font-medium">{language === "hi" ? "मोबाइल (OTP)" : "Mobile (OTP)"}</label>
+            <div className="flex gap-2">
               <Input
-                value={bloName}
-                onChange={(e) => setBloName(e.target.value)}
-                placeholder="Enter BLO name"
-                data-testid="input-blo-name"
+                type="tel"
+                maxLength={10}
+                value={blaMobile}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  setBlaMobile(v);
+                  if (v !== blaMobile) {
+                    setMobileVerified(false);
+                    setOtpSent(false);
+                    setOtp("");
+                  }
+                }}
+                disabled={mobileVerified}
               />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">
-                {language === "hi"
-                  ? "BLO मोबाइल (OTP सत्यापन) *"
-                  : language === "pa"
-                  ? "BLO ਮੋਬਾਈਲ (OTP ਤਸਦੀਕ) *"
-                  : "BLO Mobile (OTP Verify) *"}
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="tel"
-                  maxLength={10}
-                  value={bloMobile}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
-                    setBloMobile(val);
-                    if (val !== bloMobile) {
-                      setBloVerified(false);
-                      setBloOtpSent(false);
-                      setBloOtp("");
-                    }
-                  }}
-                  placeholder={language === "hi" || language === "pa" ? "9876543210" : "9876543210"}
-                  disabled={bloVerified}
-                  data-testid="input-blo-mobile"
-                />
-                {!bloVerified && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="whitespace-nowrap"
-                    onClick={() => sendOtpMutation.mutate()}
-                    disabled={bloMobile.length !== 10 || sendOtpMutation.isPending}
-                    data-testid="button-send-blo-otp"
-                  >
-                    {sendOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4 mr-1" />}
-                    {language === "hi" ? "OTP भेजें" : language === "pa" ? "OTP ਭੇਜੋ" : "Send OTP"}
-                  </Button>
-                )}
-                {bloVerified && (
-                  <Badge className="bg-green-100 text-green-800 flex items-center gap-1 whitespace-nowrap">
-                    <CheckCircle className="h-3 w-3" /> Verified
-                  </Badge>
-                )}
-              </div>
-              {bloOtpSent && !bloVerified && (
-                <div className="space-y-2 pt-2 border-t border-indigo-200 bg-indigo-50 rounded-md p-3">
-                  <p className="text-xs text-indigo-700">
-                    {language === "hi"
-                      ? `OTP भेजा गया: ${bloMobile}`
-                      : language === "pa"
-                      ? `OTP ਭੇਜਿਆ ਗਿਆ: ${bloMobile}`
-                      : `OTP sent to ${bloMobile}`}
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      maxLength={4}
-                      value={bloOtp}
-                      onChange={(e) => setBloOtp(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                      placeholder={
-                        language === "hi"
-                          ? "4 अंकों का OTP डालें"
-                          : language === "pa"
-                          ? "4 ਅੰਕਾਂ ਦਾ OTP ਦਾਖਲ ਕਰੋ"
-                          : "Enter 4-digit OTP"
-                      }
-                      data-testid="input-blo-otp"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => verifyOtpMutation.mutate()}
-                      disabled={bloOtp.length !== 4 || verifyOtpMutation.isPending}
-                      data-testid="button-verify-blo-otp"
-                    >
-                      {verifyOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {language === "hi" ? "सत्यापित करें" : language === "pa" ? "ਤਸਦੀਕ ਕਰੋ" : "Verify"}
-                    </Button>
-                  </div>
-                </div>
+              {!mobileVerified && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => sendOtpMutation.mutate()}
+                  disabled={blaMobile.length !== 10 || sendOtpMutation.isPending}
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+              )}
+              {mobileVerified && (
+                <Badge className="bg-green-100 text-green-800">
+                  <CheckCircle className="h-3 w-3 mr-1" /> OK
+                </Badge>
               )}
             </div>
+            {otpSent && !mobileVerified && (
+              <div className="flex gap-2">
+                <Input maxLength={4} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 4))} />
+                <Button size="sm" onClick={() => verifyOtpMutation.mutate()} disabled={otp.length !== 4}>
+                  {language === "hi" ? "सत्यापित" : "Verify"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
-              {language === "hi"
-                ? "आधार (फ्रंट और बैक) OCR के साथ *"
-                : language === "pa"
-                ? "ਆਧਾਰ (ਅੱਗੇ ਅਤੇ ਪਿੱਛੇ) OCR ਨਾਲ *"
-                : "Aadhaar (Front & Back) with OCR *"}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <input
-                  ref={aadhaarFrontInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleAadhaarFrontChange}
-                  data-testid="input-aadhaar-front"
-                />
-                <Button
-                  variant="outline"
-                  className="w-full h-24 flex flex-col items-center justify-center gap-1"
-                  onClick={() => aadhaarFrontInputRef.current?.click()}
-                >
-                  <Camera className="h-5 w-5 text-slate-500" />
-                  <span className="text-xs">
-                    {aadhaarFront
-                      ? language === "hi"
-                        ? "फ्रंट कैप्चर हुआ"
-                        : language === "pa"
-                        ? "ਅੱਗਲਾ ਪਾਸਾ ਕੈਪਚਰ"
-                        : "Front captured"
-                      : language === "hi"
-                      ? "फ्रंट कैप्चर करें"
-                      : language === "pa"
-                      ? "ਅੱਗਲਾ ਪਾਸਾ ਕੈਪਚਰ ਕਰੋ"
-                      : "Capture Front"}
-                  </span>
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <input
-                  ref={aadhaarBackInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleAadhaarBackChange}
-                  data-testid="input-aadhaar-back"
-                />
-                <Button
-                  variant="outline"
-                  className="w-full h-24 flex flex-col items-center justify-center gap-1"
-                  onClick={() => aadhaarBackInputRef.current?.click()}
-                >
-                  <Camera className="h-5 w-5 text-slate-500" />
-                  <span className="text-xs">
-                    {aadhaarBack
-                      ? language === "hi"
-                        ? "बैक कैप्चर हुआ"
-                        : language === "pa"
-                        ? "ਪਿੱਛਲਾ ਪਾਸਾ ਕੈਪਚਰ"
-                        : "Back captured"
-                      : language === "hi"
-                      ? "बैक कैप्चर करें"
-                      : language === "pa"
-                      ? "ਪਿੱਛਲਾ ਪਾਸਾ ਕੈਪਚਰ ਕਰੋ"
-                      : "Capture Back"}
-                  </span>
-                </Button>
-              </div>
+            <p className="text-sm font-semibold">{language === "hi" ? "आधार" : "Aadhaar"}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input ref={aadhaarFrontRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarFrontRef.current, setAadhaarFront, "aadhaarFront", (r) => r?.aadhaarNumber && setAadhaarNumber(r.aadhaarNumber))} />
+              <input ref={aadhaarBackRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarBackRef.current, setAadhaarBack, "aadhaarBack")} />
+              <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarFrontRef.current?.click()}>
+                <Camera className="h-4 w-4" /> Front
+              </Button>
+              <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarBackRef.current?.click()}>
+                <Camera className="h-4 w-4" /> Back
+              </Button>
             </div>
-            {processingType && (processingType === "aadhaarFront" || processingType === "aadhaarBack") && (
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />{" "}
-                {language === "hi"
-                  ? "आधार विवरण पढ़े जा रहे हैं…"
-                  : language === "pa"
-                  ? "ਆਧਾਰ ਵੇਰਵੇ ਪੜ੍ਹੇ ਜਾ ਰਹੇ ਹਨ…"
-                  : "Reading Aadhaar details…"}
-              </p>
-            )}
-            {(ocrAadhaarName || ocrAadhaarNumber) && (
-              <div className="text-xs text-slate-600 space-y-0.5">
-                {ocrAadhaarName && <p><span className="font-semibold">Name:</span> {ocrAadhaarName}</p>}
-                {ocrAadhaarNumber && <p><span className="font-semibold">Aadhaar:</span> {ocrAadhaarNumber}</p>}
-                {ocrAadhaarDob && <p><span className="font-semibold">DOB:</span> {ocrAadhaarDob}</p>}
-                {ocrAadhaarGender && <p><span className="font-semibold">Gender:</span> {ocrAadhaarGender}</p>}
-                {ocrAadhaarAddress && <p><span className="font-semibold">Address:</span> {ocrAadhaarAddress}</p>}
-              </div>
-            )}
+            <label className="text-sm font-medium">{language === "hi" ? "आधार नंबर" : "Aadhaar Number"}</label>
+            <Input value={aadhaarNumber} onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, "").slice(0, 12))} maxLength={12} />
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
-              {language === "hi"
-                ? "वोटर कार्ड OCR और बूथ मैच के साथ *"
-                : language === "pa"
-                ? "ਵੋਟਰ ਕਾਰਡ OCR ਅਤੇ ਬੂਥ ਮੈਚ ਨਾਲ *"
-                : "Voter Card with OCR & Booth Match *"}
-            </p>
-            <input
-              ref={voterCardInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleVoterCardChange}
-              data-testid="input-voter-card"
-            />
-            <Button
-              variant="outline"
-              className="w-full h-24 flex flex-col items-center justify-center gap-1"
-              onClick={() => voterCardInputRef.current?.click()}
-            >
-              <Camera className="h-5 w-5 text-slate-500" />
-              <span className="text-xs">
-                {voterCardImage
-                  ? language === "hi"
-                    ? "वोटर कार्ड कैप्चर हुआ"
-                    : language === "pa"
-                    ? "ਵੋਟਰ ਕਾਰਡ ਕੈਪਚਰ ਕੀਤਾ ਗਿਆ"
-                    : "Voter card captured"
-                  : language === "hi"
-                  ? "वोटर कार्ड कैप्चर करें"
-                  : language === "pa"
-                  ? "ਵੋਟਰ ਕਾਰਡ ਕੈਪਚਰ ਕਰੋ"
-                  : "Capture voter card"}
-              </span>
-            </Button>
-            {processingType === "voterId" && (
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />{" "}
-                {language === "hi"
-                  ? "वोटर कार्ड पढ़ा जा रहा है…"
-                  : language === "pa"
-                  ? "ਵੋਟਰ ਕਾਰਡ ਪੜ੍ਹਿਆ ਜਾ ਰਿਹਾ ਹੈ…"
-                  : "Reading voter card…"}
-              </p>
-            )}
-            {(ocrVoterId || ocrVoterName) && (
-              <div className="text-xs text-slate-600 space-y-0.5">
-                {ocrVoterId && <p><span className="font-semibold">Voter ID:</span> {ocrVoterId}</p>}
-                {ocrVoterName && <p><span className="font-semibold">Name:</span> {ocrVoterName}</p>}
-              </div>
-            )}
-            {voterMatch && (
-              <div className="border rounded-md p-2 bg-green-50 text-xs text-slate-700 space-y-0.5">
-                <p className="font-semibold text-green-700">
-                  {language === "hi"
-                    ? "Voter Mapping में मैच मिला"
-                    : language === "pa"
-                    ? "Voter Mapping ਵਿੱਚ ਮੇਚ ਮਿਲਿਆ"
-                    : "Matched in Voter Mapping"}
-                </p>
-                <p>Booth: {voterMatch.boothId || "—"}</p>
-                <p>
-                  {language === "hi" ? "नाम:" : language === "pa" ? "ਨਾਮ:" : "Name:"}{" "}
-                  {voterMatch.name || "—"}
-                </p>
-                <p>
-                  {language === "hi"
-                    ? "पिता/पति का नाम:"
-                    : language === "pa"
-                    ? "ਪਿਤਾ/ਪਤੀ ਦਾ ਨਾਮ:"
-                    : "Father's Name:"}{" "}
-                  {voterMatch.fatherName || "—"}
-                </p>
-                <p>
-                  {language === "hi" ? "गांव:" : language === "pa" ? "ਪਿੰਡ:" : "Village:"}{" "}
-                  {voterMatch.villageName || "—"}
-                </p>
-              </div>
-            )}
-            {!voterMatch && !!ocrVoterId && (
-              <div className="space-y-2">
-                <p className="text-xs text-red-600">
-                  {language === "hi"
-                    ? "Voter Mapping में Voter ID नहीं मिली। कृपया बूथ नंबर मैन्युअली डालें।"
-                    : language === "pa"
-                    ? "Voter Mapping ਵਿੱਚ ਵੋਟਰ ID ਨਹੀਂ ਮਿਲੀ। ਕਿਰਪਾ ਕਰਕੇ ਬੂਥ ਨੰਬਰ ਹੱਥੋਂ ਭਰੋ।"
-                    : "Voter ID not found in Voter Mapping. Please enter Booth Number manually."}
-                </p>
-                <Input
-                  value={manualBoothId}
-                  onChange={(e) => setManualBoothId(e.target.value)}
-                  placeholder={
-                    language === "hi"
-                      ? "बूथ नंबर दर्ज करें"
-                      : language === "pa"
-                      ? "ਬੂਥ ਨੰਬਰ ਦਰਜ ਕਰੋ"
-                      : "Enter Booth Number"
-                  }
-                  data-testid="input-manual-booth"
-                />
-              </div>
-            )}
+            <p className="text-sm font-semibold">{language === "hi" ? "वोटर कार्ड" : "Voter Card"}</p>
+            <input ref={voterCardRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(voterCardRef.current, setVoterCardImage, "voterId", (r) => r?.voterId && setEpicNumber(r.voterId))} />
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
+                <Camera className="h-4 w-4" /> Camera
+              </Button>
+              <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
+                <Upload className="h-4 w-4" /> Upload
+              </Button>
+            </div>
+            <label className="text-sm font-medium">EPIC / Voter ID</label>
+            <Input value={epicNumber} onChange={(e) => setEpicNumber(e.target.value.toUpperCase())} />
           </CardContent>
         </Card>
 
-        <Button
-          className="w-full"
-          onClick={() => {
-            if (!validateForm()) return;
-            submitMutation.mutate();
-          }}
-          disabled={submitMutation.isPending}
-          data-testid="button-submit-bla"
-        >
-          {submitMutation.isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Saving…
-            </>
-          ) : (
-            "Submit BLA"
-          )}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <label className="text-sm font-medium">{language === "hi" ? "लिंग" : "Gender"}</label>
+            <Select value={gender} onValueChange={setGender}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">{language === "hi" ? "पुरुष" : "Male"}</SelectItem>
+                <SelectItem value="female">{language === "hi" ? "महिला" : "Female"}</SelectItem>
+                <SelectItem value="other">{language === "hi" ? "अन्य" : "Other"}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {(gender === "male" || gender === "female") && (
+              <>
+                <label className="text-sm font-medium">
+                  {language === "hi" ? "हेल्थ कार्ड बना?" : "Health card made?"}
+                </label>
+                <Select value={healthCardMade} onValueChange={setHealthCardMade}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Yes / No" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YES_NO.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {yesNoLabel(o.value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            <label className="text-sm font-medium">
+              {language === "hi" ? "MSR में रजिस्ट्रेशन?" : "MSR registration done?"}
+            </label>
+            <Select value={msrRegistered} onValueChange={setMsrRegistered}>
+              <SelectTrigger>
+                <SelectValue placeholder="Yes / No" />
+              </SelectTrigger>
+              <SelectContent>
+                {YES_NO.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {yesNoLabel(o.value)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <label className="text-sm font-medium">{language === "hi" ? "BLA का रिश्ता" : "BLA Relation"}</label>
+            <Select value={blaRelation} onValueChange={setBlaRelation}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select relation" />
+              </SelectTrigger>
+              <SelectContent>
+                {RELATION_OPTIONS.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <label className="text-sm font-medium">{language === "hi" ? "जाति श्रेणी" : "Caste category"}</label>
+            <Select value={casteCategory} onValueChange={setCasteCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="GEN / OBC / SC / ST" />
+              </SelectTrigger>
+              <SelectContent>
+                {CASTE_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.en}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <label className="text-sm font-medium">{language === "hi" ? "डिजिटल स्किल्स" : "Digital skills"}</label>
+            {digitalSkills.map((skill, i) => (
+              <div key={i} className="flex gap-2">
+                <Input
+                  value={skill}
+                  onChange={(e) => {
+                    const next = [...digitalSkills];
+                    next[i] = e.target.value;
+                    setDigitalSkills(next);
+                  }}
+                  placeholder={language === "hi" ? "स्किल दर्ज करें" : "Enter skill"}
+                />
+                {digitalSkills.length > 1 && (
+                  <Button type="button" variant="ghost" size="icon" onClick={() => setDigitalSkills(digitalSkills.filter((_, j) => j !== i))}>
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={() => setDigitalSkills([...digitalSkills, ""])}>
+              <Plus className="h-4 w-4 mr-1" /> {language === "hi" ? "और जोड़ें" : "Add more"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}>
+          {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          {language === "hi" ? "सहेजें और सबमिट करें" : "Save & Submit"}
         </Button>
       </div>
     </div>
   );
 }
-
