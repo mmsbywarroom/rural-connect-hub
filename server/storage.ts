@@ -533,6 +533,14 @@ export interface IStorage {
   replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]>;
   getBlaMasterList(): Promise<BlaMaster[]>;
   getBlaMasterByBooth(boothNumber: string): Promise<BlaMaster[]>;
+  getBlaMasterByBoothWithStatus(boothNumber: string): Promise<
+    (BlaMaster & {
+      completionPercentage: number;
+      status: string;
+      submissionId: string | null;
+    })[]
+  >;
+  createBlaMasterEntry(data: { name: string; mobileNumber: string; boothNumber: string }): Promise<BlaMaster>;
   getBlaMasterById(id: string): Promise<BlaMaster | undefined>;
   createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
   getBlaSubmissions(): Promise<BlaSubmission[]>;
@@ -2569,6 +2577,51 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(blaMaster)
       .where(eq(blaMaster.boothNumber, booth))
       .orderBy(blaMaster.serialNumber);
+  }
+
+  async getBlaMasterByBoothWithStatus(boothNumber: string) {
+    const masters = await this.getBlaMasterByBooth(boothNumber);
+    if (masters.length === 0) return [];
+    const masterIds = masters.map((m) => m.id);
+    const subs = await db.select().from(blaSubmissions)
+      .where(inArray(blaSubmissions.blaMasterId, masterIds));
+    const subByMaster = new Map(
+      subs.filter((s) => s.blaMasterId).map((s) => [s.blaMasterId!, s]),
+    );
+    return masters.map((m) => {
+      const sub = subByMaster.get(m.id);
+      return {
+        ...m,
+        completionPercentage: sub?.completionPercentage ?? 0,
+        status: sub?.status ?? "incomplete",
+        submissionId: sub?.id ?? null,
+      };
+    });
+  }
+
+  async createBlaMasterEntry(data: {
+    name: string;
+    mobileNumber: string;
+    boothNumber: string;
+  }): Promise<BlaMaster> {
+    const mobile = data.mobileNumber.replace(/\D/g, "").replace(/^91/, "").slice(0, 10);
+    if (mobile.length !== 10) {
+      throw new Error("Invalid mobile number");
+    }
+    const [maxRow] = await db
+      .select({ maxSn: sql<number>`coalesce(max(${blaMaster.serialNumber}), 0)` })
+      .from(blaMaster);
+    const serialNumber = Number(maxRow?.maxSn ?? 0) + 1;
+    const [row] = await db
+      .insert(blaMaster)
+      .values({
+        serialNumber,
+        name: data.name.trim(),
+        mobileNumber: mobile,
+        boothNumber: data.boothNumber.trim(),
+      })
+      .returning();
+    return row;
   }
 
   async getBlaMasterById(id: string): Promise<BlaMaster | undefined> {

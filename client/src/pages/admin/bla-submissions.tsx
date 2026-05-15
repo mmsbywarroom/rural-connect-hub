@@ -293,9 +293,20 @@ export default function BlaSubmissionsPage() {
                   <p>Health: {selected.healthCardMade || "—"}</p>
                   <p>MSR: {selected.msrRegistered || "—"}</p>
                   <p>Caste: {selected.casteCategory || "—"}</p>
-                  <p>Relation: {selected.blaRelation || "—"}</p>
+                  <p>Religion: {selected.blaRelation || "—"}</p>
+                  <p>Computer data entry: {selected.computerDataEntry || "—"}</p>
                   <p>Aadhaar #: {selected.aadhaarNumber || selected.ocrAadhaarNumber || "—"}</p>
                 </div>
+                {selected.blaLivePhoto && (
+                  <div>
+                    <p className="font-semibold mb-2">BLA live photo</p>
+                    <img
+                      src={selected.blaLivePhoto}
+                      alt="BLA live photo"
+                      className="w-full max-h-56 object-cover rounded-lg border"
+                    />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="font-semibold">Village</p>
@@ -332,6 +343,18 @@ export default function BlaSubmissionsPage() {
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  {selected.blaLivePhoto && (
+                    <Button asChild variant="outline" size="sm">
+                      <a
+                        href={selected.blaLivePhoto}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={`bla-live-photo-${selected.id}.jpg`}
+                      >
+                        View / Download BLA Live Photo
+                      </a>
+                    </Button>
+                  )}
                   {selected.aadhaarFront && (
                     <Button asChild variant="outline" size="sm">
                       <a href={selected.aadhaarFront} target="_blank" rel="noreferrer" download={`aadhaar-front-${selected.id}.jpg`}>

@@ -41,6 +41,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'caste_category') THEN
     ALTER TABLE bla_submissions ADD COLUMN caste_category TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'bla_live_photo') THEN
+    ALTER TABLE bla_submissions ADD COLUMN bla_live_photo TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'computer_data_entry') THEN
+    ALTER TABLE bla_submissions ADD COLUMN computer_data_entry TEXT;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'digital_skills') THEN
     ALTER TABLE bla_submissions ADD COLUMN digital_skills JSONB;
   END IF;

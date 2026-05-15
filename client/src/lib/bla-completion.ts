@@ -1,5 +1,6 @@
 export type BlaCompletionInput = {
   bloMobileVerified?: boolean | null;
+  blaLivePhoto?: string | null;
   aadhaarFront?: string | null;
   aadhaarBack?: string | null;
   aadhaarNumber?: string | null;
@@ -10,7 +11,7 @@ export type BlaCompletionInput = {
   msrRegistered?: string | null;
   blaRelation?: string | null;
   casteCategory?: string | null;
-  digitalSkills?: string[] | null;
+  computerDataEntry?: string | null;
 };
 
 export type BlaCompletionResult = {
@@ -21,33 +22,46 @@ export type BlaCompletionResult = {
   isComplete: boolean;
 };
 
-const FIELD_LABELS: { key: keyof BlaCompletionInput; label: string; test: (d: BlaCompletionInput) => boolean }[] = [
-  { key: "bloMobileVerified", label: "Mobile OTP verified", test: (d) => !!d.bloMobileVerified },
-  { key: "aadhaarFront", label: "Aadhaar front", test: (d) => !!d.aadhaarFront?.trim() },
-  { key: "aadhaarBack", label: "Aadhaar back", test: (d) => !!d.aadhaarBack?.trim() },
-  { key: "aadhaarNumber", label: "Aadhaar number", test: (d) => !!d.aadhaarNumber?.trim() },
-  { key: "voterCardImage", label: "Voter card", test: (d) => !!d.voterCardImage?.trim() },
-  { key: "epicNumber", label: "EPIC number", test: (d) => !!d.epicNumber?.trim() },
-  { key: "gender", label: "Gender", test: (d) => !!d.gender?.trim() },
-  { key: "healthCardMade", label: "Health card", test: (d) => !!d.healthCardMade?.trim() },
-  { key: "msrRegistered", label: "MSR registration", test: (d) => !!d.msrRegistered?.trim() },
-  { key: "blaRelation", label: "BLA relation", test: (d) => !!d.blaRelation?.trim() },
-  { key: "casteCategory", label: "Caste category", test: (d) => !!d.casteCategory?.trim() },
-  {
-    key: "digitalSkills",
-    label: "Digital skills",
-    test: (d) => Array.isArray(d.digitalSkills) && d.digitalSkills.some((s) => s.trim().length > 0),
-  },
-];
+type FieldCheck = { label: string; test: (d: BlaCompletionInput) => boolean };
+
+function getBlaFieldChecks(data: BlaCompletionInput): FieldCheck[] {
+  const checks: FieldCheck[] = [
+    { label: "Mobile OTP verified", test: (d) => !!d.bloMobileVerified },
+    { label: "BLA live photo", test: (d) => !!d.blaLivePhoto?.trim() },
+    { label: "Aadhaar front", test: (d) => !!d.aadhaarFront?.trim() },
+    { label: "Aadhaar back", test: (d) => !!d.aadhaarBack?.trim() },
+    { label: "Aadhaar number", test: (d) => !!d.aadhaarNumber?.trim() },
+    { label: "Voter card", test: (d) => !!d.voterCardImage?.trim() },
+    { label: "EPIC number", test: (d) => !!d.epicNumber?.trim() },
+    { label: "Gender", test: (d) => !!d.gender?.trim() },
+  ];
+
+  const g = (data.gender || "").toLowerCase();
+  if (g === "male" || g === "female" || g === "other") {
+    checks.push({ label: "Health card", test: (d) => !!d.healthCardMade?.trim() });
+  }
+  if (g === "female") {
+    checks.push({ label: "MSR registration", test: (d) => !!d.msrRegistered?.trim() });
+  }
+
+  checks.push(
+    { label: "Religion", test: (d) => !!d.blaRelation?.trim() },
+    { label: "Caste category", test: (d) => !!d.casteCategory?.trim() },
+    { label: "Computer data entry", test: (d) => !!d.computerDataEntry?.trim() },
+  );
+
+  return checks;
+}
 
 export function computeBlaCompletion(data: BlaCompletionInput): BlaCompletionResult {
+  const checks = getBlaFieldChecks(data);
   const missingFields: string[] = [];
   let filledCount = 0;
-  for (const f of FIELD_LABELS) {
+  for (const f of checks) {
     if (f.test(data)) filledCount++;
     else missingFields.push(f.label);
   }
-  const totalCount = FIELD_LABELS.length;
+  const totalCount = checks.length;
   const percentage = totalCount === 0 ? 0 : Math.round((filledCount / totalCount) * 100);
   return {
     percentage,

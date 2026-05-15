@@ -5037,6 +5037,7 @@ export async function registerRoutes(
 
   function computeBlaCompletionServer(data: {
     bloMobileVerified?: boolean | null;
+    blaLivePhoto?: string | null;
     aadhaarFront?: string | null;
     aadhaarBack?: string | null;
     aadhaarNumber?: string | null;
@@ -5047,22 +5048,30 @@ export async function registerRoutes(
     msrRegistered?: string | null;
     blaRelation?: string | null;
     casteCategory?: string | null;
-    digitalSkills?: string[] | null;
+    computerDataEntry?: string | null;
   }) {
-    const checks = [
+    const checks: boolean[] = [
       !!data.bloMobileVerified,
+      !!data.blaLivePhoto?.trim(),
       !!data.aadhaarFront?.trim(),
       !!data.aadhaarBack?.trim(),
       !!data.aadhaarNumber?.trim(),
       !!data.voterCardImage?.trim(),
       !!data.epicNumber?.trim(),
       !!data.gender?.trim(),
-      !!data.healthCardMade?.trim(),
-      !!data.msrRegistered?.trim(),
+    ];
+    const g = (data.gender || "").toLowerCase();
+    if (g === "male" || g === "female" || g === "other") {
+      checks.push(!!data.healthCardMade?.trim());
+    }
+    if (g === "female") {
+      checks.push(!!data.msrRegistered?.trim());
+    }
+    checks.push(
       !!data.blaRelation?.trim(),
       !!data.casteCategory?.trim(),
-      Array.isArray(data.digitalSkills) && data.digitalSkills.some((s) => s.trim().length > 0),
-    ];
+      !!data.computerDataEntry?.trim(),
+    );
     const filled = checks.filter(Boolean).length;
     const total = checks.length;
     const percentage = total === 0 ? 0 : Math.round((filled / total) * 100);
@@ -5113,11 +5122,11 @@ export async function registerRoutes(
   }
 
   function enrichBlaPayload(body: Record<string, unknown>) {
-    const digitalSkills = Array.isArray(body.digitalSkills)
-      ? (body.digitalSkills as string[]).map((s) => String(s).trim()).filter(Boolean)
-      : [];
+    const computerDataEntry =
+      typeof body.computerDataEntry === "string" ? body.computerDataEntry.trim() || null : null;
     const completion = computeBlaCompletionServer({
       bloMobileVerified: !!body.bloMobileVerified,
+      blaLivePhoto: body.blaLivePhoto as string | null,
       aadhaarFront: body.aadhaarFront as string | null,
       aadhaarBack: body.aadhaarBack as string | null,
       aadhaarNumber: body.aadhaarNumber as string | null,
@@ -5128,9 +5137,9 @@ export async function registerRoutes(
       msrRegistered: body.msrRegistered as string | null,
       blaRelation: body.blaRelation as string | null,
       casteCategory: body.casteCategory as string | null,
-      digitalSkills,
+      computerDataEntry,
     });
-    return { digitalSkills, completionPercentage: completion.percentage, status: completion.status };
+    return { computerDataEntry, completionPercentage: completion.percentage, status: completion.status };
   }
 
   app.get("/api/admin/bla-master", async (_req, res) => {
@@ -5173,11 +5182,39 @@ export async function registerRoutes(
     try {
       const booth = String(req.params.boothNumber || "").trim();
       if (!booth) return res.json([]);
-      const list = await storage.getBlaMasterByBooth(booth);
+      const withStatus = req.query.withStatus === "1" || req.query.withStatus === "true";
+      const list = withStatus
+        ? await storage.getBlaMasterByBoothWithStatus(booth)
+        : await storage.getBlaMasterByBooth(booth);
       res.json(list);
     } catch (error: any) {
       console.error("[BLA Master] by booth error:", error.message);
       res.status(500).json({ error: "Failed to fetch BLAs for booth" });
+    }
+  });
+
+  app.post("/api/bla/master/add", async (req, res) => {
+    try {
+      const { name, mobileNumber, boothNumber } = req.body as {
+        name?: string;
+        mobileNumber?: string;
+        boothNumber?: string;
+      };
+      if (!name?.trim() || !mobileNumber?.trim() || !boothNumber?.trim()) {
+        return res.status(400).json({ error: "Name, mobile and booth number are required" });
+      }
+      if (!isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const row = await storage.createBlaMasterEntry({
+        name: name.trim(),
+        mobileNumber,
+        boothNumber: boothNumber.trim(),
+      });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[BLA Master] add error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to add BLA" });
     }
   });
 
@@ -5250,7 +5287,7 @@ export async function registerRoutes(
   app.post("/api/bla/submit", async (req, res) => {
     try {
       const body = req.body as Record<string, unknown>;
-      const { digitalSkills, completionPercentage, status } = enrichBlaPayload(body);
+      const { computerDataEntry, completionPercentage, status } = enrichBlaPayload(body);
       if (body.blaMasterId) {
         const existing = await storage.getBlaSubmissionByMasterId(String(body.blaMasterId));
         if (existing) {
@@ -5259,7 +5296,7 @@ export async function registerRoutes(
       }
       const data = insertBlaSubmissionSchema.parse({
         ...body,
-        digitalSkills,
+        computerDataEntry,
         completionPercentage,
         status,
         epicNumber: body.epicNumber || body.ocrVoterId || null,
@@ -5301,10 +5338,10 @@ export async function registerRoutes(
       const existing = await storage.getBlaSubmission(req.params.id);
       if (!existing) return res.status(404).json({ error: "Submission not found" });
       const merged = { ...existing, ...body };
-      const { digitalSkills, completionPercentage, status } = enrichBlaPayload(merged);
+      const { computerDataEntry, completionPercentage, status } = enrichBlaPayload(merged);
       const updated = await storage.updateBlaSubmission(req.params.id, {
         ...(body as Partial<InsertBlaSubmission>),
-        digitalSkills,
+        computerDataEntry,
         completionPercentage,
         status,
       });

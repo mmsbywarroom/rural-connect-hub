@@ -148,7 +148,11 @@ function getFixedTaskLabel(slug: string, language: Language): string {
         ? "ਵੋਟਰ ਰਜਿਸਟ੍ਰੇਸ਼ਨ"
         : "Voter Registration";
     case "bla":
-      return "Booth Level Agent (BLA)";
+      return language === "hi"
+        ? "Booth Level Agent (BLA)"
+        : language === "pa"
+        ? "ਬੂਥ ਲੈਵਲ ਏਜੰਟ (BLA)"
+        : "Booth Level Agent (BLA)";
     default:
       return slug;
   }
@@ -882,13 +886,13 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "Booth Level Agent (BLA)" : language === "pa" ? "Booth Level Agent (BLA)" : "Booth Level Agent (BLA)"}
+                    {getFixedTaskLabel("bla", language)}
                   </h3>
                   <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
                     {language === "hi"
                       ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
                       : language === "pa"
-                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਅਤੇ ਦਸਤਾਵੇਜ਼ ਨਾਲ ਰਜਿਸਟਰ"
+                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
                       : "Select booth & BLA, verify mobile, upload documents"}
                   </p>
                 </div>

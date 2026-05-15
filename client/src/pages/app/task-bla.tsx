@@ -6,6 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -15,11 +22,18 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
-import { ArrowLeft, Loader2, Phone, CheckCircle, Camera, Upload, Plus, Trash2, ChevronRight } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, Camera, Upload, ChevronRight, UserPlus } from "lucide-react";
 import { useLocation } from "wouter";
 import { compressImage } from "@/lib/image-compress";
 import { useOcr } from "@/hooks/use-ocr";
 import { computeBlaCompletion } from "@/lib/bla-completion";
+import {
+  blaT,
+  blaReligionLabel,
+  blaCasteLabel,
+  translateCompletionMissing,
+  BLA_RELIGION_VALUES,
+} from "@/lib/bla-i18n";
 import type { AppUser, BlaMaster, BlaSubmission } from "@shared/schema";
 
 interface Props {
@@ -28,6 +42,12 @@ interface Props {
 
 type Step = "booth" | "select_bla" | "form";
 
+type BlaMasterWithStatus = BlaMaster & {
+  completionPercentage: number;
+  status: string;
+  submissionId: string | null;
+};
+
 const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
 
 const CASTE_OPTIONS = [
@@ -35,18 +55,6 @@ const CASTE_OPTIONS = [
   { value: "OBC", en: "OBC" },
   { value: "SC", en: "SC" },
   { value: "ST", en: "ST" },
-];
-
-const RELATION_OPTIONS = [
-  "Self",
-  "Spouse",
-  "Father",
-  "Mother",
-  "Son",
-  "Daughter",
-  "Brother",
-  "Sister",
-  "Other",
 ];
 
 const YES_NO = [
@@ -58,6 +66,7 @@ export default function TaskBla({ user }: Props) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { language } = useTranslation();
+  const t = (key: Parameters<typeof blaT>[0], vars?: Record<string, string>) => blaT(key, language, vars);
   const { processingType, processImage } = useOcr();
 
   const [step, setStep] = useState<Step>("booth");
@@ -71,6 +80,7 @@ export default function TaskBla({ user }: Props) {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [mobileVerified, setMobileVerified] = useState(false);
+  const [blaLivePhoto, setBlaLivePhoto] = useState<string | null>(null);
 
   const [aadhaarFront, setAadhaarFront] = useState<string | null>(null);
   const [aadhaarBack, setAadhaarBack] = useState<string | null>(null);
@@ -83,8 +93,13 @@ export default function TaskBla({ user }: Props) {
   const [msrRegistered, setMsrRegistered] = useState("");
   const [blaRelation, setBlaRelation] = useState("");
   const [casteCategory, setCasteCategory] = useState("");
-  const [digitalSkills, setDigitalSkills] = useState<string[]>([""]);
+  const [computerDataEntry, setComputerDataEntry] = useState("");
 
+  const [addBlaOpen, setAddBlaOpen] = useState(false);
+  const [addBlaName, setAddBlaName] = useState("");
+  const [addBlaMobile, setAddBlaMobile] = useState("");
+
+  const blaLivePhotoRef = useRef<HTMLInputElement>(null);
   const aadhaarFrontRef = useRef<HTMLInputElement>(null);
   const aadhaarBackRef = useRef<HTMLInputElement>(null);
   const voterCardRef = useRef<HTMLInputElement>(null);
@@ -95,15 +110,41 @@ export default function TaskBla({ user }: Props) {
     return BOOTH_OPTIONS.filter((b) => b.includes(q));
   }, [boothSearch]);
 
-  const { data: boothBlas, isLoading: loadingBlas } = useQuery<BlaMaster[]>({
-    queryKey: ["/api/bla/master/by-booth", selectedBooth],
+  const {
+    data: boothBlas,
+    isLoading: loadingBlas,
+    refetch: refetchBoothBlas,
+  } = useQuery<BlaMasterWithStatus[]>({
+    queryKey: ["/api/bla/master/by-booth", selectedBooth, "withStatus"],
     enabled: step === "select_bla" && !!selectedBooth,
     queryFn: async () => {
-      const res = await fetch(`/api/bla/master/by-booth/${encodeURIComponent(selectedBooth)}`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/bla/master/by-booth/${encodeURIComponent(selectedBooth)}?withStatus=true`,
+        { credentials: "include" },
+      );
       if (!res.ok) throw new Error("Failed to load BLAs");
       return res.json();
+    },
+  });
+
+  const addBlaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/bla/master/add", {
+        name: addBlaName.trim(),
+        mobileNumber: addBlaMobile.trim(),
+        boothNumber: selectedBooth,
+      });
+      return res.json() as BlaMaster;
+    },
+    onSuccess: () => {
+      toast({ title: t("blaAdded") });
+      setAddBlaOpen(false);
+      setAddBlaName("");
+      setAddBlaMobile("");
+      refetchBoothBlas();
+    },
+    onError: () => {
+      toast({ title: t("addBlaFailed"), variant: "destructive" });
     },
   });
 
@@ -111,6 +152,7 @@ export default function TaskBla({ user }: Props) {
     () =>
       computeBlaCompletion({
         bloMobileVerified: mobileVerified,
+        blaLivePhoto,
         aadhaarFront,
         aadhaarBack,
         aadhaarNumber,
@@ -121,10 +163,11 @@ export default function TaskBla({ user }: Props) {
         msrRegistered,
         blaRelation,
         casteCategory,
-        digitalSkills,
+        computerDataEntry,
       }),
     [
       mobileVerified,
+      blaLivePhoto,
       aadhaarFront,
       aadhaarBack,
       aadhaarNumber,
@@ -135,7 +178,7 @@ export default function TaskBla({ user }: Props) {
       msrRegistered,
       blaRelation,
       casteCategory,
-      digitalSkills,
+      computerDataEntry,
     ],
   );
 
@@ -146,9 +189,9 @@ export default function TaskBla({ user }: Props) {
     },
     onSuccess: () => {
       setOtpSent(true);
-      toast({ title: language === "hi" ? "OTP भेजा गया" : "OTP sent" });
+      toast({ title: t("otpSent") });
     },
-    onError: () => toast({ title: "Failed to send OTP", variant: "destructive" }),
+    onError: () => toast({ title: t("otpFailed"), variant: "destructive" }),
   });
 
   const verifyOtpMutation = useMutation({
@@ -158,14 +201,13 @@ export default function TaskBla({ user }: Props) {
     },
     onSuccess: () => {
       setMobileVerified(true);
-      toast({ title: language === "hi" ? "मोबाइल सत्यापित" : "Mobile verified" });
+      toast({ title: t("mobileVerified") });
     },
-    onError: () => toast({ title: "Invalid OTP", variant: "destructive" }),
+    onError: () => toast({ title: t("invalidOtp"), variant: "destructive" }),
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const skills = digitalSkills.map((s) => s.trim()).filter(Boolean);
       const payload = {
         appUserId: user.id,
         blaMasterId: selectedMaster?.id ?? null,
@@ -173,6 +215,7 @@ export default function TaskBla({ user }: Props) {
         bloName: blaName.trim(),
         bloMobileNumber: blaMobile.trim(),
         bloMobileVerified: mobileVerified,
+        blaLivePhoto,
         aadhaarFront,
         aadhaarBack,
         aadhaarNumber: aadhaarNumber.trim() || null,
@@ -180,11 +223,11 @@ export default function TaskBla({ user }: Props) {
         epicNumber: epicNumber.trim() || null,
         ocrVoterId: epicNumber.trim() || null,
         gender: gender || null,
-        healthCardMade: healthCardMade || null,
-        msrRegistered: msrRegistered || null,
+        healthCardMade: showHealthCard ? healthCardMade || null : null,
+        msrRegistered: showMsr ? msrRegistered || null : null,
         blaRelation: blaRelation || null,
         casteCategory: casteCategory || null,
-        digitalSkills: skills,
+        computerDataEntry: computerDataEntry || null,
         completionPercentage: completion.percentage,
         status: completion.isComplete ? "complete" : "incomplete",
         manualBoothId: selectedBooth,
@@ -198,20 +241,15 @@ export default function TaskBla({ user }: Props) {
     },
     onSuccess: () => {
       toast({
-        title: completion.isComplete
-          ? language === "hi"
-            ? "BLA सबमिट हो गया"
-            : "BLA submitted"
-          : language === "hi"
-          ? "अधूरा सहेजा गया"
-          : "Saved as incomplete",
+        title: completion.isComplete ? t("blaSubmitted") : t("savedIncomplete"),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bla/my-submissions", user.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bla/master/by-booth", selectedBooth] });
       setStep("booth");
       resetForm();
     },
     onError: async (err: unknown) => {
-      let msg = "Submit failed";
+      let msg = t("submitFailed");
       try {
         const res = (err as { response?: Response })?.response;
         if (res) {
@@ -232,6 +270,7 @@ export default function TaskBla({ user }: Props) {
     setOtpSent(false);
     setOtp("");
     setMobileVerified(false);
+    setBlaLivePhoto(null);
     setAadhaarFront(null);
     setAadhaarBack(null);
     setAadhaarNumber("");
@@ -242,7 +281,7 @@ export default function TaskBla({ user }: Props) {
     setMsrRegistered("");
     setBlaRelation("");
     setCasteCategory("");
-    setDigitalSkills([""]);
+    setComputerDataEntry("");
   };
 
   const loadSubmissionIntoForm = (s: BlaSubmission) => {
@@ -251,6 +290,7 @@ export default function TaskBla({ user }: Props) {
     setBlaName(s.bloName);
     setBlaMobile(s.bloMobileNumber);
     setMobileVerified(!!s.bloMobileVerified);
+    setBlaLivePhoto(s.blaLivePhoto || null);
     setAadhaarFront(s.aadhaarFront || null);
     setAadhaarBack(s.aadhaarBack || null);
     setAadhaarNumber(s.aadhaarNumber || s.ocrAadhaarNumber || "");
@@ -261,8 +301,9 @@ export default function TaskBla({ user }: Props) {
     setMsrRegistered(s.msrRegistered || "");
     setBlaRelation(s.blaRelation || "");
     setCasteCategory(s.casteCategory || "");
-    setDigitalSkills(
-      s.digitalSkills && s.digitalSkills.length > 0 ? s.digitalSkills : [""],
+    setComputerDataEntry(
+      s.computerDataEntry ||
+        (s.digitalSkills && s.digitalSkills.length > 0 ? "yes" : ""),
     );
     setStep("form");
   };
@@ -283,7 +324,7 @@ export default function TaskBla({ user }: Props) {
         after?.(result);
       }
     } catch {
-      toast({ title: "Image error", variant: "destructive" });
+      toast({ title: t("imageError"), variant: "destructive" });
     } finally {
       if (input) input.value = "";
     }
@@ -295,26 +336,93 @@ export default function TaskBla({ user }: Props) {
     else setStep("select_bla");
   };
 
+  const openBlaForm = async (m: BlaMaster) => {
+    setSelectedMaster(m);
+    setBlaName(m.name);
+    setBlaMobile(m.mobileNumber);
+    setMobileVerified(false);
+    setOtpSent(false);
+    setOtp("");
+    try {
+      const res = await fetch(`/api/bla/submission-by-master/${m.id}`, {
+        credentials: "include",
+      });
+      const existing = (await res.json()) as BlaSubmission | null;
+      if (existing) {
+        loadSubmissionIntoForm(existing);
+      } else {
+        setEditingId(null);
+        resetFormFieldsOnly();
+        setBlaName(m.name);
+        setBlaMobile(m.mobileNumber);
+        setSelectedBooth(m.boothNumber);
+        setStep("form");
+      }
+    } catch {
+      setEditingId(null);
+      setStep("form");
+    }
+  };
+
+  const resetFormFieldsOnly = () => {
+    setAadhaarFront(null);
+    setAadhaarBack(null);
+    setAadhaarNumber("");
+    setVoterCardImage(null);
+    setEpicNumber("");
+    setGender("");
+    setHealthCardMade("");
+    setMsrRegistered("");
+    setBlaRelation("");
+    setCasteCategory("");
+    setBlaLivePhoto(null);
+    setComputerDataEntry("");
+    setMobileVerified(false);
+    setOtpSent(false);
+    setOtp("");
+  };
+
+  const statusBadge = (item: BlaMasterWithStatus) => {
+    const isComplete = item.status === "complete";
+    const pct = item.completionPercentage ?? 0;
+    return (
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span className="text-xs font-semibold text-indigo-600">{pct}%</span>
+        <Badge
+          className={
+            isComplete
+              ? "bg-green-600 hover:bg-green-600 text-white border-0"
+              : "bg-amber-500 hover:bg-amber-500 text-white border-0"
+          }
+        >
+          {isComplete ? t("complete") : t("incomplete")}
+        </Badge>
+      </div>
+    );
+  };
+
   const yesNoLabel = (v: string) => {
     const o = YES_NO.find((x) => x.value === v);
     if (!o) return v;
     return language === "hi" ? o.hi : language === "pa" ? o.pa : o.en;
   };
 
+  const handleGenderChange = (value: string) => {
+    setGender(value);
+    if (value !== "female") {
+      setMsrRegistered("");
+    }
+  };
+
+  const showHealthCard = gender === "male" || gender === "female" || gender === "other";
+  const showMsr = gender === "female";
+
   const headerTitle =
     step === "booth"
-      ? language === "hi"
-        ? "बूथ चुनें (1–258)"
-        : language === "pa"
-        ? "ਬੂਥ ਚੁਣੋ (1–258)"
-        : "Select Booth (1–258)"
+      ? t("selectBoothTitle")
       : step === "select_bla"
-      ? language === "hi"
-        ? `बूथ ${selectedBooth} – BLA चुनें`
-        : `Booth ${selectedBooth} – Select BLA`
-      : language === "hi"
-      ? "BLA पंजीकरण फॉर्म"
-      : "BLA Registration Form";
+      ? t("selectBlaTitle", { booth: selectedBooth })
+      : t("formTitle");
 
   if (step === "booth") {
     return (
@@ -327,7 +435,7 @@ export default function TaskBla({ user }: Props) {
         </header>
         <div className="p-4 space-y-3 flex-1">
           <Input
-            placeholder={language === "hi" ? "बूथ नंबर खोजें..." : "Search booth number..."}
+            placeholder={t("searchBooth")}
             value={boothSearch}
             onChange={(e) => setBoothSearch(e.target.value.replace(/\D/g, "").slice(0, 3))}
           />
@@ -360,7 +468,16 @@ export default function TaskBla({ user }: Props) {
           </Button>
           <h1 className="text-lg font-semibold">{headerTitle}</h1>
         </header>
-        <div className="p-4 space-y-3 flex-1">
+        <div className="p-4 space-y-3 flex-1 pb-8">
+          <Button
+            variant="outline"
+            className="w-full border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+            onClick={() => setAddBlaOpen(true)}
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            {t("addMoreBla", { booth: selectedBooth })}
+          </Button>
+
           {loadingBlas ? (
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
@@ -368,54 +485,72 @@ export default function TaskBla({ user }: Props) {
           ) : !boothBlas?.length ? (
             <Card>
               <CardContent className="p-4 text-sm text-slate-600">
-                {language === "hi"
-                  ? "इस बूथ के लिए कोई BLA नहीं मिला। Admin से CSV अपलोड करवाएं।"
-                  : "No BLA found for this booth. Ask admin to upload CSV."}
+                {t("noBlaYet")}
               </CardContent>
             </Card>
           ) : (
             boothBlas.map((m, idx) => (
               <Card
                 key={m.id}
-                className="cursor-pointer hover:border-indigo-300"
-                onClick={async () => {
-                  setSelectedMaster(m);
-                  setBlaName(m.name);
-                  setBlaMobile(m.mobileNumber);
-                  setMobileVerified(false);
-                  setOtpSent(false);
-                  setOtp("");
-                  try {
-                    const res = await fetch(`/api/bla/submission-by-master/${m.id}`, {
-                      credentials: "include",
-                    });
-                    const existing = (await res.json()) as BlaSubmission | null;
-                    if (existing) {
-                      setSelectedMaster(m);
-                      loadSubmissionIntoForm(existing);
-                    } else {
-                      setEditingId(null);
-                      setStep("form");
-                    }
-                  } catch {
-                    setStep("form");
-                  }
-                }}
+                className="cursor-pointer hover:border-indigo-300 hover:shadow-sm"
+                onClick={() => openBlaForm(m)}
               >
-                <CardContent className="p-4 flex justify-between items-center">
-                  <div>
+                <CardContent className="p-4 flex justify-between items-center gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold text-slate-800">
                       BLA {idx + 1}: {m.name}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {m.mobileNumber} · Booth {m.boothNumber}
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {m.mobileNumber} · {t("boothLabel")} {m.boothNumber}
                     </p>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-indigo-500" />
+                  <div className="flex items-center gap-2 shrink-0">
+                    {statusBadge(m)}
+                    <ChevronRight className="h-5 w-5 text-indigo-500" />
+                  </div>
                 </CardContent>
               </Card>
             ))
           )}
+
+          <Dialog open={addBlaOpen} onOpenChange={setAddBlaOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle>
+                  {t("addBlaDialogTitle", { booth: selectedBooth })}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium">{t("name")}</label>
+                  <Input value={addBlaName} onChange={(e) => setAddBlaName(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">{t("mobile")}</label>
+                  <Input
+                    type="tel"
+                    maxLength={10}
+                    value={addBlaMobile}
+                    onChange={(e) => setAddBlaMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddBlaOpen(false)}>
+                  {t("cancel")}
+                </Button>
+                <Button
+                  onClick={() => addBlaMutation.mutate()}
+                  disabled={
+                    !addBlaName.trim() || addBlaMobile.length !== 10 || addBlaMutation.isPending
+                  }
+                >
+                  {addBlaMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  {t("add")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     );
@@ -430,7 +565,7 @@ export default function TaskBla({ user }: Props) {
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-semibold truncate">{headerTitle}</h1>
           <p className="text-xs text-white/80 truncate">
-            Booth {selectedBooth} · {blaName}
+            {t("boothLabel")} {selectedBooth} · {blaName}
           </p>
         </div>
       </header>
@@ -440,20 +575,15 @@ export default function TaskBla({ user }: Props) {
           <CardContent className="p-3 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="font-medium">
-                {completion.isComplete
-                  ? language === "hi"
-                    ? "पूर्ण"
-                    : "Complete"
-                  : language === "hi"
-                  ? "अधूरा"
-                  : "Incomplete"}
+                {completion.isComplete ? t("complete") : t("incomplete")}
               </span>
               <span className="font-bold text-indigo-600">{completion.percentage}%</span>
             </div>
             <Progress value={completion.percentage} className="h-2" />
             {!completion.isComplete && completion.missingFields.length > 0 && (
               <p className="text-[11px] text-slate-500">
-                {language === "hi" ? "बाकी:" : "Remaining:"} {completion.missingFields.slice(0, 4).join(", ")}
+                {t("remaining")}{" "}
+                {translateCompletionMissing(completion.missingFields, language).slice(0, 4).join(", ")}
                 {completion.missingFields.length > 4 ? "…" : ""}
               </p>
             )}
@@ -464,11 +594,11 @@ export default function TaskBla({ user }: Props) {
       <div className="p-4 space-y-4">
         <Card>
           <CardContent className="p-4 space-y-3">
-            <label className="text-sm font-medium">{language === "hi" ? "BLA नाम" : "BLA Name"}</label>
+            <label className="text-sm font-medium">{t("blaName")}</label>
             <Input value={blaName} onChange={(e) => setBlaName(e.target.value)} />
-            <label className="text-sm font-medium">{language === "hi" ? "बूथ नंबर" : "Booth Number"}</label>
+            <label className="text-sm font-medium">{t("boothNumber")}</label>
             <Input value={selectedBooth} onChange={(e) => setSelectedBooth(e.target.value)} />
-            <label className="text-sm font-medium">{language === "hi" ? "मोबाइल (OTP)" : "Mobile (OTP)"}</label>
+            <label className="text-sm font-medium">{t("mobileOtp")}</label>
             <div className="flex gap-2">
               <Input
                 type="tel"
@@ -489,15 +619,20 @@ export default function TaskBla({ user }: Props) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="whitespace-nowrap shrink-0 px-3"
                   onClick={() => sendOtpMutation.mutate()}
                   disabled={blaMobile.length !== 10 || sendOtpMutation.isPending}
                 >
-                  <Phone className="h-4 w-4" />
+                  {sendOtpMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    t("sendOtp")
+                  )}
                 </Button>
               )}
               {mobileVerified && (
                 <Badge className="bg-green-100 text-green-800">
-                  <CheckCircle className="h-3 w-3 mr-1" /> OK
+                  <CheckCircle className="h-3 w-3 mr-1" /> {t("verified")}
                 </Badge>
               )}
             </div>
@@ -505,7 +640,7 @@ export default function TaskBla({ user }: Props) {
               <div className="flex gap-2">
                 <Input maxLength={4} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 4))} />
                 <Button size="sm" onClick={() => verifyOtpMutation.mutate()} disabled={otp.length !== 4}>
-                  {language === "hi" ? "सत्यापित" : "Verify"}
+                  {t("verify")}
                 </Button>
               </div>
             )}
@@ -514,61 +649,90 @@ export default function TaskBla({ user }: Props) {
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold">{language === "hi" ? "आधार" : "Aadhaar"}</p>
+            <p className="text-sm font-semibold">{t("blaLivePhoto")}</p>
+            <p className="text-xs text-slate-500">{t("blaLivePhotoHint")}</p>
+            <input
+              ref={blaLivePhotoRef}
+              type="file"
+              accept="image/*"
+              capture="user"
+              className="hidden"
+              onChange={() => pickImage(blaLivePhotoRef.current, setBlaLivePhoto)}
+            />
+            {blaLivePhoto ? (
+              <div className="space-y-2">
+                <img
+                  src={blaLivePhoto}
+                  alt={t("blaLivePhoto")}
+                  className="w-full max-h-48 object-cover rounded-lg border"
+                />
+                <Button variant="outline" size="sm" className="w-full" onClick={() => blaLivePhotoRef.current?.click()}>
+                  <Camera className="h-4 w-4 mr-1" /> {t("retakePhoto")}
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full h-24 flex-col" onClick={() => blaLivePhotoRef.current?.click()}>
+                <Camera className="h-5 w-5 mb-1" /> {t("camera")}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-sm font-semibold">{t("aadhaar")}</p>
             <div className="grid grid-cols-2 gap-2">
               <input ref={aadhaarFrontRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarFrontRef.current, setAadhaarFront, "aadhaarFront", (r) => r?.aadhaarNumber && setAadhaarNumber(r.aadhaarNumber))} />
               <input ref={aadhaarBackRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarBackRef.current, setAadhaarBack, "aadhaarBack")} />
               <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarFrontRef.current?.click()}>
-                <Camera className="h-4 w-4" /> Front
+                <Camera className="h-4 w-4" /> {t("aadhaarFront")}
               </Button>
               <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarBackRef.current?.click()}>
-                <Camera className="h-4 w-4" /> Back
+                <Camera className="h-4 w-4" /> {t("aadhaarBack")}
               </Button>
             </div>
-            <label className="text-sm font-medium">{language === "hi" ? "आधार नंबर" : "Aadhaar Number"}</label>
+            <label className="text-sm font-medium">{t("aadhaarNumber")}</label>
             <Input value={aadhaarNumber} onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, "").slice(0, 12))} maxLength={12} />
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm font-semibold">{language === "hi" ? "वोटर कार्ड" : "Voter Card"}</p>
+            <p className="text-sm font-semibold">{t("voterCard")}</p>
             <input ref={voterCardRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(voterCardRef.current, setVoterCardImage, "voterId", (r) => r?.voterId && setEpicNumber(r.voterId))} />
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
-                <Camera className="h-4 w-4" /> Camera
+                <Camera className="h-4 w-4" /> {t("camera")}
               </Button>
               <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
-                <Upload className="h-4 w-4" /> Upload
+                <Upload className="h-4 w-4" /> {t("upload")}
               </Button>
             </div>
-            <label className="text-sm font-medium">EPIC / Voter ID</label>
+            <label className="text-sm font-medium">{t("epicVoterId")}</label>
             <Input value={epicNumber} onChange={(e) => setEpicNumber(e.target.value.toUpperCase())} />
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4 space-y-3">
-            <label className="text-sm font-medium">{language === "hi" ? "लिंग" : "Gender"}</label>
-            <Select value={gender} onValueChange={setGender}>
+            <label className="text-sm font-medium">{t("gender")}</label>
+            <Select value={gender} onValueChange={handleGenderChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select" />
+                <SelectValue placeholder={t("select")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="male">{language === "hi" ? "पुरुष" : "Male"}</SelectItem>
-                <SelectItem value="female">{language === "hi" ? "महिला" : "Female"}</SelectItem>
-                <SelectItem value="other">{language === "hi" ? "अन्य" : "Other"}</SelectItem>
+                <SelectItem value="male">{t("male")}</SelectItem>
+                <SelectItem value="female">{t("female")}</SelectItem>
+                <SelectItem value="other">{t("other")}</SelectItem>
               </SelectContent>
             </Select>
 
-            {(gender === "male" || gender === "female") && (
+            {showHealthCard && (
               <>
-                <label className="text-sm font-medium">
-                  {language === "hi" ? "हेल्थ कार्ड बना?" : "Health card made?"}
-                </label>
+                <label className="text-sm font-medium">{t("healthCard")}</label>
                 <Select value={healthCardMade} onValueChange={setHealthCardMade}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Yes / No" />
+                    <SelectValue placeholder={t("yesNo")} />
                   </SelectTrigger>
                   <SelectContent>
                     {YES_NO.map((o) => (
@@ -581,12 +745,56 @@ export default function TaskBla({ user }: Props) {
               </>
             )}
 
-            <label className="text-sm font-medium">
-              {language === "hi" ? "MSR में रजिस्ट्रेशन?" : "MSR registration done?"}
-            </label>
-            <Select value={msrRegistered} onValueChange={setMsrRegistered}>
+            {showMsr && (
+              <>
+                <label className="text-sm font-medium">{t("msrRegistration")}</label>
+                <Select value={msrRegistered} onValueChange={setMsrRegistered}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("yesNo")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YES_NO.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {yesNoLabel(o.value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+
+            <label className="text-sm font-medium">{t("religion")}</label>
+            <Select value={blaRelation} onValueChange={setBlaRelation}>
               <SelectTrigger>
-                <SelectValue placeholder="Yes / No" />
+                <SelectValue placeholder={t("selectReligion")} />
+              </SelectTrigger>
+              <SelectContent>
+                {BLA_RELIGION_VALUES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {blaReligionLabel(r, language)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <label className="text-sm font-medium">{t("casteCategory")}</label>
+            <Select value={casteCategory} onValueChange={setCasteCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("castePlaceholder")} />
+              </SelectTrigger>
+              <SelectContent>
+                {CASTE_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {blaCasteLabel(c.value, language)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <label className="text-sm font-medium">{t("computerDataEntry")}</label>
+            <Select value={computerDataEntry} onValueChange={setComputerDataEntry}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("yesNo")} />
               </SelectTrigger>
               <SelectContent>
                 {YES_NO.map((o) => (
@@ -596,65 +804,15 @@ export default function TaskBla({ user }: Props) {
                 ))}
               </SelectContent>
             </Select>
-
-            <label className="text-sm font-medium">{language === "hi" ? "BLA का रिश्ता" : "BLA Relation"}</label>
-            <Select value={blaRelation} onValueChange={setBlaRelation}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select relation" />
-              </SelectTrigger>
-              <SelectContent>
-                {RELATION_OPTIONS.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {r}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <label className="text-sm font-medium">{language === "hi" ? "जाति श्रेणी" : "Caste category"}</label>
-            <Select value={casteCategory} onValueChange={setCasteCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="GEN / OBC / SC / ST" />
-              </SelectTrigger>
-              <SelectContent>
-                {CASTE_OPTIONS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.en}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <label className="text-sm font-medium">{language === "hi" ? "डिजिटल स्किल्स" : "Digital skills"}</label>
-            {digitalSkills.map((skill, i) => (
-              <div key={i} className="flex gap-2">
-                <Input
-                  value={skill}
-                  onChange={(e) => {
-                    const next = [...digitalSkills];
-                    next[i] = e.target.value;
-                    setDigitalSkills(next);
-                  }}
-                  placeholder={language === "hi" ? "स्किल दर्ज करें" : "Enter skill"}
-                />
-                {digitalSkills.length > 1 && (
-                  <Button type="button" variant="ghost" size="icon" onClick={() => setDigitalSkills(digitalSkills.filter((_, j) => j !== i))}>
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button type="button" variant="outline" size="sm" onClick={() => setDigitalSkills([...digitalSkills, ""])}>
-              <Plus className="h-4 w-4 mr-1" /> {language === "hi" ? "और जोड़ें" : "Add more"}
-            </Button>
           </CardContent>
         </Card>
 
         <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}>
           {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          {language === "hi" ? "सहेजें और सबमिट करें" : "Save & Submit"}
+          {t("saveSubmit")}
         </Button>
       </div>
     </div>
   );
 }
+

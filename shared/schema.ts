@@ -1388,6 +1388,7 @@ export const blaSubmissions = pgTable("bla_submissions", {
   bloName: text("blo_name").notNull(),
   bloMobileNumber: text("blo_mobile_number").notNull(),
   bloMobileVerified: boolean("blo_mobile_verified").default(false),
+  blaLivePhoto: text("bla_live_photo"),
   // Aadhaar documents + OCR
   aadhaarFront: text("aadhaar_front"),
   aadhaarBack: text("aadhaar_back"),
@@ -1407,6 +1408,7 @@ export const blaSubmissions = pgTable("bla_submissions", {
   msrRegistered: text("msr_registered"),
   blaRelation: text("bla_relation"),
   casteCategory: text("caste_category"),
+  computerDataEntry: text("computer_data_entry"),
   digitalSkills: jsonb("digital_skills").$type<string[] | null>(),
   completionPercentage: integer("completion_percentage").default(0),
   status: text("status").default("incomplete").notNull(),
