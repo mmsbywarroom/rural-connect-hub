@@ -134,6 +134,7 @@ export default function TaskBla({ user }: Props) {
   const {
     data: boothBlas,
     isLoading: loadingBlas,
+    isError: boothBlasError,
     refetch: refetchBoothBlas,
   } = useQuery<BlaMasterWithStatus[]>({
     queryKey: ["/api/bla/master/by-booth", selectedBooth, "withStatus", attendanceDate],
@@ -535,6 +536,15 @@ export default function TaskBla({ user }: Props) {
             <div className="flex justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
             </div>
+          ) : boothBlasError ? (
+            <Card>
+              <CardContent className="p-4 space-y-3 text-sm text-slate-600">
+                <p>{t("loadBlaFailed")}</p>
+                <Button variant="outline" size="sm" onClick={() => refetchBoothBlas()}>
+                  {t("retry")}
+                </Button>
+              </CardContent>
+            </Card>
           ) : !boothBlas?.length ? (
             <Card>
               <CardContent className="p-4 text-sm text-slate-600">

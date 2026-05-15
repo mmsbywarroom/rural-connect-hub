@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { normalizeBoothNumber } from "./bla-booth";
 import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
 import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
@@ -2572,12 +2573,21 @@ export class DatabaseStorage implements IStorage {
 
   // BLA Master + Submissions
   async replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]> {
-    // Clear FK references so master list can be replaced without constraint errors
-    await db.delete(blaAttendance);
-    await db.update(blaSubmissions).set({ blaMasterId: null });
-    await db.delete(blaMaster);
-    if (rows.length === 0) return [];
-    return db.insert(blaMaster).values(rows).returning();
+    const normalized = rows.map((r) => ({
+      ...r,
+      boothNumber: normalizeBoothNumber(r.boothNumber),
+    }));
+    return db.transaction(async (tx) => {
+      try {
+        await tx.delete(blaAttendance);
+      } catch (e) {
+        console.warn("[BLA Master] bla_attendance clear skipped:", (e as Error).message);
+      }
+      await tx.update(blaSubmissions).set({ blaMasterId: null });
+      await tx.delete(blaMaster);
+      if (normalized.length === 0) return [];
+      return tx.insert(blaMaster).values(normalized).returning();
+    });
   }
 
   async getBlaMasterList(): Promise<BlaMaster[]> {
@@ -2585,10 +2595,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBlaMasterByBooth(boothNumber: string): Promise<BlaMaster[]> {
-    const booth = boothNumber.trim();
-    return db.select().from(blaMaster)
-      .where(eq(blaMaster.boothNumber, booth))
-      .orderBy(blaMaster.serialNumber);
+    const booth = normalizeBoothNumber(boothNumber);
+    const all = await db.select().from(blaMaster).orderBy(blaMaster.serialNumber);
+    return all.filter((m) => normalizeBoothNumber(m.boothNumber) === booth);
   }
 
   async getBlaMasterByBoothWithStatus(boothNumber: string, attendanceDate?: string) {
@@ -2596,9 +2605,13 @@ export class DatabaseStorage implements IStorage {
     if (masters.length === 0) return [];
     const masterIds = masters.map((m) => m.id);
     const dateKey = attendanceDate?.trim() || new Date().toISOString().slice(0, 10);
-    const [subs, attendanceRows] = await Promise.all([
-      db.select().from(blaSubmissions).where(inArray(blaSubmissions.blaMasterId, masterIds)),
-      db
+    const subs = await db
+      .select()
+      .from(blaSubmissions)
+      .where(inArray(blaSubmissions.blaMasterId, masterIds));
+    let attendanceRows: BlaAttendance[] = [];
+    try {
+      attendanceRows = await db
         .select()
         .from(blaAttendance)
         .where(
@@ -2606,8 +2619,10 @@ export class DatabaseStorage implements IStorage {
             inArray(blaAttendance.blaMasterId, masterIds),
             eq(blaAttendance.attendanceDate, dateKey),
           ),
-        ),
-    ]);
+        );
+    } catch (e) {
+      console.warn("[BLA Master] attendance lookup skipped:", (e as Error).message);
+    }
     const subByMaster = new Map(
       subs.filter((s) => s.blaMasterId).map((s) => [s.blaMasterId!, s]),
     );
@@ -2692,7 +2707,7 @@ export class DatabaseStorage implements IStorage {
         serialNumber,
         name: data.name.trim(),
         mobileNumber: mobile,
-        boothNumber: data.boothNumber.trim(),
+        boothNumber: normalizeBoothNumber(data.boothNumber),
       })
       .returning();
     return row;

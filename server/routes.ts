@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { ImageAnnotatorClient } from "@google-cloud/vision";
 import { OAuth2Client } from "google-auth-library";
 import { storage } from "./storage";
+import { normalizeBoothNumber } from "./bla-booth";
 import { sendPushToAll, sendPushToUser, sendPushToGroupMembers, VAPID_PUBLIC_KEY } from "./push";
 import { attachCallWebSocket, notifyIncomingCall, notifyCallEnded, sendToUser } from "./ws-calls";
 import { translateBatch } from "./translate";
@@ -5159,7 +5160,7 @@ export async function registerRoutes(
       const cells = splitRow(lines[i]);
       const name = (cells[ni] || "").trim();
       const mobileNumber = parseBlaMasterMobile(cells[mi] || "");
-      const boothNumber = (cells[bi] || "").trim();
+      const boothNumber = normalizeBoothNumber((cells[bi] || "").trim());
       if (!name || mobileNumber.length !== 10 || !boothNumber) {
         if (cells.some((c) => c.trim())) {
           skipped.push(`Row ${i + 1}: invalid name/mobile/booth`);

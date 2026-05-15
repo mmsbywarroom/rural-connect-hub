@@ -17,6 +17,12 @@ const labels: Record<string, L10n> = {
     hi: "इस बूथ के लिए अभी कोई BLA नहीं। ऊपर बटन से नया BLA जोड़ें।",
     pa: "ਇਸ ਬੂਥ ਲਈ ਅਜੇ ਕੋਈ BLA ਨਹੀਂ। ਉੱਪਰਲੇ ਬਟਨ ਨਾਲ ਨਵਾਂ BLA ਜੋੜੋ।",
   },
+  loadBlaFailed: {
+    en: "Could not load BLA list. Tap retry or ask admin to upload CSV again.",
+    hi: "BLA सूची लोड नहीं हुई। दोबारा कोशिश करें या admin से CSV upload करवाएं।",
+    pa: "BLA ਸੂਚੀ ਲੋਡ ਨਹੀਂ ਹੋਈ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ ਜਾਂ admin ਤੋਂ CSV upload ਕਰਵਾਓ।",
+  },
+  retry: { en: "Retry", hi: "दोबारा", pa: "ਦੁਬਾਰਾ" },
   blaAdded: { en: "BLA added to this booth", hi: "BLA जोड़ा गया", pa: "BLA ਇਸ ਬੂਥ ਵਿੱਚ ਜੋੜਿਆ ਗਿਆ" },
   addBlaFailed: { en: "Failed to add BLA", hi: "BLA जोड़ना असफल", pa: "BLA ਜੋੜਨਾ ਅਸਫਲ" },
   otpSent: { en: "OTP sent", hi: "OTP भेजा गया", pa: "OTP ਭੇਜਿਆ ਗਿਆ" },
