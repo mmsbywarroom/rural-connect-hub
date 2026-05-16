@@ -586,7 +586,6 @@ export default function VolunteerPortal() {
       return <TaskVoterRegistration user={user} />;
     }
     if (location === "/task/bla" || location === "/app/task/bla") {
-      if (!profileComplete) return <ProfileGate />;
       return <TaskBla user={user} />;
     }
     if (location === "/chat" || location === "/app/chat") {
