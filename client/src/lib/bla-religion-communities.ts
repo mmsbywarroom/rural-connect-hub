@@ -11,8 +11,39 @@ function opt(value: string, en: string, pa: string, hi?: string): BlaCommunityOp
   return { value, en, hi: hi ?? en, pa };
 }
 
+export const BLA_COMMUNITY_OTHER_VALUE = "other";
+export const BLA_COMMUNITY_OTHER_PREFIX = "other:";
+
+export const OTHER_COMMUNITY_OPTION: BlaCommunityOption = opt("other", "Other", "ਹੋਰ", "अन्य");
+
+function withOtherOption(options: BlaCommunityOption[]): BlaCommunityOption[] {
+  if (options.some((c) => c.value === BLA_COMMUNITY_OTHER_VALUE)) return options;
+  return [...options, OTHER_COMMUNITY_OPTION];
+}
+
+/** Stored in DB as `other:Custom text` when user picks Other and types a value. */
+export function formatBlaCommunityValue(selectValue: string, customText: string): string {
+  if (selectValue === BLA_COMMUNITY_OTHER_VALUE) {
+    const trimmed = customText.trim();
+    return trimmed ? `${BLA_COMMUNITY_OTHER_PREFIX}${trimmed}` : "";
+  }
+  return selectValue;
+}
+
+export function parseBlaCommunityValue(stored: string): { select: string; custom: string } {
+  if (!stored) return { select: "", custom: "" };
+  if (stored.startsWith(BLA_COMMUNITY_OTHER_PREFIX)) {
+    return {
+      select: BLA_COMMUNITY_OTHER_VALUE,
+      custom: stored.slice(BLA_COMMUNITY_OTHER_PREFIX.length),
+    };
+  }
+  return { select: stored, custom: "" };
+}
+
 const HINDU_COMMUNITIES: BlaCommunityOption[] = [
   opt("brahmin", "Brahmin", "ਬ੍ਰਾਹਮਣ", "ब्राह्मण"),
+  opt("khatri", "Khatri", "ਖਤਰੀ", "खत्री"),
   opt("rajput", "Rajput", "ਰਾਜਪੂਤ", "राजपूत"),
   opt("thakur", "Thakur", "ਠਾਕੁਰ", "ठाकुर"),
   opt("bhumihar", "Bhumihar", "ਭੂਮਿਹਾਰ", "भूमिहार"),
@@ -87,9 +118,7 @@ const BUDDHIST_COMMUNITIES: BlaCommunityOption[] = [
   opt("other_buddhist", "Other Buddhist", "ਹੋਰ ਬੁੱਧ", "अन्य बौद्ध"),
 ];
 
-const OTHER_COMMUNITIES: BlaCommunityOption[] = [
-  opt("other", "Other", "ਹੋਰ", "अन्य"),
-];
+const OTHER_COMMUNITIES: BlaCommunityOption[] = [OTHER_COMMUNITY_OPTION];
 
 export const OBC_COMMUNITIES: BlaCommunityOption[] = [
   opt("yadav_obc", "Yadav", "ਯਾਦਵ", "यादव"),
@@ -134,9 +163,9 @@ const RELIGION_COMMUNITIES: Record<string, BlaCommunityOption[]> = {
 
 /** Community list for religion + reservation category (OBC/SC use dedicated lists). */
 export function getBlaCommunityOptions(religion: string, casteCategory: string): BlaCommunityOption[] {
-  if (casteCategory === "OBC" || casteCategory === "BC") return OBC_COMMUNITIES;
-  if (casteCategory === "SC") return SC_COMMUNITIES;
-  return RELIGION_COMMUNITIES[religion] ?? OTHER_COMMUNITIES;
+  if (casteCategory === "OBC" || casteCategory === "BC") return withOtherOption(OBC_COMMUNITIES);
+  if (casteCategory === "SC") return withOtherOption(SC_COMMUNITIES);
+  return withOtherOption(RELIGION_COMMUNITIES[religion] ?? OTHER_COMMUNITIES);
 }
 
 export function blaCommunityLabel(
@@ -145,7 +174,16 @@ export function blaCommunityLabel(
   casteCategory: string,
   language: Language,
 ): string {
-  const o = getBlaCommunityOptions(religion, casteCategory).find((c) => c.value === value);
+  const parsed = parseBlaCommunityValue(value);
+  if (parsed.select === BLA_COMMUNITY_OTHER_VALUE) {
+    if (parsed.custom) return parsed.custom;
+    return language === "hi"
+      ? OTHER_COMMUNITY_OPTION.hi
+      : language === "pa"
+        ? OTHER_COMMUNITY_OPTION.pa
+        : OTHER_COMMUNITY_OPTION.en;
+  }
+  const o = getBlaCommunityOptions(religion, casteCategory).find((c) => c.value === parsed.select);
   if (!o) return value;
   return language === "hi" ? o.hi : language === "pa" ? o.pa : o.en;
 }

@@ -95,6 +95,16 @@ const labels: Record<string, L10n> = {
     hi: "समुदाय चुनें",
     pa: "ਸਮੁਦਾਇ ਚੁਣੋ",
   },
+  communityOtherLabel: {
+    en: "Specify community / caste",
+    hi: "समुदाय / जाति लिखें",
+    pa: "ਸਮੁਦਾਇ / ਜਾਤਿ ਲਿਖੋ",
+  },
+  communityOtherPlaceholder: {
+    en: "Enter name",
+    hi: "नाम लिखें",
+    pa: "ਨਾਮ ਲਿਖੋ",
+  },
   casteCategory: { en: "Caste category", hi: "जाति श्रेणी", pa: "ਜਾਤਿ ਸ਼੍ਰੇਣੀ" },
   castePlaceholder: { en: "GEN / OBC / BC / SC / ST", hi: "GEN / OBC / BC / SC / ST", pa: "GEN / OBC / BC / SC / ST" },
   dob: { en: "Date of birth", hi: "जन्म तिथि", pa: "ਜਨਮ ਤਾਰੀਖ" },

@@ -34,7 +34,13 @@ import {
   translateCompletionMissing,
   BLA_RELIGION_VALUES,
 } from "@/lib/bla-i18n";
-import { getBlaCommunityOptions, blaCommunityLabel } from "@/lib/bla-religion-communities";
+import {
+  BLA_COMMUNITY_OTHER_VALUE,
+  blaCommunityLabel,
+  formatBlaCommunityValue,
+  getBlaCommunityOptions,
+  parseBlaCommunityValue,
+} from "@/lib/bla-religion-communities";
 import type { AppUser, BlaMaster, BlaSubmission } from "@shared/schema";
 
 interface Props {
@@ -199,7 +205,8 @@ export default function TaskBla({ user }: Props) {
   const [healthCardMade, setHealthCardMade] = useState("");
   const [msrRegistered, setMsrRegistered] = useState("");
   const [blaRelation, setBlaRelation] = useState("");
-  const [religionCommunity, setReligionCommunity] = useState("");
+  const [communitySelect, setCommunitySelect] = useState("");
+  const [communityOtherText, setCommunityOtherText] = useState("");
   const [casteCategory, setCasteCategory] = useState("");
   const [dob, setDob] = useState("");
   const [anniversaryDate, setAnniversaryDate] = useState("");
@@ -226,11 +233,20 @@ export default function TaskBla({ user }: Props) {
     [blaRelation, casteCategory],
   );
 
+  const religionCommunityStored = useMemo(
+    () => formatBlaCommunityValue(communitySelect, communityOtherText),
+    [communitySelect, communityOtherText],
+  );
+
   useEffect(() => {
-    if (!religionCommunity) return;
-    const valid = communityOptions.some((c) => c.value === religionCommunity);
-    if (!valid) setReligionCommunity("");
-  }, [communityOptions, religionCommunity]);
+    if (!communitySelect) return;
+    if (communitySelect === BLA_COMMUNITY_OTHER_VALUE) return;
+    const valid = communityOptions.some((c) => c.value === communitySelect);
+    if (!valid) {
+      setCommunitySelect("");
+      setCommunityOtherText("");
+    }
+  }, [communityOptions, communitySelect]);
 
   const filteredBooths = useMemo(() => {
     const q = boothSearch.trim();
@@ -318,7 +334,7 @@ export default function TaskBla({ user }: Props) {
         healthCardMade,
         msrRegistered,
         blaRelation,
-        religionCommunity,
+        religionCommunity: religionCommunityStored,
         casteCategory,
         dob,
         anniversaryDate,
@@ -337,7 +353,7 @@ export default function TaskBla({ user }: Props) {
       healthCardMade,
       msrRegistered,
       blaRelation,
-      religionCommunity,
+      religionCommunityStored,
       casteCategory,
       dob,
       anniversaryDate,
@@ -390,7 +406,7 @@ export default function TaskBla({ user }: Props) {
         healthCardMade: showHealthCard ? healthCardMade || null : null,
         msrRegistered: showMsr ? msrRegistered || null : null,
         blaRelation: blaRelation || null,
-        religionCommunity: religionCommunity || null,
+        religionCommunity: religionCommunityStored || null,
         casteCategory: casteCategory || null,
         dob: dob || null,
         anniversaryDate: anniversaryDate || null,
@@ -444,7 +460,8 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade("");
     setMsrRegistered("");
     setBlaRelation("");
-    setReligionCommunity("");
+    setCommunitySelect("");
+    setCommunityOtherText("");
     setCasteCategory("");
     setDob("");
     setAnniversaryDate("");
@@ -468,7 +485,9 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade(s.healthCardMade || "");
     setMsrRegistered(s.msrRegistered || "");
     setBlaRelation(s.blaRelation || "");
-    setReligionCommunity(s.religionCommunity || "");
+    const communityParsed = parseBlaCommunityValue(s.religionCommunity || "");
+    setCommunitySelect(communityParsed.select);
+    setCommunityOtherText(communityParsed.custom);
     setCasteCategory(s.casteCategory || "");
     setDob(s.dob || "");
     setAnniversaryDate(s.anniversaryDate || "");
@@ -552,7 +571,8 @@ export default function TaskBla({ user }: Props) {
     setHealthCardMade("");
     setMsrRegistered("");
     setBlaRelation("");
-    setReligionCommunity("");
+    setCommunitySelect("");
+    setCommunityOtherText("");
     setCasteCategory("");
     setBlaLivePhoto(null);
     setComputerDataEntry("");
@@ -1031,7 +1051,8 @@ export default function TaskBla({ user }: Props) {
               value={blaRelation}
               onValueChange={(v) => {
                 setBlaRelation(v);
-                setReligionCommunity("");
+                setCommunitySelect("");
+                setCommunityOtherText("");
               }}
             >
               <SelectTrigger>
@@ -1049,7 +1070,13 @@ export default function TaskBla({ user }: Props) {
             {blaRelation && (
               <>
                 <label className="text-sm font-medium">{t("religionCommunity")}</label>
-                <Select value={religionCommunity} onValueChange={setReligionCommunity}>
+                <Select
+                  value={communitySelect}
+                  onValueChange={(v) => {
+                    setCommunitySelect(v);
+                    if (v !== BLA_COMMUNITY_OTHER_VALUE) setCommunityOtherText("");
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder={t("selectCommunity")} />
                   </SelectTrigger>
@@ -1061,6 +1088,16 @@ export default function TaskBla({ user }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
+                {communitySelect === BLA_COMMUNITY_OTHER_VALUE && (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">{t("communityOtherLabel")}</label>
+                    <Input
+                      value={communityOtherText}
+                      onChange={(e) => setCommunityOtherText(e.target.value)}
+                      placeholder={t("communityOtherPlaceholder")}
+                    />
+                  </div>
+                )}
               </>
             )}
 
@@ -1069,7 +1106,8 @@ export default function TaskBla({ user }: Props) {
               value={casteCategory}
               onValueChange={(v) => {
                 setCasteCategory(v);
-                setReligionCommunity("");
+                setCommunitySelect("");
+                setCommunityOtherText("");
               }}
             >
               <SelectTrigger>
