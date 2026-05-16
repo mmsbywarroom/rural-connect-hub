@@ -58,6 +58,16 @@ const labels: Record<string, L10n> = {
   attendanceMarked: { en: "Attendance saved", hi: "उपस्थिति सहेजी गई", pa: "ਹਾਜ਼ਰੀ ਸੰਭਾਲੀ ਗਈ" },
   attendanceFailed: { en: "Failed to save attendance", hi: "उपस्थिति सहेजना असफल", pa: "ਹਾਜ਼ਰੀ ਸੰਭਾਲਣਾ ਅਸਫਲ" },
   sendOtp: { en: "Send OTP", hi: "OTP भेजें", pa: "OTP ਭੇਜੋ" },
+  otpRequired: {
+    en: "Verify BLA mobile with OTP before saving",
+    hi: "सहेजने से पहले BLA मोबाइल OTP से सत्यापित करें",
+    pa: "ਸੰਭਾਲਣ ਤੋਂ ਪਹਿਲਾਂ BLA ਮੋਬਾਈਲ OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ",
+  },
+  otpRequiredHint: {
+    en: "OTP verification is required to save this form",
+    hi: "फॉर्म सहेजने के लिए OTP सत्यापन ज़रूरी है",
+    pa: "ਫਾਰਮ ਸੰਭਾਲਣ ਲਈ OTP ਤਸਦੀਕ ਲਾਜ਼ਮੀ ਹੈ",
+  },
   verified: { en: "Verified", hi: "सत्यापित", pa: "ਤਸਦੀਕਿਤ" },
   verify: { en: "Verify", hi: "सत्यापित करें", pa: "ਤਸਦੀਕ ਕਰੋ" },
   aadhaar: { en: "Aadhaar", hi: "आधार", pa: "ਆਧਾਰ" },

@@ -5388,7 +5388,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid Indian mobile number" });
       }
       const normalized = normalizeMobile(mobileNumber);
-      const otp = await storeOTP(normalized);
+      const otp = await storeOTP(`bla_${normalized}`);
       if (isSmsConfigured()) {
         try {
           await sendOtpSms(normalized, otp);
@@ -5412,7 +5412,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Mobile number and OTP are required" });
       }
       const normalized = normalizeMobile(mobileNumber);
-      const valid = await verifyOTP(normalized, otp);
+      const valid = await verifyOTP(`bla_${normalized}`, otp);
       if (!valid) {
         return res.status(400).json({ error: "Invalid or expired OTP" });
       }
@@ -5427,6 +5427,13 @@ export async function registerRoutes(
   app.post("/api/bla/submit", async (req, res) => {
     try {
       const body = req.body as Record<string, unknown>;
+      if (!body.bloMobileVerified) {
+        return res.status(400).json({ error: "Mobile OTP verification is required before saving BLA form" });
+      }
+      const mobile = normalizeMobile(String(body.bloMobileNumber ?? ""));
+      if (mobile.length !== 10) {
+        return res.status(400).json({ error: "Valid 10-digit BLA mobile number is required" });
+      }
       const { computerDataEntry, completionPercentage, status } = enrichBlaPayload(body);
       const parsed = insertBlaSubmissionSchema.parse({
         ...body,
@@ -5483,6 +5490,11 @@ export async function registerRoutes(
       const body = req.body as Record<string, unknown>;
       const existing = await storage.getBlaSubmission(req.params.id);
       if (!existing) return res.status(404).json({ error: "Submission not found" });
+      const mergedVerified =
+        body.bloMobileVerified !== undefined ? !!body.bloMobileVerified : !!existing.bloMobileVerified;
+      if (!mergedVerified) {
+        return res.status(400).json({ error: "Mobile OTP verification is required before saving BLA form" });
+      }
       const { computerDataEntry, completionPercentage, status } = enrichBlaPayload({
         ...existing,
         ...body,

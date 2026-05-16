@@ -385,6 +385,18 @@ export default function TaskBla({ user }: Props) {
     onError: () => toast({ title: t("invalidOtp"), variant: "destructive" }),
   });
 
+  const handleSaveSubmit = () => {
+    if (blaMobile.length !== 10) {
+      toast({ title: t("otpFailed"), variant: "destructive" });
+      return;
+    }
+    if (!mobileVerified) {
+      toast({ title: t("otpRequired"), variant: "destructive" });
+      return;
+    }
+    submitMutation.mutate();
+  };
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -843,6 +855,11 @@ export default function TaskBla({ user }: Props) {
             <label className="text-sm font-medium">{t("boothNumber")}</label>
             <Input value={selectedBooth} onChange={(e) => setSelectedBooth(e.target.value)} />
             <label className="text-sm font-medium">{t("mobileOtp")}</label>
+            {!mobileVerified && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                {t("otpRequiredHint")}
+              </p>
+            )}
             <div className="flex gap-2">
               <Input
                 type="tel"
@@ -1159,7 +1176,11 @@ export default function TaskBla({ user }: Props) {
           </CardContent>
         </Card>
 
-        <Button className="w-full" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending}>
+        <Button
+          className="w-full"
+          onClick={handleSaveSubmit}
+          disabled={submitMutation.isPending || !mobileVerified || blaMobile.length !== 10}
+        >
           {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
           {t("saveSubmit")}
         </Button>
