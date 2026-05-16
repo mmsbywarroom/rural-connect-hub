@@ -5043,6 +5043,7 @@ export async function registerRoutes(
     aadhaarBack?: string | null;
     aadhaarNumber?: string | null;
     voterCardImage?: string | null;
+    voterCardImageBack?: string | null;
     epicNumber?: string | null;
     gender?: string | null;
     healthCardMade?: string | null;
@@ -5061,6 +5062,7 @@ export async function registerRoutes(
       !!data.aadhaarBack?.trim(),
       !!data.aadhaarNumber?.trim(),
       !!data.voterCardImage?.trim(),
+      !!data.voterCardImageBack?.trim(),
       !!data.epicNumber?.trim(),
       !!data.gender?.trim(),
     ];
@@ -5191,6 +5193,7 @@ export async function registerRoutes(
       aadhaarBack: body.aadhaarBack as string | null,
       aadhaarNumber: body.aadhaarNumber as string | null,
       voterCardImage: body.voterCardImage as string | null,
+      voterCardImageBack: body.voterCardImageBack as string | null,
       epicNumber: body.epicNumber as string | null,
       gender: body.gender as string | null,
       healthCardMade: body.healthCardMade as string | null,

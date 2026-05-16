@@ -6,6 +6,7 @@ const EXTENDED_KEYS = [
   "religionCommunity",
   "dob",
   "anniversaryDate",
+  "voterCardImageBack",
   "computerDataEntry",
   "digitalSkills",
 ] as const;

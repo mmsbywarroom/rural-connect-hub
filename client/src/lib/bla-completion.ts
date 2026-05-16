@@ -5,6 +5,7 @@ export type BlaCompletionInput = {
   aadhaarBack?: string | null;
   aadhaarNumber?: string | null;
   voterCardImage?: string | null;
+  voterCardImageBack?: string | null;
   epicNumber?: string | null;
   gender?: string | null;
   healthCardMade?: string | null;
@@ -34,7 +35,8 @@ function getBlaFieldChecks(data: BlaCompletionInput): FieldCheck[] {
     { label: "Aadhaar front", test: (d) => !!d.aadhaarFront?.trim() },
     { label: "Aadhaar back", test: (d) => !!d.aadhaarBack?.trim() },
     { label: "Aadhaar number", test: (d) => !!d.aadhaarNumber?.trim() },
-    { label: "Voter card", test: (d) => !!d.voterCardImage?.trim() },
+    { label: "Voter card (front)", test: (d) => !!d.voterCardImage?.trim() },
+    { label: "Voter card (back)", test: (d) => !!d.voterCardImageBack?.trim() },
     { label: "EPIC number", test: (d) => !!d.epicNumber?.trim() },
     { label: "Gender", test: (d) => !!d.gender?.trim() },
   ];

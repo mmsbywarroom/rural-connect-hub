@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, type Ref } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,89 @@ function parseApiErrorMessage(err: unknown): string {
   return msg.replace(/^\d+:\s*/, "");
 }
 
+function BlaDocumentSideBlock({
+  title,
+  imageSrc,
+  cameraInputRef,
+  uploadInputRef,
+  onCameraChange,
+  onUploadChange,
+  blaText,
+}: {
+  title: string;
+  imageSrc: string | null;
+  cameraInputRef: Ref<HTMLInputElement>;
+  uploadInputRef: Ref<HTMLInputElement>;
+  onCameraChange: () => void;
+  onUploadChange: () => void;
+  blaText: (key: Parameters<typeof blaT>[0], vars?: Record<string, string>) => string;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/80 p-2">
+      <p className="text-xs font-semibold text-slate-700">{title}</p>
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={onCameraChange}
+      />
+      <input ref={uploadInputRef} type="file" accept="image/*" className="hidden" onChange={onUploadChange} />
+      {imageSrc ? (
+        <div className="space-y-2">
+          <div className="relative overflow-hidden rounded-md border border-slate-200 bg-white">
+            <img src={imageSrc} alt="" className="max-h-32 w-full object-contain" />
+            <Badge className="absolute right-1.5 top-1.5 h-5 gap-0.5 bg-green-600 px-1.5 py-0 text-[10px] text-white hover:bg-green-600">
+              <CheckCircle className="h-3 w-3" />
+              {blaText("attached")}
+            </Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-12 flex-1 flex-col"
+              onClick={() => cameraInputRef.current?.click()}
+            >
+              <Camera className="h-4 w-4" /> {blaText("camera")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-12 flex-1 flex-col"
+              onClick={() => uploadInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4" /> {blaText("upload")}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-16 flex-1 flex-col"
+            onClick={() => cameraInputRef.current?.click()}
+          >
+            <Camera className="h-4 w-4" /> {blaText("camera")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-16 flex-1 flex-col"
+            onClick={() => uploadInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" /> {blaText("upload")}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const BOOTH_OPTIONS = Array.from({ length: 258 }, (_, i) => String(i + 1));
 
 const CASTE_OPTIONS = [
@@ -110,6 +193,7 @@ export default function TaskBla({ user }: Props) {
   const [aadhaarNumber, setAadhaarNumber] = useState("");
 
   const [voterCardImage, setVoterCardImage] = useState<string | null>(null);
+  const [voterCardImageBack, setVoterCardImageBack] = useState<string | null>(null);
   const [epicNumber, setEpicNumber] = useState("");
   const [gender, setGender] = useState("");
   const [healthCardMade, setHealthCardMade] = useState("");
@@ -126,9 +210,14 @@ export default function TaskBla({ user }: Props) {
   const [addBlaMobile, setAddBlaMobile] = useState("");
 
   const blaLivePhotoRef = useRef<HTMLInputElement>(null);
-  const aadhaarFrontRef = useRef<HTMLInputElement>(null);
-  const aadhaarBackRef = useRef<HTMLInputElement>(null);
-  const voterCardRef = useRef<HTMLInputElement>(null);
+  const aadhaarFrontCameraRef = useRef<HTMLInputElement>(null);
+  const aadhaarFrontUploadRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackCameraRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackUploadRef = useRef<HTMLInputElement>(null);
+  const voterCardFrontCameraRef = useRef<HTMLInputElement>(null);
+  const voterCardFrontUploadRef = useRef<HTMLInputElement>(null);
+  const voterCardBackCameraRef = useRef<HTMLInputElement>(null);
+  const voterCardBackUploadRef = useRef<HTMLInputElement>(null);
 
   const attendanceDate = useMemo(() => localDateYmd(), []);
 
@@ -223,6 +312,7 @@ export default function TaskBla({ user }: Props) {
         aadhaarBack,
         aadhaarNumber,
         voterCardImage,
+        voterCardImageBack,
         epicNumber,
         gender,
         healthCardMade,
@@ -241,6 +331,7 @@ export default function TaskBla({ user }: Props) {
       aadhaarBack,
       aadhaarNumber,
       voterCardImage,
+      voterCardImageBack,
       epicNumber,
       gender,
       healthCardMade,
@@ -292,6 +383,7 @@ export default function TaskBla({ user }: Props) {
         aadhaarBack,
         aadhaarNumber: aadhaarNumber.trim() || null,
         voterCardImage,
+        voterCardImageBack,
         epicNumber: epicNumber.trim() || null,
         ocrVoterId: epicNumber.trim() || null,
         gender: gender || null,
@@ -346,6 +438,7 @@ export default function TaskBla({ user }: Props) {
     setAadhaarBack(null);
     setAadhaarNumber("");
     setVoterCardImage(null);
+    setVoterCardImageBack(null);
     setEpicNumber("");
     setGender("");
     setHealthCardMade("");
@@ -369,6 +462,7 @@ export default function TaskBla({ user }: Props) {
     setAadhaarBack(s.aadhaarBack || null);
     setAadhaarNumber(s.aadhaarNumber || s.ocrAadhaarNumber || "");
     setVoterCardImage(s.voterCardImage || null);
+    setVoterCardImageBack(s.voterCardImageBack || null);
     setEpicNumber(s.epicNumber || s.ocrVoterId || "");
     setGender(s.gender || "");
     setHealthCardMade(s.healthCardMade || "");
@@ -452,6 +546,7 @@ export default function TaskBla({ user }: Props) {
     setAadhaarBack(null);
     setAadhaarNumber("");
     setVoterCardImage(null);
+    setVoterCardImageBack(null);
     setEpicNumber("");
     setGender("");
     setHealthCardMade("");
@@ -461,6 +556,8 @@ export default function TaskBla({ user }: Props) {
     setCasteCategory("");
     setBlaLivePhoto(null);
     setComputerDataEntry("");
+    setDob("");
+    setAnniversaryDate("");
     setMobileVerified(false);
     setOtpSent(false);
     setOtp("");
@@ -808,15 +905,39 @@ export default function TaskBla({ user }: Props) {
         <Card>
           <CardContent className="p-4 space-y-3">
             <p className="text-sm font-semibold">{t("aadhaar")}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <input ref={aadhaarFrontRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarFrontRef.current, setAadhaarFront, "aadhaarFront", (r) => r?.aadhaarNumber && setAadhaarNumber(r.aadhaarNumber))} />
-              <input ref={aadhaarBackRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(aadhaarBackRef.current, setAadhaarBack, "aadhaarBack")} />
-              <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarFrontRef.current?.click()}>
-                <Camera className="h-4 w-4" /> {t("aadhaarFront")}
-              </Button>
-              <Button variant="outline" className="h-20 flex-col" onClick={() => aadhaarBackRef.current?.click()}>
-                <Camera className="h-4 w-4" /> {t("aadhaarBack")}
-              </Button>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <BlaDocumentSideBlock
+                title={t("aadhaarFront")}
+                imageSrc={aadhaarFront}
+                cameraInputRef={aadhaarFrontCameraRef}
+                uploadInputRef={aadhaarFrontUploadRef}
+                onCameraChange={() =>
+                  pickImage(
+                    aadhaarFrontCameraRef.current,
+                    setAadhaarFront,
+                    "aadhaarFront",
+                    (r) => r?.aadhaarNumber && setAadhaarNumber(r.aadhaarNumber),
+                  )
+                }
+                onUploadChange={() =>
+                  pickImage(
+                    aadhaarFrontUploadRef.current,
+                    setAadhaarFront,
+                    "aadhaarFront",
+                    (r) => r?.aadhaarNumber && setAadhaarNumber(r.aadhaarNumber),
+                  )
+                }
+                blaText={t}
+              />
+              <BlaDocumentSideBlock
+                title={t("aadhaarBack")}
+                imageSrc={aadhaarBack}
+                cameraInputRef={aadhaarBackCameraRef}
+                uploadInputRef={aadhaarBackUploadRef}
+                onCameraChange={() => pickImage(aadhaarBackCameraRef.current, setAadhaarBack, "aadhaarBack")}
+                onUploadChange={() => pickImage(aadhaarBackUploadRef.current, setAadhaarBack, "aadhaarBack")}
+                blaText={t}
+              />
             </div>
             <label className="text-sm font-medium">{t("aadhaarNumber")}</label>
             <Input value={aadhaarNumber} onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, "").slice(0, 12))} maxLength={12} />
@@ -826,14 +947,29 @@ export default function TaskBla({ user }: Props) {
         <Card>
           <CardContent className="p-4 space-y-3">
             <p className="text-sm font-semibold">{t("voterCard")}</p>
-            <input ref={voterCardRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={() => pickImage(voterCardRef.current, setVoterCardImage, "voterId", (r) => r?.voterId && setEpicNumber(r.voterId))} />
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
-                <Camera className="h-4 w-4" /> {t("camera")}
-              </Button>
-              <Button variant="outline" className="flex-1 h-16 flex-col" onClick={() => voterCardRef.current?.click()}>
-                <Upload className="h-4 w-4" /> {t("upload")}
-              </Button>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <BlaDocumentSideBlock
+                title={t("voterCardFront")}
+                imageSrc={voterCardImage}
+                cameraInputRef={voterCardFrontCameraRef}
+                uploadInputRef={voterCardFrontUploadRef}
+                onCameraChange={() =>
+                  pickImage(voterCardFrontCameraRef.current, setVoterCardImage, "voterId", (r) => r?.voterId && setEpicNumber(r.voterId))
+                }
+                onUploadChange={() =>
+                  pickImage(voterCardFrontUploadRef.current, setVoterCardImage, "voterId", (r) => r?.voterId && setEpicNumber(r.voterId))
+                }
+                blaText={t}
+              />
+              <BlaDocumentSideBlock
+                title={t("voterCardBack")}
+                imageSrc={voterCardImageBack}
+                cameraInputRef={voterCardBackCameraRef}
+                uploadInputRef={voterCardBackUploadRef}
+                onCameraChange={() => pickImage(voterCardBackCameraRef.current, setVoterCardImageBack)}
+                onUploadChange={() => pickImage(voterCardBackUploadRef.current, setVoterCardImageBack)}
+                blaText={t}
+              />
             </div>
             <label className="text-sm font-medium">{t("epicVoterId")}</label>
             <Input value={epicNumber} onChange={(e) => setEpicNumber(e.target.value.toUpperCase())} />

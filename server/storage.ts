@@ -2827,6 +2827,7 @@ export class DatabaseStorage implements IStorage {
           religionCommunity: blaSubmissions.religionCommunity,
           dob: blaSubmissions.dob,
           anniversaryDate: blaSubmissions.anniversaryDate,
+          voterCardImageBack: blaSubmissions.voterCardImageBack,
           computerDataEntry: blaSubmissions.computerDataEntry,
           digitalSkills: blaSubmissions.digitalSkills,
         })
@@ -2847,6 +2848,7 @@ export class DatabaseStorage implements IStorage {
         religionCommunity: null,
         dob: null,
         anniversaryDate: null,
+        voterCardImageBack: null,
         computerDataEntry: null,
         digitalSkills: null,
       } as BlaSubmission;

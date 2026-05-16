@@ -47,6 +47,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'bla_live_photo') THEN
     ALTER TABLE bla_submissions ADD COLUMN bla_live_photo TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'voter_card_image_back') THEN
+    ALTER TABLE bla_submissions ADD COLUMN voter_card_image_back TEXT;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bla_submissions' AND column_name = 'dob') THEN
     ALTER TABLE bla_submissions ADD COLUMN dob TEXT;
   END IF;

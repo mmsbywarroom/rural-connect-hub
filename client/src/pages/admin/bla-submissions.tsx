@@ -386,8 +386,20 @@ export default function BlaSubmissionsPage() {
                   )}
                   {selected.voterCardImage && (
                     <Button asChild variant="outline" size="sm">
-                      <a href={selected.voterCardImage} target="_blank" rel="noreferrer" download={`voter-card-${selected.id}.jpg`}>
-                        View / Download Voter Card
+                      <a href={selected.voterCardImage} target="_blank" rel="noreferrer" download={`voter-card-front-${selected.id}.jpg`}>
+                        View / Download Voter Card (front)
+                      </a>
+                    </Button>
+                  )}
+                  {selected.voterCardImageBack && (
+                    <Button asChild variant="outline" size="sm">
+                      <a
+                        href={selected.voterCardImageBack}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={`voter-card-back-${selected.id}.jpg`}
+                      >
+                        View / Download Voter Card (back)
                       </a>
                     </Button>
                   )}

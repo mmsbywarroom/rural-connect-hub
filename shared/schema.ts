@@ -1433,6 +1433,7 @@ export const blaSubmissions = pgTable("bla_submissions", {
   ocrAadhaarAddress: text("ocr_aadhaar_address"),
   // Voter card + OCR
   voterCardImage: text("voter_card_image"),
+  voterCardImageBack: text("voter_card_image_back"),
   epicNumber: text("epic_number"),
   ocrVoterId: text("ocr_voter_id"),
   ocrVoterName: text("ocr_voter_name"),
