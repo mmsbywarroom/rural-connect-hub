@@ -5244,6 +5244,31 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/bla-master/add", async (req, res) => {
+    try {
+      const { name, mobileNumber, boothNumber } = req.body as {
+        name?: string;
+        mobileNumber?: string;
+        boothNumber?: string;
+      };
+      if (!name?.trim() || !mobileNumber?.trim() || !boothNumber?.trim()) {
+        return res.status(400).json({ error: "Name, mobile and booth number are required" });
+      }
+      if (!isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const row = await storage.createBlaMasterEntry({
+        name: name.trim(),
+        mobileNumber,
+        boothNumber: boothNumber.trim(),
+      });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[BLA Master] manual add error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to add BLA" });
+    }
+  });
+
   app.get("/api/bla/master/by-booth/:boothNumber", async (req, res) => {
     try {
       const booth = String(req.params.boothNumber || "").trim();

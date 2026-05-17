@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { normalizeBoothNumber } from "./bla-booth";
+import { normalizeBlaMobile, normalizeBoothNumber } from "./bla-booth";
 import { mergeBlaSubmissionRow, splitBlaSubmissionWrite } from "./bla-submission-write";
 import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
 import {
@@ -2573,9 +2573,65 @@ export class DatabaseStorage implements IStorage {
   }
 
   // BLA Master + Submissions
+  /** Re-attach submissions to new master rows after CSV replace (match mobile + booth). */
+  private async relinkBlaSubmissionsToMasters(
+    tx: Pick<typeof db, "select" | "update">,
+    masters: BlaMaster[],
+  ): Promise<number> {
+    if (masters.length === 0) return 0;
+
+    const orphans = await tx
+      .select({
+        id: blaSubmissions.id,
+        bloMobileNumber: blaSubmissions.bloMobileNumber,
+        boothNumber: blaSubmissions.boothNumber,
+        manualBoothId: blaSubmissions.manualBoothId,
+        voterMappingBoothId: blaSubmissions.voterMappingBoothId,
+        updatedAt: blaSubmissions.updatedAt,
+      })
+      .from(blaSubmissions)
+      .where(isNull(blaSubmissions.blaMasterId));
+
+    const pool = new Map<string, typeof orphans>();
+    for (const o of orphans) {
+      const mobile = normalizeBlaMobile(o.bloMobileNumber);
+      if (mobile.length !== 10) continue;
+      const booth = normalizeBoothNumber(
+        o.boothNumber || o.manualBoothId || o.voterMappingBoothId || "",
+      );
+      const key = `${mobile}:${booth}`;
+      if (!pool.has(key)) pool.set(key, []);
+      pool.get(key)!.push(o);
+    }
+    for (const list of Array.from(pool.values())) {
+      list.sort((a: (typeof orphans)[0], b: (typeof orphans)[0]) => {
+        const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tb - ta;
+      });
+    }
+
+    let linked = 0;
+    for (const m of masters) {
+      const mobile = normalizeBlaMobile(m.mobileNumber);
+      if (mobile.length !== 10) continue;
+      const booth = normalizeBoothNumber(m.boothNumber);
+      let candidates = pool.get(`${mobile}:${booth}`) ?? [];
+      if (candidates.length === 0) {
+        candidates = pool.get(`${mobile}:`) ?? [];
+      }
+      if (candidates.length === 0) continue;
+      const best = candidates.shift()!;
+      await tx.update(blaSubmissions).set({ blaMasterId: m.id }).where(eq(blaSubmissions.id, best.id));
+      linked++;
+    }
+    return linked;
+  }
+
   async replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]> {
     const normalized = rows.map((r) => ({
       ...r,
+      mobileNumber: normalizeBlaMobile(r.mobileNumber),
       boothNumber: normalizeBoothNumber(r.boothNumber),
     }));
     return db.transaction(async (tx) => {
@@ -2587,7 +2643,12 @@ export class DatabaseStorage implements IStorage {
       await tx.update(blaSubmissions).set({ blaMasterId: null });
       await tx.delete(blaMaster);
       if (normalized.length === 0) return [];
-      return tx.insert(blaMaster).values(normalized).returning();
+      const inserted = await tx.insert(blaMaster).values(normalized).returning();
+      const linked = await this.relinkBlaSubmissionsToMasters(tx, inserted);
+      if (linked > 0) {
+        console.log(`[BLA Master] Re-linked ${linked} submission(s) after CSV upload`);
+      }
+      return inserted;
     });
   }
 
@@ -2604,6 +2665,13 @@ export class DatabaseStorage implements IStorage {
   async getBlaMasterByBoothWithStatus(boothNumber: string, attendanceDate?: string) {
     const masters = await this.getBlaMasterByBooth(boothNumber);
     if (masters.length === 0) return [];
+    try {
+      await db.transaction(async (tx) => {
+        await this.relinkBlaSubmissionsToMasters(tx, masters);
+      });
+    } catch (e) {
+      console.warn("[BLA Master] booth relink skipped:", (e as Error).message);
+    }
     const masterIds = masters.map((m) => m.id);
     const dateKey = attendanceDate?.trim() || new Date().toISOString().slice(0, 10);
 
@@ -2625,6 +2693,45 @@ export class DatabaseStorage implements IStorage {
         })
         .from(blaSubmissions)
         .where(inArray(blaSubmissions.blaMasterId, masterIds));
+
+      const linkedMasterIds = new Set(subs.map((s) => s.blaMasterId).filter(Boolean));
+      const masterByMobileBooth = new Map(
+        masters.map((m) => [
+          `${normalizeBlaMobile(m.mobileNumber)}:${normalizeBoothNumber(m.boothNumber)}`,
+          m.id,
+        ]),
+      );
+      const orphans = await db
+        .select({
+          id: blaSubmissions.id,
+          blaMasterId: blaSubmissions.blaMasterId,
+          bloMobileNumber: blaSubmissions.bloMobileNumber,
+          boothNumber: blaSubmissions.boothNumber,
+          manualBoothId: blaSubmissions.manualBoothId,
+          voterMappingBoothId: blaSubmissions.voterMappingBoothId,
+          completionPercentage: blaSubmissions.completionPercentage,
+          status: blaSubmissions.status,
+          updatedAt: blaSubmissions.updatedAt,
+        })
+        .from(blaSubmissions)
+        .where(isNull(blaSubmissions.blaMasterId));
+
+      for (const o of orphans) {
+        const mobile = normalizeBlaMobile(o.bloMobileNumber);
+        if (mobile.length !== 10) continue;
+        const booth = normalizeBoothNumber(
+          o.boothNumber || o.manualBoothId || o.voterMappingBoothId || "",
+        );
+        const masterId = masterByMobileBooth.get(`${mobile}:${booth}`);
+        if (!masterId || linkedMasterIds.has(masterId)) continue;
+        subs.push({
+          id: o.id,
+          blaMasterId: masterId,
+          completionPercentage: o.completionPercentage,
+          status: o.status,
+        });
+        linkedMasterIds.add(masterId);
+      }
     } catch (e) {
       console.warn("[BLA Master] submission status lookup skipped:", (e as Error).message);
     }
@@ -2734,6 +2841,9 @@ export class DatabaseStorage implements IStorage {
         boothNumber: normalizeBoothNumber(data.boothNumber),
       })
       .returning();
+    await db.transaction(async (tx) => {
+      await this.relinkBlaSubmissionsToMasters(tx, [row]);
+    });
     return row;
   }
 
@@ -2841,21 +2951,52 @@ export class DatabaseStorage implements IStorage {
 
     try {
       const [row] = await db.select(coreSelect).from(blaSubmissions).where(where).limit(1);
-      if (!row) return undefined;
-      return {
-        ...row,
-        blaLivePhoto: null,
-        religionCommunity: null,
-        dob: null,
-        anniversaryDate: null,
-        voterCardImageBack: null,
-        computerDataEntry: null,
-        digitalSkills: null,
-      } as BlaSubmission;
+      if (row) {
+        return {
+          ...row,
+          blaLivePhoto: null,
+          religionCommunity: null,
+          dob: null,
+          anniversaryDate: null,
+          voterCardImageBack: null,
+          computerDataEntry: null,
+          digitalSkills: null,
+        } as BlaSubmission;
+      }
     } catch (e) {
       console.error("[BLA] submission by master failed:", (e as Error).message);
-      return undefined;
     }
+
+    const master = await this.getBlaMasterById(blaMasterId);
+    if (!master) return undefined;
+    const mobile = normalizeBlaMobile(master.mobileNumber);
+    if (mobile.length !== 10) return undefined;
+    const booth = normalizeBoothNumber(master.boothNumber);
+    try {
+      const orphans = await db
+        .select()
+        .from(blaSubmissions)
+        .where(isNull(blaSubmissions.blaMasterId))
+        .orderBy(desc(blaSubmissions.updatedAt));
+      const match = orphans.find(
+        (o) =>
+          normalizeBlaMobile(o.bloMobileNumber) === mobile &&
+          normalizeBoothNumber(
+            o.boothNumber || o.manualBoothId || o.voterMappingBoothId || "",
+          ) === booth,
+      );
+      if (match) {
+        await db
+          .update(blaSubmissions)
+          .set({ blaMasterId: blaMasterId })
+          .where(eq(blaSubmissions.id, match.id));
+        const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, match.id)).limit(1);
+        return row;
+      }
+    } catch (e) {
+      console.warn("[BLA] orphan submission relink failed:", (e as Error).message);
+    }
+    return undefined;
   }
 
   async updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined> {
