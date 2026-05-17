@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Upload, FileUp, UserPlus } from "lucide-react";
+import { Loader2, Upload, FileUp, UserPlus, Pencil } from "lucide-react";
 import type { BlaMaster } from "@shared/schema";
 
 export default function BlaUploadCsvPage() {
@@ -24,6 +24,10 @@ export default function BlaUploadCsvPage() {
   const [addName, setAddName] = useState("");
   const [addMobile, setAddMobile] = useState("");
   const [addBooth, setAddBooth] = useState("");
+  const [editRow, setEditRow] = useState<BlaMaster | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editMobile, setEditMobile] = useState("");
+  const [editBooth, setEditBooth] = useState("");
 
   const { data, isLoading, refetch } = useQuery<BlaMaster[]>({
     queryKey: ["/api/admin/bla-master"],
@@ -37,7 +41,7 @@ export default function BlaUploadCsvPage() {
     onSuccess: (result: { count: number }) => {
       toast({
         title: "CSV uploaded",
-        description: `${result.count} BLA rows loaded. Completed profiles stay linked by mobile number.`,
+        description: `${result.count} BLA rows loaded. Profiles and attendance are re-linked by mobile + booth.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bla-master"] });
       refetch();
@@ -62,7 +66,7 @@ export default function BlaUploadCsvPage() {
         mobileNumber: addMobile.trim(),
         boothNumber: addBooth.trim(),
       });
-      return res.json() as BlaMaster;
+      return (await res.json()) as BlaMaster;
     },
     onSuccess: () => {
       toast({ title: "BLA added to master list" });
@@ -85,6 +89,43 @@ export default function BlaUploadCsvPage() {
       toast({ title: msg, variant: "destructive" });
     },
   });
+
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      if (!editRow) throw new Error("No row selected");
+      const res = await apiRequest("PATCH", `/api/admin/bla-master/${editRow.id}`, {
+        name: editName.trim(),
+        mobileNumber: editMobile.trim(),
+        boothNumber: editBooth.trim(),
+      });
+      return (await res.json()) as BlaMaster;
+    },
+    onSuccess: () => {
+      toast({ title: "BLA updated" });
+      setEditRow(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bla-master"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bla/master/by-booth"] });
+      refetch();
+    },
+    onError: async (err: unknown) => {
+      let msg = "Could not update BLA";
+      try {
+        const res = (err as { response?: Response })?.response;
+        if (res) {
+          const body = await res.json();
+          if (body?.error) msg = body.error;
+        }
+      } catch {}
+      toast({ title: msg, variant: "destructive" });
+    },
+  });
+
+  const openEdit = (row: BlaMaster) => {
+    setEditRow(row);
+    setEditName(row.name);
+    setEditMobile(row.mobileNumber);
+    setEditBooth(row.boothNumber);
+  };
 
   const handleFile = (file: File) => {
     const reader = new FileReader();
@@ -110,7 +151,7 @@ export default function BlaUploadCsvPage() {
         <h1 className="text-2xl font-bold">BLA Upload CSV</h1>
         <CardDescription>
           Upload CSV with columns <strong>NAME</strong>, <strong>Mobile Number</strong>, <strong>Booth No</strong>.
-          Each upload replaces the master list; completed volunteer submissions are re-linked by mobile + booth.
+          Each upload replaces the master list; completed profiles and attendance are re-linked by mobile + booth.
         </CardDescription>
       </div>
 
@@ -154,7 +195,7 @@ export default function BlaUploadCsvPage() {
         <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
           <div>
             <CardTitle className="text-sm">Master log ({filtered.length})</CardTitle>
-            <CardDescription className="text-xs">Serial-wise list from last upload</CardDescription>
+            <CardDescription className="text-xs">Serial-wise list from last upload — use Edit to fix name, mobile or booth</CardDescription>
           </div>
           <Input
             placeholder="Search name, mobile, booth..."
@@ -179,6 +220,7 @@ export default function BlaUploadCsvPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Mobile</TableHead>
                     <TableHead>Booth No</TableHead>
+                    <TableHead className="w-[80px]">Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -188,6 +230,18 @@ export default function BlaUploadCsvPage() {
                       <TableCell className="text-sm font-medium">{r.name}</TableCell>
                       <TableCell className="text-sm">{r.mobileNumber}</TableCell>
                       <TableCell className="text-sm">{r.boothNumber}</TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEdit(r)}
+                          title="Edit name, mobile, booth"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -219,7 +273,7 @@ export default function BlaUploadCsvPage() {
             </div>
             <div>
               <label className="text-sm font-medium">Booth No</label>
-              <Input value={addBooth} onChange={(e) => setAddBooth(e.target.value)} placeholder="e.g. 107" />
+              <Input value={addBooth} onChange={(e) => setAddBooth(e.target.value)} placeholder="e.g. 125" />
             </div>
           </div>
           <DialogFooter>
@@ -234,6 +288,47 @@ export default function BlaUploadCsvPage() {
             >
               {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Add
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editRow} onOpenChange={(open) => !open && setEditRow(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit BLA master entry</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Name</label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Mobile (10 digits)</label>
+              <Input
+                type="tel"
+                maxLength={10}
+                value={editMobile}
+                onChange={(e) => setEditMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Booth No</label>
+              <Input value={editBooth} onChange={(e) => setEditBooth(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRow(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => editMutation.mutate()}
+              disabled={
+                !editName.trim() || editMobile.length !== 10 || !editBooth.trim() || editMutation.isPending
+              }
+            >
+              {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

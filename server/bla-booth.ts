@@ -11,6 +11,32 @@ export function normalizeBlaMobile(raw: string): string {
   return digits;
 }
 
+/** Normalize BLA names for loose CSV ↔ submission matching. */
+export function normalizeBlaName(name: string): string {
+  return String(name ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+export function submissionBoothForMatch(row: {
+  boothNumber?: string | null;
+  manualBoothId?: string | null;
+  voterMappingBoothId?: string | null;
+}): string {
+  return normalizeBoothNumber(row.boothNumber || row.manualBoothId || row.voterMappingBoothId || "");
+}
+
+/** Prefer complete / highest-percentage submission when re-linking. */
+export function blaSubmissionLinkScore(row: {
+  completionPercentage?: number | null;
+  status?: string | null;
+}): number {
+  const pct = row.completionPercentage ?? 0;
+  const complete = String(row.status ?? "").toLowerCase() === "complete" ? 10_000 : 0;
+  return complete + pct;
+}
+
 /** Normalize booth numbers so "01", "1 ", and "Booth 1" all match booth 1. */
 export function normalizeBoothNumber(booth: string): string {
   const t = String(booth ?? "").trim();

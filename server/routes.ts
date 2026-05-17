@@ -5269,6 +5269,29 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/admin/bla-master/:id", async (req, res) => {
+    try {
+      const { name, mobileNumber, boothNumber } = req.body as {
+        name?: string;
+        mobileNumber?: string;
+        boothNumber?: string;
+      };
+      if (mobileNumber?.trim() && !isIndianMobile(mobileNumber)) {
+        return res.status(400).json({ error: "Invalid Indian mobile number" });
+      }
+      const row = await storage.updateBlaMasterEntry(req.params.id, {
+        name: name?.trim(),
+        mobileNumber: mobileNumber?.trim(),
+        boothNumber: boothNumber?.trim(),
+      });
+      if (!row) return res.status(404).json({ error: "BLA not found" });
+      res.json(row);
+    } catch (error: any) {
+      console.error("[BLA Master] update error:", error.message);
+      res.status(400).json({ error: error.message || "Failed to update BLA" });
+    }
+  });
+
   app.get("/api/bla/master/by-booth/:boothNumber", async (req, res) => {
     try {
       const booth = String(req.params.boothNumber || "").trim();

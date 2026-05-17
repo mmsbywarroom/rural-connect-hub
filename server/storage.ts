@@ -1,5 +1,11 @@
 import { db } from "./db";
-import { normalizeBlaMobile, normalizeBoothNumber } from "./bla-booth";
+import {
+  blaSubmissionLinkScore,
+  normalizeBlaMobile,
+  normalizeBlaName,
+  normalizeBoothNumber,
+  submissionBoothForMatch,
+} from "./bla-booth";
 import { mergeBlaSubmissionRow, splitBlaSubmissionWrite } from "./bla-submission-write";
 import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
 import {
@@ -552,6 +558,10 @@ export interface IStorage {
   upsertBlaAttendance(data: InsertBlaAttendance): Promise<BlaAttendance>;
   getBlaAttendanceByDate(attendanceDate: string): Promise<BlaAttendance[]>;
   createBlaMasterEntry(data: { name: string; mobileNumber: string; boothNumber: string }): Promise<BlaMaster>;
+  updateBlaMasterEntry(
+    id: string,
+    data: { name?: string; mobileNumber?: string; boothNumber?: string },
+  ): Promise<BlaMaster | undefined>;
   getBlaMasterById(id: string): Promise<BlaMaster | undefined>;
   createBlaSubmission(data: InsertBlaSubmission): Promise<BlaSubmission>;
   getBlaSubmissions(): Promise<BlaSubmission[]>;
@@ -561,6 +571,18 @@ export interface IStorage {
   updateBlaSubmission(id: string, data: Partial<InsertBlaSubmission>): Promise<BlaSubmission | undefined>;
   deleteBlaSubmission(id: string): Promise<void>;
 }
+
+type BlaSubmissionLinkRow = {
+  id: string;
+  bloName: string;
+  bloMobileNumber: string;
+  boothNumber: string | null;
+  manualBoothId: string | null;
+  voterMappingBoothId: string | null;
+  completionPercentage: number | null;
+  status: string;
+  updatedAt: Date | null;
+};
 
 export class DatabaseStorage implements IStorage {
   // Admin Roles
@@ -2573,59 +2595,149 @@ export class DatabaseStorage implements IStorage {
   }
 
   // BLA Master + Submissions
-  /** Re-attach submissions to new master rows after CSV replace (match mobile + booth). */
+  private pickBestBlaSubmissionCandidate(candidates: BlaSubmissionLinkRow[]): BlaSubmissionLinkRow | undefined {
+    if (candidates.length === 0) return undefined;
+    return [...candidates].sort((a, b) => {
+      const scoreDiff = blaSubmissionLinkScore(b) - blaSubmissionLinkScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return tb - ta;
+    })[0];
+  }
+
+  private collectBlaSubmissionCandidates(
+    byMobileBooth: Map<string, BlaSubmissionLinkRow[]>,
+    byNameBooth: Map<string, BlaSubmissionLinkRow[]>,
+    mobile: string,
+    booth: string,
+    masterName: string,
+  ): BlaSubmissionLinkRow[] {
+    const uniq = new Map<string, BlaSubmissionLinkRow>();
+    const add = (rows: BlaSubmissionLinkRow[]) => {
+      for (const r of rows) uniq.set(r.id, r);
+    };
+    add(byMobileBooth.get(`${mobile}:${booth}`) ?? []);
+    for (const [key, list] of Array.from(byMobileBooth.entries())) {
+      if (key.startsWith(`${mobile}:`)) add(list);
+    }
+    add(byNameBooth.get(`${normalizeBlaName(masterName)}:${booth}`) ?? []);
+    return Array.from(uniq.values());
+  }
+
+  /** Re-attach submissions to master rows (mobile, booth, or name; prefer complete). */
   private async relinkBlaSubmissionsToMasters(
     tx: Pick<typeof db, "select" | "update">,
     masters: BlaMaster[],
   ): Promise<number> {
     if (masters.length === 0) return 0;
 
-    const orphans = await tx
+    const masterIds = masters.map((m) => m.id);
+    await tx.update(blaSubmissions).set({ blaMasterId: null }).where(inArray(blaSubmissions.blaMasterId, masterIds));
+
+    const poolRows = await tx
       .select({
         id: blaSubmissions.id,
+        bloName: blaSubmissions.bloName,
         bloMobileNumber: blaSubmissions.bloMobileNumber,
         boothNumber: blaSubmissions.boothNumber,
         manualBoothId: blaSubmissions.manualBoothId,
         voterMappingBoothId: blaSubmissions.voterMappingBoothId,
+        completionPercentage: blaSubmissions.completionPercentage,
+        status: blaSubmissions.status,
         updatedAt: blaSubmissions.updatedAt,
       })
       .from(blaSubmissions)
       .where(isNull(blaSubmissions.blaMasterId));
 
-    const pool = new Map<string, typeof orphans>();
-    for (const o of orphans) {
+    const byMobileBooth = new Map<string, BlaSubmissionLinkRow[]>();
+    const byNameBooth = new Map<string, BlaSubmissionLinkRow[]>();
+    for (const o of poolRows) {
       const mobile = normalizeBlaMobile(o.bloMobileNumber);
-      if (mobile.length !== 10) continue;
-      const booth = normalizeBoothNumber(
-        o.boothNumber || o.manualBoothId || o.voterMappingBoothId || "",
-      );
-      const key = `${mobile}:${booth}`;
-      if (!pool.has(key)) pool.set(key, []);
-      pool.get(key)!.push(o);
-    }
-    for (const list of Array.from(pool.values())) {
-      list.sort((a: (typeof orphans)[0], b: (typeof orphans)[0]) => {
-        const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return tb - ta;
-      });
+      const booth = submissionBoothForMatch(o);
+      if (mobile.length === 10) {
+        const mKey = `${mobile}:${booth}`;
+        if (!byMobileBooth.has(mKey)) byMobileBooth.set(mKey, []);
+        byMobileBooth.get(mKey)!.push(o);
+      }
+      const nKey = `${normalizeBlaName(o.bloName)}:${booth}`;
+      if (!byNameBooth.has(nKey)) byNameBooth.set(nKey, []);
+      byNameBooth.get(nKey)!.push(o);
     }
 
+    const usedSubmissionIds = new Set<string>();
     let linked = 0;
     for (const m of masters) {
       const mobile = normalizeBlaMobile(m.mobileNumber);
-      if (mobile.length !== 10) continue;
       const booth = normalizeBoothNumber(m.boothNumber);
-      let candidates = pool.get(`${mobile}:${booth}`) ?? [];
-      if (candidates.length === 0) {
-        candidates = pool.get(`${mobile}:`) ?? [];
-      }
-      if (candidates.length === 0) continue;
-      const best = candidates.shift()!;
+      const candidates = this.collectBlaSubmissionCandidates(
+        byMobileBooth,
+        byNameBooth,
+        mobile,
+        booth,
+        m.name,
+      ).filter((c) => !usedSubmissionIds.has(c.id));
+      const best = this.pickBestBlaSubmissionCandidate(candidates);
+      if (!best) continue;
       await tx.update(blaSubmissions).set({ blaMasterId: m.id }).where(eq(blaSubmissions.id, best.id));
+      usedSubmissionIds.add(best.id);
       linked++;
     }
     return linked;
+  }
+
+  private async restoreBlaAttendanceAfterMasterReplace(
+    tx: Pick<typeof db, "insert" | "select">,
+    masters: BlaMaster[],
+    snapshots: {
+      bloMobileNumber: string;
+      boothNumber: string;
+      attendanceDate: string;
+      status: string;
+      appUserId: string;
+      bloName: string;
+    }[],
+  ): Promise<number> {
+    let restored = 0;
+    for (const snap of snapshots) {
+      const mobile = normalizeBlaMobile(snap.bloMobileNumber);
+      const booth = normalizeBoothNumber(snap.boothNumber);
+      let master =
+        masters.find(
+          (m) => normalizeBlaMobile(m.mobileNumber) === mobile && normalizeBoothNumber(m.boothNumber) === booth,
+        ) ??
+        masters.find((m) => normalizeBlaMobile(m.mobileNumber) === mobile) ??
+        masters.find(
+          (m) => normalizeBlaName(m.name) === normalizeBlaName(snap.bloName) && normalizeBoothNumber(m.boothNumber) === booth,
+        );
+      if (!master) continue;
+      const status = snap.status === "present" || snap.status === "absent" ? snap.status : "absent";
+      try {
+        await tx.insert(blaAttendance).values({
+          blaMasterId: master.id,
+          appUserId: snap.appUserId,
+          boothNumber: master.boothNumber,
+          bloName: master.name,
+          bloMobileNumber: master.mobileNumber,
+          attendanceDate: snap.attendanceDate.trim(),
+          status,
+        });
+        restored++;
+      } catch (e) {
+        const [existing] = await tx
+          .select({ id: blaAttendance.id })
+          .from(blaAttendance)
+          .where(
+            and(
+              eq(blaAttendance.blaMasterId, master.id),
+              eq(blaAttendance.attendanceDate, snap.attendanceDate.trim()),
+            ),
+          )
+          .limit(1);
+        if (existing) restored++;
+      }
+    }
+    return restored;
   }
 
   async replaceBlaMaster(rows: InsertBlaMaster[]): Promise<BlaMaster[]> {
@@ -2635,18 +2747,40 @@ export class DatabaseStorage implements IStorage {
       boothNumber: normalizeBoothNumber(r.boothNumber),
     }));
     return db.transaction(async (tx) => {
+      let attendanceSnapshots: {
+        bloMobileNumber: string;
+        boothNumber: string;
+        attendanceDate: string;
+        status: string;
+        appUserId: string;
+        bloName: string;
+      }[] = [];
       try {
+        attendanceSnapshots = await tx
+          .select({
+            bloMobileNumber: blaAttendance.bloMobileNumber,
+            boothNumber: blaAttendance.boothNumber,
+            attendanceDate: blaAttendance.attendanceDate,
+            status: blaAttendance.status,
+            appUserId: blaAttendance.appUserId,
+            bloName: blaAttendance.bloName,
+          })
+          .from(blaAttendance);
         await tx.delete(blaAttendance);
       } catch (e) {
-        console.warn("[BLA Master] bla_attendance clear skipped:", (e as Error).message);
+        console.warn("[BLA Master] bla_attendance snapshot skipped:", (e as Error).message);
       }
       await tx.update(blaSubmissions).set({ blaMasterId: null });
       await tx.delete(blaMaster);
       if (normalized.length === 0) return [];
       const inserted = await tx.insert(blaMaster).values(normalized).returning();
       const linked = await this.relinkBlaSubmissionsToMasters(tx, inserted);
+      const attRestored = await this.restoreBlaAttendanceAfterMasterReplace(tx, inserted, attendanceSnapshots);
       if (linked > 0) {
         console.log(`[BLA Master] Re-linked ${linked} submission(s) after CSV upload`);
+      }
+      if (attRestored > 0) {
+        console.log(`[BLA Master] Restored ${attRestored} attendance row(s) after CSV upload`);
       }
       return inserted;
     });
@@ -2736,20 +2870,32 @@ export class DatabaseStorage implements IStorage {
       console.warn("[BLA Master] submission status lookup skipped:", (e as Error).message);
     }
 
-    let attendanceRows: { blaMasterId: string; status: string }[] = [];
+    const boothNorm = normalizeBoothNumber(boothNumber);
+    const attByMaster = new Map<string, "present" | "absent">();
+    const attByMobile = new Map<string, "present" | "absent">();
     try {
-      attendanceRows = await db
+      const attendanceRows = await db
         .select({
           blaMasterId: blaAttendance.blaMasterId,
+          bloMobileNumber: blaAttendance.bloMobileNumber,
+          boothNumber: blaAttendance.boothNumber,
           status: blaAttendance.status,
         })
         .from(blaAttendance)
-        .where(
-          and(
-            inArray(blaAttendance.blaMasterId, masterIds),
-            eq(blaAttendance.attendanceDate, dateKey),
-          ),
-        );
+        .where(eq(blaAttendance.attendanceDate, dateKey));
+
+      for (const a of attendanceRows) {
+        const status =
+          a.status === "present" || a.status === "absent" ? (a.status as "present" | "absent") : null;
+        if (!status) continue;
+        if (masterIds.includes(a.blaMasterId)) {
+          attByMaster.set(a.blaMasterId, status);
+        }
+        if (normalizeBoothNumber(a.boothNumber) === boothNorm) {
+          const mob = normalizeBlaMobile(a.bloMobileNumber);
+          if (mob.length === 10) attByMobile.set(mob, status);
+        }
+      }
     } catch (e) {
       console.warn("[BLA Master] attendance lookup skipped:", (e as Error).message);
     }
@@ -2757,20 +2903,17 @@ export class DatabaseStorage implements IStorage {
     const subByMaster = new Map(
       subs.filter((s) => s.blaMasterId).map((s) => [s.blaMasterId!, s]),
     );
-    const attByMaster = new Map(
-      attendanceRows.map((a) => [
-        a.blaMasterId,
-        a.status === "present" || a.status === "absent" ? (a.status as "present" | "absent") : null,
-      ]),
-    );
     return masters.map((m) => {
       const sub = subByMaster.get(m.id);
+      const mobile = normalizeBlaMobile(m.mobileNumber);
+      const todayAttendance =
+        attByMaster.get(m.id) ?? (mobile.length === 10 ? attByMobile.get(mobile) : null) ?? null;
       return {
         ...m,
         completionPercentage: sub?.completionPercentage ?? 0,
         status: sub?.status ?? "incomplete",
         submissionId: sub?.id ?? null,
-        todayAttendance: attByMaster.get(m.id) ?? null,
+        todayAttendance,
       };
     });
   }
@@ -2843,6 +2986,39 @@ export class DatabaseStorage implements IStorage {
       .returning();
     await db.transaction(async (tx) => {
       await this.relinkBlaSubmissionsToMasters(tx, [row]);
+    });
+    return row;
+  }
+
+  async updateBlaMasterEntry(
+    id: string,
+    data: { name?: string; mobileNumber?: string; boothNumber?: string },
+  ): Promise<BlaMaster | undefined> {
+    const existing = await this.getBlaMasterById(id);
+    if (!existing) return undefined;
+
+    const patch: Partial<Pick<BlaMaster, "name" | "mobileNumber" | "boothNumber">> = {};
+    if (data.name?.trim()) patch.name = data.name.trim();
+    if (data.mobileNumber?.trim()) {
+      const mobile = normalizeBlaMobile(data.mobileNumber);
+      if (mobile.length !== 10) throw new Error("Invalid mobile number");
+      patch.mobileNumber = mobile;
+    }
+    if (data.boothNumber?.trim()) patch.boothNumber = normalizeBoothNumber(data.boothNumber);
+
+    if (Object.keys(patch).length === 0) return existing;
+
+    const [row] = await db.update(blaMaster).set(patch).where(eq(blaMaster.id, id)).returning();
+    await db.transaction(async (tx) => {
+      await this.relinkBlaSubmissionsToMasters(tx, [row]);
+      await tx
+        .update(blaAttendance)
+        .set({
+          bloName: row.name,
+          bloMobileNumber: row.mobileNumber,
+          boothNumber: row.boothNumber,
+        })
+        .where(eq(blaAttendance.blaMasterId, id));
     });
     return row;
   }
@@ -2978,19 +3154,22 @@ export class DatabaseStorage implements IStorage {
         .from(blaSubmissions)
         .where(isNull(blaSubmissions.blaMasterId))
         .orderBy(desc(blaSubmissions.updatedAt));
-      const match = orphans.find(
-        (o) =>
-          normalizeBlaMobile(o.bloMobileNumber) === mobile &&
-          normalizeBoothNumber(
-            o.boothNumber || o.manualBoothId || o.voterMappingBoothId || "",
-          ) === booth,
-      );
-      if (match) {
+      const bestOrphan = orphans
+        .filter((o) => {
+          const oMobile = normalizeBlaMobile(o.bloMobileNumber);
+          const oBooth = submissionBoothForMatch(o);
+          return (
+            (oMobile === mobile && (oBooth === booth || !oBooth)) ||
+            (normalizeBlaName(o.bloName) === normalizeBlaName(master.name) && oBooth === booth)
+          );
+        })
+        .sort((a, b) => blaSubmissionLinkScore(b) - blaSubmissionLinkScore(a))[0];
+      if (bestOrphan) {
         await db
           .update(blaSubmissions)
           .set({ blaMasterId: blaMasterId })
-          .where(eq(blaSubmissions.id, match.id));
-        const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, match.id)).limit(1);
+          .where(eq(blaSubmissions.id, bestOrphan.id));
+        const [row] = await db.select().from(blaSubmissions).where(eq(blaSubmissions.id, bestOrphan.id)).limit(1);
         return row;
       }
     } catch (e) {
