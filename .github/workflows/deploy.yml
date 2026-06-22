@@ -21,11 +21,9 @@ jobs:
       - name: Install, build, and pack release
         run: |
           npm ci
-          npm run build
+          NODE_ENV=production npm run build
           npm prune --omit=dev
           tar -czf release.tar.gz dist node_modules package.json package-lock.json ecosystem.config.cjs
-        env:
-          NODE_ENV: production
 
       - name: Upload release to EC2
         uses: appleboy/scp-action@v1.0.0
