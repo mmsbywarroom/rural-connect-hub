@@ -9,7 +9,35 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install, build, and pack release
+        run: |
+          npm ci
+          npm run build
+          npm prune --omit=dev
+          tar -czf release.tar.gz dist node_modules package.json package-lock.json ecosystem.config.cjs
+        env:
+          NODE_ENV: production
+
+      - name: Upload release to EC2
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: release.tar.gz
+          target: ${{ secrets.EC2_APP_PATH }}
+          overwrite: true
+
+      - name: Extract on EC2 and restart app
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -18,6 +46,11 @@ jobs:
           script_stop: true
           script: |
             cd "${{ secrets.EC2_APP_PATH }}"
-            git fetch origin main
-            git reset --hard origin/main
-            bash scripts/deploy.sh
+            tar -xzf release.tar.gz
+            rm -f release.tar.gz
+            if pm2 describe rural-connect-hub >/dev/null 2>&1; then
+              pm2 restart rural-connect-hub
+            else
+              pm2 start ecosystem.config.cjs
+            fi
+            pm2 save
