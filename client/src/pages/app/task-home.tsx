@@ -3,8 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, ArrowRight, Star, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle, Vote, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle, Vote, ExternalLink } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getProfileCompletion } from "@/lib/profile-completion";
@@ -159,34 +159,20 @@ function getFixedTaskLabel(slug: string, language: Language): string {
 }
 
 function CircularProgress({ percentage, size = 44 }: { percentage: number; size?: number }) {
-  const strokeWidth = 3.5;
+  const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percentage / 100) * circumference;
-  const isAbove90 = percentage >= 90;
-  const gradientId = "progress-gradient";
+  const complete = percentage >= 100;
 
   return (
     <svg width={size} height={size} className="transform -rotate-90">
-      <defs>
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor={isAbove90 ? "#34d399" : "#f87171"} />
-          <stop offset="100%" stopColor={isAbove90 ? "#22c55e" : "#ef4444"} />
-        </linearGradient>
-        <filter id="progress-glow">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
       <circle
         cx={size / 2}
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="rgba(255,255,255,0.15)"
+        stroke="rgba(255,255,255,0.2)"
         strokeWidth={strokeWidth}
       />
       <circle
@@ -194,15 +180,340 @@ function CircularProgress({ percentage, size = 44 }: { percentage: number; size?
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke={`url(#${gradientId})`}
+        stroke={complete ? "#86efac" : "#fde68a"}
         strokeWidth={strokeWidth}
         strokeDasharray={circumference}
         strokeDashoffset={offset}
         strokeLinecap="round"
-        filter="url(#progress-glow)"
-        className="transition-all duration-700 ease-out"
+        className="transition-all duration-500 ease-out"
       />
     </svg>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>;
+}
+
+function DashboardTaskCard({
+  href,
+  title,
+  description,
+  icon,
+  iconWrapClassName = "bg-blue-50 text-blue-700",
+  testId,
+  featured = false,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: ReactNode;
+  iconWrapClassName?: string;
+  testId?: string;
+  featured?: boolean;
+}) {
+  return (
+    <Link href={href}>
+      <Card
+        className={`group cursor-pointer border bg-white shadow-sm hover:shadow-md transition-all ${
+          featured ? "border-blue-200 ring-1 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+        }`}
+        data-testid={testId}
+      >
+        <CardContent className="p-3.5 flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${iconWrapClassName}`}>
+            {icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+            <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{description}</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 shrink-0" />
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function CategoryPickerItem({
+  selected,
+  onClick,
+  icon,
+  title,
+  subtitle,
+  testId,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left rounded-lg border transition-colors ${
+        selected ? "border-blue-600 bg-blue-50/60" : "border-slate-200 bg-white hover:bg-slate-50"
+      }`}
+      data-testid={testId}
+    >
+      <div className="p-3.5 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{subtitle}</p>
+        </div>
+        <ChevronRight className={`h-4 w-4 shrink-0 ${selected ? "text-blue-600" : "text-slate-400"}`} />
+      </div>
+    </button>
+  );
+}
+
+type FixedTaskMeta = {
+  href: string;
+  icon: ReactNode;
+  iconWrapClassName: string;
+  testId: string;
+  title: Record<Language, string>;
+  description: Record<Language, string>;
+};
+
+const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
+  "nasha-viruddh-yuddh": {
+    href: "/task/nasha-viruddh-yuddh",
+    icon: <ShieldAlert className="h-5 w-5" />,
+    iconWrapClassName: "bg-red-50 text-red-700",
+    testId: "task-card-nvy",
+    title: { en: "Nasha Viruddh Yuddh", hi: "नशा विरुद्ध युद्ध", pa: "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" },
+    description: {
+      en: "Secretly report locations where drug activity is happening",
+      hi: "जहां नशा हो रहा है उस स्थान की गुप्त रिपोर्टिंग",
+      pa: "ਜਿੱਥੇ ਨਸ਼ਾ ਚੱਲ ਰਿਹਾ ਹੈ ਉਸ ਥਾਂ ਦੀ ਗੁਪਤ ਰਿਪੋਰਟਿੰਗ",
+    },
+  },
+  "road-report": {
+    href: "/task/road-report",
+    icon: <RouteIcon className="h-5 w-5" />,
+    iconWrapClassName: "bg-blue-50 text-blue-700",
+    testId: "task-card-road",
+    title: { en: "Road Condition Report", hi: "सड़क खराबी सूचना", pa: "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" },
+    description: {
+      en: "Report damaged road stretch with photos, audio and map distance",
+      hi: "जहां सड़क टूटी या खराब है, वहां की शुरू से अंत तक की जानकारी भेजें",
+      pa: "ਜਿੱਥੇ ਸੜਕ ਟੁੱਟੀ ਜਾਂ ਖਰਾਬ ਹੈ, ਉੱਥੇ ਦੀ ਸ਼ੁਰੂ ਤੋਂ ਅੰਤ ਤੱਕ ਜਾਣਕਾਰੀ ਭੇਜੋ",
+    },
+  },
+  "harr-sirr-te-chatt": {
+    href: "/task/harr-sirr-te-chatt",
+    icon: <Home className="h-5 w-5" />,
+    iconWrapClassName: "bg-orange-50 text-orange-700",
+    testId: "task-card-hstc",
+    title: { en: "Harr Sirr te Chatt", hi: "हर सिर ते छत", pa: "ਹਰ ਸਿਰ ਤੇ ਛੱਤ" },
+    description: {
+      en: "Roof initiative for needy families",
+      hi: "जरूरतमंद परिवारों के लिए छत की पहल",
+      pa: "ਲੋੜਵੰਦ ਪਰਿਵਾਰਾਂ ਲਈ ਛੱਤ ਪਹਿਲਕਦਮੀ",
+    },
+  },
+  "sukh-dukh-saanjha-karo": {
+    href: "/task/sukh-dukh-saanjha-karo",
+    icon: <Heart className="h-5 w-5" />,
+    iconWrapClassName: "bg-purple-50 text-purple-700",
+    testId: "task-card-sdsk",
+    title: { en: "Sukh-Dukh Saanjha Karo", hi: "सुख-दुख सांझा करो", pa: "ਸੁਖ-ਦੁੱਖ ਸਾਂਝਾ ਕਰੋ" },
+    description: {
+      en: "Community welfare - share joy and sorrow",
+      hi: "समुदाय कल्याण - सुख और दुख साझा करें",
+      pa: "ਭਾਈਚਾਰਕ ਭਲਾਈ - ਸੁਖ ਅਤੇ ਦੁੱਖ ਸਾਂਝੇ ਕਰੋ",
+    },
+  },
+  sunwai: {
+    href: "/task/sunwai",
+    icon: <MessageSquare className="h-5 w-5" />,
+    iconWrapClassName: "bg-teal-50 text-teal-700",
+    testId: "task-card-sunwai",
+    title: { en: "Sunwai (Hearing)", hi: "सुनवाई", pa: "ਸੁਣਵਾਈ" },
+    description: {
+      en: "File complaints and track resolution",
+      hi: "शिकायत दर्ज करें और समाधान ट्रैक करें",
+      pa: "ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰੋ ਅਤੇ ਹੱਲ ਟ੍ਰੈਕ ਕਰੋ",
+    },
+  },
+  "outdoor-ad": {
+    href: "/task/outdoor-ad",
+    icon: <ImageIcon className="h-5 w-5" />,
+    iconWrapClassName: "bg-sky-50 text-sky-700",
+    testId: "task-card-outdoor-ad",
+    title: { en: "Outdoor Advertisement", hi: "आउटडोर विज्ञापन", pa: "ਆਊਟਡੋਰ ਇਸ਼ਤਿਹਾਰ" },
+    description: {
+      en: "Submit ad location details",
+      hi: "विज्ञापन स्थान विवरण जमा करें",
+      pa: "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ",
+    },
+  },
+  "gov-school": {
+    href: "/task/gov-school",
+    icon: <GraduationCap className="h-5 w-5" />,
+    iconWrapClassName: "bg-green-50 text-green-700",
+    testId: "task-card-gov-school",
+    title: { en: "Gov School Work", hi: "सरकारी स्कूल कार्य", pa: "ਸਰਕਾਰੀ ਸਕੂਲ ਕੰਮ" },
+    description: {
+      en: "Report government school issues",
+      hi: "सरकारी स्कूल की समस्याएं रिपोर्ट करें",
+      pa: "ਸਰਕਾਰੀ ਸਕੂਲ ਦੀਆਂ ਸਮੱਸਿਆਵਾਂ ਰਿਪੋਰਟ ਕਰੋ",
+    },
+  },
+  appointment: {
+    href: "/task/appointment",
+    icon: <CalendarCheck className="h-5 w-5" />,
+    iconWrapClassName: "bg-violet-50 text-violet-700",
+    testId: "task-card-appointment",
+    title: { en: "Appointment", hi: "मुलाकात", pa: "ਮੁਲਾਕਾਤ" },
+    description: {
+      en: "Request an appointment and track your scheduled meetings",
+      hi: "मुलाकात का अनुरोध करें और अपनी निर्धारित बैठकों को ट्रैक करें",
+      pa: "ਮੁਲਾਕਾਤ ਦੀ ਬੇਨਤੀ ਕਰੋ ਅਤੇ ਆਪਣੀਆਂ ਤਹਿ ਮੀਟਿੰਗਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ",
+    },
+  },
+  "event-venue": {
+    href: "/task/event-venue",
+    icon: <Building2 className="h-5 w-5" />,
+    iconWrapClassName: "bg-emerald-50 text-emerald-700",
+    testId: "task-card-event-venue",
+    title: { en: "Event Venues", hi: "इवेंट स्थल", pa: "ਇਵੈਂਟ ਸਥਾਨ" },
+    description: {
+      en: "Request booking for event venues with unit, date, time & map",
+      hi: "यूनिट चुनकर इवेंट स्थल की बुकिंग रिक्वेस्ट भेजें",
+      pa: "ਯੂਨਿਟ ਚੁਣ ਕੇ ਇਵੈਂਟ ਸਥਾਨ ਦੀ ਬੁਕਿੰਗ ਬੇਨਤੀ ਭੇਜੋ",
+    },
+  },
+  "tirth-yatra": {
+    href: "/task/tirth-yatra",
+    icon: <Users className="h-5 w-5" />,
+    iconWrapClassName: "bg-emerald-50 text-emerald-700",
+    testId: "task-card-tirth-yatra",
+    title: { en: "Tirth Yatra", hi: "तीर्थ यात्रा", pa: "ਤੀਰਥ ਯਾਤਰਾ" },
+    description: {
+      en: "Apply for pilgrimage journey with or without family",
+      hi: "तीर्थ यात्रा के लिए आवेदन करें (परिवार सहित या अकेले)",
+      pa: "ਤੀਰਥ ਯਾਤਰਾ ਲਈ ਅਰਜ਼ੀ ਦਿਓ (ਪਰਿਵਾਰ ਸਮੇਤ ਜਾਂ ਇਕੱਲੇ)",
+    },
+  },
+  "voter-registration": {
+    href: "/task/voter-registration",
+    icon: <Vote className="h-5 w-5" />,
+    iconWrapClassName: "bg-blue-50 text-blue-700",
+    testId: "task-card-voter-registration",
+    title: { en: "Voter Registration", hi: "मतदाता पंजीकरण", pa: "ਵੋਟਰ ਰਜਿਸਟ੍ਰੇਸ਼ਨ" },
+    description: {
+      en: "Personal details, address, document upload & OTP verification",
+      hi: "व्यक्तिगत जानकारी, पता, दस्तावेज़ अपलोड और OTP सत्यापन",
+      pa: "ਨਿੱਜੀ ਜਾਣਕਾਰੀ, ਪਤਾ, ਦਸਤਾਵੇਜ਼ ਅੱਪਲੋਡ ਅਤੇ OTP ਤਸਦੀਕ",
+    },
+  },
+  bla: {
+    href: "/task/bla",
+    icon: <Users className="h-5 w-5" />,
+    iconWrapClassName: "bg-indigo-50 text-indigo-700",
+    testId: "task-card-bla",
+    title: { en: "Booth Level Agent (BLA)", hi: "Booth Level Agent (BLA)", pa: "ਬੂਥ ਲੈਵਲ ਏਜੰਟ (BLA)" },
+    description: {
+      en: "Register BLAs by capturing Aadhaar & Voter Card and linking to booth",
+      hi: "BLO का Aadhaar और Voter Card लेकर Booth wise BLA register करें",
+      pa: "BLO ਦਾ ਆਧਾਰ ਅਤੇ ਵੋਟਰ ਕਾਰਡ ਲੈ ਕੇ ਬੂਥ ਵਾਇਜ਼ BLA ਰਜਿਸਟਰ ਕਰੋ",
+    },
+  },
+};
+
+function FixedTaskCard({ slug, language, featured = false }: { slug: string; language: Language; featured?: boolean }) {
+  const meta = FIXED_TASK_META[slug];
+  if (!meta) return null;
+  return (
+    <DashboardTaskCard
+      href={meta.href}
+      title={meta.title[language]}
+      description={meta.description[language]}
+      icon={meta.icon}
+      iconWrapClassName={meta.iconWrapClassName}
+      testId={meta.testId}
+      featured={featured}
+    />
+  );
+}
+
+function LeaderboardMiniCard({
+  href,
+  title,
+  emptyLabel,
+  icon,
+  iconWrapClassName,
+  entries,
+  userId,
+  testId,
+  entryTestIdPrefix,
+  scoreClassName = "text-slate-600",
+}: {
+  href: string;
+  title: string;
+  emptyLabel: string;
+  icon: ReactNode;
+  iconWrapClassName: string;
+  entries: LeaderboardEntry[];
+  userId: string;
+  testId: string;
+  entryTestIdPrefix: string;
+  scoreClassName?: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-full" data-testid={testId}>
+        <CardContent className="p-3.5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconWrapClassName}`}>
+              {icon}
+            </div>
+            <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+          </div>
+          {entries.length > 0 ? (
+            <div className="space-y-1.5">
+              {entries.map((entry, i) => {
+                const isMe = entry.userId === userId;
+                const rankIcon =
+                  i === 0 ? (
+                    <Crown className="h-3 w-3 text-amber-500" />
+                  ) : (
+                    <Medal className={`h-3 w-3 ${i === 1 ? "text-slate-400" : "text-amber-600"}`} />
+                  );
+                return (
+                  <div
+                    key={entry.userId}
+                    className={`flex items-center gap-2 rounded-md px-2 py-1 ${isMe ? "bg-blue-50" : "bg-slate-50"}`}
+                    data-testid={`${entryTestIdPrefix}-${i + 1}`}
+                  >
+                    {rankIcon}
+                    <Avatar className="w-5 h-5">
+                      {entry.hasPhoto ? (
+                        <AvatarImage src={photoUrl(entry.userId)} />
+                      ) : (
+                        <AvatarFallback className="bg-slate-200 text-slate-600 text-[8px]">{entry.name.charAt(0)}</AvatarFallback>
+                      )}
+                    </Avatar>
+                    <span className="text-[10px] font-medium text-slate-700 truncate flex-1">{entry.name.split(" ")[0]}</span>
+                    <span className={`text-[10px] font-semibold ${scoreClassName}`}>{entry.count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">{emptyLabel}</p>
+          )}
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
@@ -220,7 +531,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
       : t("volunteer");
   const completion = getProfileCompletion(user);
   const isComplete = completion.percentage === 100;
-  const isAbove90 = completion.percentage >= 90;
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
@@ -234,11 +544,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
-  });
-
-  const { data: submissionCounts } = useQuery<Record<string, number>>({
-    queryKey: ["/api/app/my-submissions", user.id],
-    enabled: !!user.id,
   });
 
   const { data: leaderboardData } = useQuery<LeaderboardData>({
@@ -283,345 +588,27 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
     const hasDynamic = dynamicTasks.length > 0;
     return (
       <>
-        {fixedSlugsFiltered.includes("nasha-viruddh-yuddh") && (
-        <Link href="/task/nasha-viruddh-yuddh">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-red-200 hover:shadow-md transition-all duration-200" data-testid="task-card-nvy">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-red-600 to-rose-600 shadow-sm">
-                <ShieldAlert className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "नशा विरुद्ध युद्ध" : language === "pa" ? "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" : "Nasha Viruddh Yuddh"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "जहां नशा हो रहा है उस स्थान की गुप्त रिपोर्टिंग"
-                    : language === "pa"
-                    ? "ਜਿੱਥੇ ਨਸ਼ਾ ਚੱਲ ਰਿਹਾ ਹੈ ਉਸ ਥਾਂ ਦੀ ਗੁਪਤ ਰਿਪੋਰਟਿੰਗ"
-                    : "Secretly report locations where drug activity is happening"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-red-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("road-report") && (
-        <Link href="/task/road-report">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-road">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-600 to-sky-500 shadow-sm">
-                <RouteIcon className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "सड़क खराबी सूचना" : language === "pa" ? "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" : "Road Condition Report"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "जहां सड़क टूटी या खराब है, वहां की शुरू से अंत तक की जानकारी भेजें"
-                    : language === "pa"
-                    ? "ਜਿੱਥੇ ਸੜਕ ਟੁੱਟੀ ਜਾਂ ਖਰਾਬ ਹੈ, ਉੱਥੇ ਦੀ ਸ਼ੁਰੂ ਤੋਂ ਅੰਤ ਤੱਕ ਜਾਣਕਾਰੀ ਭੇਜੋ"
-                    : "Report damaged road stretch with photos, audio and map distance"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-blue-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("harr-sirr-te-chatt") && (
-        <Link href="/task/harr-sirr-te-chatt">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-orange-200 hover:shadow-md transition-all duration-200" data-testid="task-card-hstc">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-orange-500 to-red-500 shadow-sm">
-                <Home className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "हर सिर ते छत" : language === "pa" ? "ਹਰ ਸਿਰ ਤੇ ਛੱਤ" : "Harr Sirr te Chatt"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "जरूरतमंद परिवारों के लिए छत की पहल" : language === "pa" ? "ਲੋੜਵੰਦ ਪਰਿਵਾਰਾਂ ਲਈ ਛੱਤ ਪਹਿਲਕਦਮੀ" : "Roof initiative for needy families"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-orange-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("sukh-dukh-saanjha-karo") && (
-        <Link href="/task/sukh-dukh-saanjha-karo">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sdsk">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-pink-500 shadow-sm">
-                <Heart className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "सुख-दुख सांझा करो" : language === "pa" ? "ਸੁਖ-ਦੁੱਖ ਸਾਂਝਾ ਕਰੋ" : "Sukh-Dukh Saanjha Karo"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "समुदाय कल्याण - सुख और दुख साझा करें" : language === "pa" ? "ਭਾਈਚਾਰਕ ਭਲਾਈ - ਸੁਖ ਅਤੇ ਦੁੱਖ ਸਾਂਝੇ ਕਰੋ" : "Community welfare - share joy and sorrow"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-purple-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("sunwai") && (
-        <Link href="/task/sunwai">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-teal-200 hover:shadow-md transition-all duration-200" data-testid="task-card-sunwai">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-teal-500 to-cyan-600 shadow-sm">
-                <MessageSquare className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "सुनवाई" : language === "pa" ? "ਸੁਣਵਾਈ" : "Sunwai (Hearing)"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "शिकायत दर्ज करें और समाधान ट्रैक करें" : language === "pa" ? "ਸ਼ਿਕਾਇਤ ਦਰਜ ਕਰੋ ਅਤੇ ਹੱਲ ਟ੍ਰੈਕ ਕਰੋ" : "File complaints and track resolution"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-teal-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("outdoor-ad") && (
-        <Link href="/task/outdoor-ad">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-outdoor-ad">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm">
-                <ImageIcon className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "आउटडोर विज्ञापन" : language === "pa" ? "ਆਊਟਡੋਰ ਇਸ਼ਤਿਹਾਰ" : "Outdoor Advertisement"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "विज्ञापन स्थान विवरण जमा करें" : language === "pa" ? "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ" : "Submit ad location details"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-blue-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("gov-school") && (
-        <Link href="/task/gov-school">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-green-200 hover:shadow-md transition-all duration-200" data-testid="task-card-gov-school">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-green-500 to-emerald-600 shadow-sm">
-                <GraduationCap className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "सरकारी स्कूल कार्य" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਕੰਮ" : "Gov School Work"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "सरकारी स्कूल की समस्याएं रिपोर्ट करें" : language === "pa" ? "ਸਰਕਾਰੀ ਸਕੂਲ ਦੀਆਂ ਸਮੱਸਿਆਵਾਂ ਰਿਪੋਰਟ ਕਰੋ" : "Report government school issues"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-green-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("appointment") && (
-        <Link href="/task/appointment">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-appointment">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-500 to-indigo-600 shadow-sm">
-                <CalendarCheck className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "मुलाकात" : language === "pa" ? "ਮੁਲਾਕਾਤ" : "Appointment"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "मुलाकात का अनुरोध करें और अपनी निर्धारित बैठकों को ट्रैक करें" : language === "pa" ? "ਮੁਲਾਕਾਤ ਦੀ ਬੇਨਤੀ ਕਰੋ ਅਤੇ ਆਪਣੀਆਂ ਤਹਿ ਮੀਟਿੰਗਾਂ ਨੂੰ ਟਰੈਕ ਕਰੋ" : "Request an appointment and track your scheduled meetings"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-purple-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("event-venue") && (
-        <Link href="/task/event-venue">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200" data-testid="task-card-event-venue">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "इवेंट स्थल" : language === "pa" ? "ਇਵੈਂਟ ਸਥਾਨ" : "Event Venues"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "यूनिट चुनकर इवेंट स्थल की बुकिंग रिक्वेस्ट भेजें"
-                    : language === "pa"
-                    ? "ਯੂਨਿਟ ਚੁਣ ਕੇ ਇਵੈਂਟ ਸਥਾਨ ਦੀ ਬੁਕਿੰਗ ਬੇਨਤੀ ਭੇਜੋ"
-                    : "Request booking for event venues with unit, date, time & map"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("tirth-yatra") && (
-        <Link href="/task/tirth-yatra">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md transition-all duration-200" data-testid="task-card-tirth-yatra">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-600 to-teal-700 shadow-sm">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "तीर्थ यात्रा" : language === "pa" ? "ਤੀਰਥ ਯਾਤਰਾ" : "Tirth Yatra"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "तीर्थ यात्रा के लिए आवेदन करें (परिवार सहित या अकेले)"
-                    : language === "pa"
-                    ? "ਤੀਰਥ ਯਾਤਰਾ ਲਈ ਅਰਜ਼ੀ ਦਿਓ (ਪਰਿਵਾਰ ਸਮੇਤ ਜਾਂ ਇਕੱਲੇ)"
-                    : "Apply for pilgrimage journey with or without family"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("voter-registration") && (
-        <Link href="/task/voter-registration">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid="task-card-voter-registration">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-cyan-600 shadow-sm">
-                <Vote className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "मतदाता पंजीकरण" : language === "pa" ? "ਵੋਟਰ ਰਜਿਸਟ੍ਰੇਸ਼ਨ" : "Voter Registration"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi" ? "व्यक्तिगत जानकारी, पता, दस्तावेज़ अपलोड और OTP सत्यापन" : language === "pa" ? "ਨਿੱਜੀ ਜਾਣਕਾਰੀ, ਪਤਾ, ਦਸਤਾਵੇਜ਼ ਅੱਪਲੋਡ ਅਤੇ OTP ਤਸਦੀਕ" : "Personal details, address, document upload & OTP verification"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-blue-500" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
-        {fixedSlugsFiltered.includes("bla") && (
-        <Link href="/task/bla">
-          <Card className="group cursor-pointer bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200" data-testid="task-card-bla">
-            <CardContent className="p-4 flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-600 to-blue-600 shadow-sm">
-                <Users className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm text-slate-800">
-                  {language === "hi" ? "Booth Level Agent (BLA)" : language === "pa" ? "Booth Level Agent (BLA)" : "Booth Level Agent (BLA)"}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                  {language === "hi"
-                    ? "BLO का Aadhaar और Voter Card लेकर Booth wise BLA register करें"
-                    : language === "pa"
-                    ? "BLO ਦਾ ਆਧਾਰ ਅਤੇ ਵੋਟਰ ਕਾਰਡ ਲੈ ਕੇ ਬੂਥ ਵਾਇਜ਼ BLA ਰਜਿਸਟਰ ਕਰੋ"
-                    : "Register BLAs by capturing Aadhaar & Voter Card and linking to booth"}
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                  <ChevronRight className="h-4 w-4 text-indigo-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-        )}
+        {fixedSlugsFiltered.map((slug) => (
+          <FixedTaskCard key={slug} slug={slug} language={language} />
+        ))}
         {isLoading && (
           <>
-            <Skeleton className="h-[72px] w-full rounded-xl" />
-            <Skeleton className="h-[72px] w-full rounded-xl" />
+            <Skeleton className="h-[68px] w-full rounded-lg" />
+            <Skeleton className="h-[68px] w-full rounded-lg" />
           </>
         )}
         {dynamicTasks.map((task) => {
           const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
-          const count = submissionCounts?.[task.id] || 0;
           return (
-            <Link key={task.id} href={getTaskRoute(task)}>
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid={`task-card-${task.id}`}>
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                    style={{ background: `linear-gradient(135deg, ${task.color || "#3b82f6"}, ${task.color || "#3b82f6"}dd)` }}
-                  >
-                    <IconComponent className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, task)}</h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, task)}</p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-blue-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            <DashboardTaskCard
+              key={task.id}
+              href={getTaskRoute(task)}
+              title={getTaskName(language, task)}
+              description={getTaskDesc(language, task)}
+              icon={<IconComponent className="h-5 w-5" />}
+              iconWrapClassName="bg-blue-50 text-blue-700"
+              testId={`task-card-${task.id}`}
+            />
           );
         })}
         {!isLoading && !hasFixed && !hasDynamic && (
@@ -649,143 +636,120 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   })();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 pt-5 pb-6 shadow-lg relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-white rounded-full" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white rounded-full" />
-        </div>
-        <div className="relative flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-12 h-12 min-w-[48px] min-h-[48px] max-w-[48px] max-h-[48px] border-2 border-white/30 shadow-md overflow-hidden">
-              {user.selfPhoto ? <AvatarImage src={user.selfPhoto} className="object-cover w-full h-full" /> : <AvatarFallback className="bg-white/20 text-white text-lg font-bold">{user.name.charAt(0)}</AvatarFallback>}
-            </Avatar>
-            <div>
-              <h1 className="font-bold text-lg leading-tight flex items-center gap-1.5" data-testid="text-user-name">
-                {user.name}
-                {user.isApproved && (
-                  <BadgeCheck className="h-4.5 w-4.5 text-amber-300 flex-shrink-0" data-testid="badge-verified-tick" />
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-slate-900 text-white">
+        <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" onClick={onProfile} className="flex items-center gap-3 min-w-0 text-left">
+              <Avatar className="w-11 h-11 border border-white/20 shrink-0">
+                {user.selfPhoto ? (
+                  <AvatarImage src={user.selfPhoto} className="object-cover" />
+                ) : (
+                  <AvatarFallback className="bg-slate-700 text-white text-base font-semibold">
+                    {user.name.charAt(0)}
+                  </AvatarFallback>
                 )}
-              </h1>
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <Badge variant="secondary" className="bg-white/15 text-white/90 text-[10px] px-2 border-0 backdrop-blur-sm" data-testid="text-user-role">{roleLabel}</Badge>
-                {user.mappedAreaName && <span className="text-xs text-white/70" data-testid="text-user-area">{user.mappedAreaName}</span>}
+              </Avatar>
+              <div className="min-w-0">
+                <h1 className="font-semibold text-base leading-tight truncate flex items-center gap-1" data-testid="text-user-name">
+                  {user.name}
+                  {user.isApproved && (
+                    <BadgeCheck className="h-4 w-4 text-amber-400 shrink-0" data-testid="badge-verified-tick" />
+                  )}
+                </h1>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/90" data-testid="text-user-role">
+                    {roleLabel}
+                  </span>
+                  {user.mappedAreaName && (
+                    <span className="text-xs text-slate-300 truncate" data-testid="text-user-area">
+                      {user.mappedAreaName}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={onProfile}
-              className="relative flex items-center justify-center"
-              data-testid="button-profile-completion"
-              style={{ width: 52, height: 52 }}
-            >
-              {!isAbove90 && (
-                <span className="absolute inset-0 rounded-full animate-ping-slow opacity-40" style={{ border: '2px solid #ef4444' }} />
-              )}
-              <span className={`absolute inset-0 rounded-full ${isAbove90 ? 'bg-green-500/20' : 'bg-red-500/15 animate-pulse-soft'}`} />
-              <CircularProgress percentage={completion.percentage} size={44} />
-              <span className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-[11px] font-bold ${isAbove90 ? 'text-green-300' : 'text-red-400 animate-blink'}`} style={{ textShadow: '0 0 8px rgba(0,0,0,0.3)' }}>
+            </button>
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                onClick={onProfile}
+                className="relative flex items-center justify-center w-10 h-10"
+                data-testid="button-profile-completion"
+              >
+                <CircularProgress percentage={completion.percentage} size={36} />
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white">
                   {completion.percentage}%
                 </span>
-              </span>
-              {!isAbove90 && (
-                <span className="absolute -top-0.5 -right-0.5">
-                  <Star className="h-3.5 w-3.5 text-red-400 animate-twinkle fill-red-400" />
-                </span>
-              )}
-            </button>
-            <Link href="/chat">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" data-testid="button-chat">
-                <MessageCircle className="h-5 w-5" />
+              </button>
+              <Link href="/chat">
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-9 w-9" data-testid="button-chat">
+                  <MessageCircle className="h-4.5 w-4.5" />
+                </Button>
+              </Link>
+              <LanguageSwitcher variant="ghost" className="text-white" iconClassName="text-white" />
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-9 w-9" onClick={onLogout} data-testid="button-logout">
+                <LogOut className="h-4.5 w-4.5" />
               </Button>
-            </Link>
-            <LanguageSwitcher variant="ghost" className="text-white" iconClassName="text-white" />
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onLogout} data-testid="button-logout">
-              <LogOut className="h-5 w-5" />
-            </Button>
+            </div>
           </div>
-        </div>
-        <div className="relative mt-4">
           <a
             href={MSRP_PUNJAB_VMAP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="block"
+            className="mt-4 block"
             data-testid="link-msrp-punjab-vmap"
           >
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full bg-white/95 text-slate-800 hover:bg-white shadow-md border-0 font-semibold gap-2"
-            >
-              <MapPin className="h-4 w-4 shrink-0 text-indigo-600" />
-              <span className="flex-1 text-left truncate">
-                {language === "hi"
-                  ? "मतदाता मैपिंग"
-                  : language === "pa"
-                  ? "ਵੋਟਰ ਮੈਪਿੰਗ"
-                  : "Voter Mapping"}
+            <div className="flex items-center gap-2 rounded-lg bg-white text-slate-800 px-3 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">
+              <MapPin className="h-4 w-4 shrink-0 text-blue-600" />
+              <span className="flex-1 truncate">
+                {language === "hi" ? "मतदाता मैपिंग" : language === "pa" ? "ਵੋਟਰ ਮੈਪਿੰਗ" : "Voter Mapping"}
               </span>
-              <ExternalLink className="h-4 w-4 shrink-0 text-slate-500" />
-            </Button>
+              <ExternalLink className="h-4 w-4 shrink-0 text-slate-400" />
+            </div>
           </a>
         </div>
       </header>
 
+      <div className="max-w-lg mx-auto px-4 pb-8">
       {!isComplete && (
-        <div className="px-4 -mt-3 relative z-10">
+        <div className="pt-4">
           <button
             onClick={onProfile}
-            className="w-full bg-white rounded-xl shadow-md px-4 py-3 flex items-center gap-3 text-left group border border-slate-100 hover:shadow-lg transition-shadow"
+            className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3 flex items-center gap-3 text-left hover:bg-amber-100/80 transition-colors"
             data-testid="button-profile-banner"
           >
-            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-              <Sparkles className="h-5 w-5 text-white" />
+            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 text-amber-700" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800 leading-tight">
-                {t('completeProfile')}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {completion.filledCount} {t('of')} {completion.totalCount} {t('fieldsDone')} &middot; {completion.missingFields.length} {t('remaining')}
+              <p className="text-sm font-medium text-slate-900">{t("completeProfile")}</p>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {completion.filledCount} {t("of")} {completion.totalCount} {t("fieldsDone")}
               </p>
             </div>
-            <div className="flex-shrink-0">
-              <div className="relative w-10 h-10">
-                <svg width="40" height="40" className="transform -rotate-90">
-                  <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" strokeWidth="3" />
-                  <circle cx="20" cy="20" r="16" fill="none" stroke={isAbove90 ? "#22c55e" : "#f59e0b"} strokeWidth="3"
-                    strokeDasharray={100.5} strokeDashoffset={100.5 - (completion.percentage / 100) * 100.5} strokeLinecap="round" />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">{completion.percentage}%</span>
-              </div>
-            </div>
+            <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-1 rounded-full">
+              {completion.percentage}%
+            </span>
           </button>
         </div>
       )}
 
-      <div className={`px-4 ${!isComplete ? 'pt-4' : 'pt-5'} pb-6 space-y-5`}>
+      <div className={`space-y-6 ${!isComplete ? "pt-4" : "pt-5"}`}>
 
         {!isMahilaSakhi && activeSurveys && activeSurveys.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-3">
-              <ClipboardCheck className="h-4 w-4 text-emerald-600" />
-              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                {language === "hi" ? "सर्वेक्षण" : language === "pa" ? "ਸਰਵੇਖਣ" : "Pending Surveys"}
-              </h2>
-            </div>
-            <div className="space-y-2.5">
+            <SectionTitle
+              title={language === "hi" ? "सर्वेक्षण" : language === "pa" ? "ਸਰਵੇਖਣ" : "Pending Surveys"}
+            />
+            <div className="space-y-2">
               {activeSurveys.map((survey) => (
                 <Link key={survey.id} href={`/survey/${survey.id}`}>
-                  <Card className="group cursor-pointer border-emerald-100 bg-white hover:border-emerald-300 hover:shadow-md transition-all duration-200" data-testid={`survey-card-${survey.id}`}>
-                    <CardContent className="p-4 flex items-center gap-3.5">
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
-                        <ClipboardCheck className="h-5 w-5 text-white" />
+                  <Card className="border border-emerald-200 bg-white shadow-sm hover:shadow-md transition-shadow" data-testid={`survey-card-${survey.id}`}>
+                    <CardContent className="p-3.5 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                        <ClipboardCheck className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-slate-800 leading-tight">
+                        <h3 className="font-medium text-sm text-slate-900 leading-tight">
                           {getLocalizedText(language, survey.title, survey.titleHi || undefined, survey.titlePa || undefined)}
                         </h3>
                         {survey.description && (
@@ -797,11 +761,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                           {survey.questions?.length || 0} {language === "hi" ? "प्रश्न" : language === "pa" ? "ਸਵਾਲ" : "questions"}
                         </Badge>
                       </div>
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                          <ArrowRight className="h-4 w-4 text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
-                        </div>
-                      </div>
+                      <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
                     </CardContent>
                   </Card>
                 </Link>
@@ -813,172 +773,67 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
         {!isMahilaSakhi && (
         <section>
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/leaderboard">
-              <Card className="cursor-pointer bg-gradient-to-br from-indigo-500 to-purple-600 border-0 text-white hover:shadow-lg transition-shadow h-full" data-testid="card-leaderboard">
-                <CardContent className="p-3.5">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <Trophy className="h-4.5 w-4.5 text-yellow-300" />
-                    <h3 className="font-semibold text-sm text-white">
-                      {language === "hi" ? "लीडरबोर्ड" : language === "pa" ? "ਲੀਡਰਬੋਰਡ" : "Leaderboard"}
-                    </h3>
-                  </div>
-                  {overallTop3.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {overallTop3.slice(0, 3).map((entry, i) => {
-                        const isMe = entry.userId === user.id;
-                        const rankIcon = i === 0 ? <Crown className="h-3 w-3 text-yellow-300" /> : i === 1 ? <Medal className="h-3 w-3 text-gray-300" /> : <Medal className="h-3 w-3 text-amber-600" />;
-                        return (
-                          <div key={entry.userId} className={`flex items-center gap-2 ${isMe ? 'bg-white/15' : 'bg-white/5'} rounded-lg px-2 py-1`} data-testid={`dashboard-top-${i + 1}`}>
-                            {rankIcon}
-                            <Avatar className="w-5 h-5">
-                              {entry.hasPhoto ? <AvatarImage src={photoUrl(entry.userId)} /> : <AvatarFallback className="bg-white/20 text-white text-[8px]">{entry.name.charAt(0)}</AvatarFallback>}
-                            </Avatar>
-                            <span className="text-[10px] font-medium truncate flex-1">{entry.name.split(" ")[0]}</span>
-                            <span className="text-[10px] font-bold text-yellow-300">{entry.count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-white/60">
-                      {language === "hi" ? "रैंकिंग देखें" : language === "pa" ? "ਰੈਂਕਿੰਗ ਵੇਖੋ" : "View rankings"}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/survey-leaderboard">
-              <Card className="cursor-pointer bg-gradient-to-br from-emerald-500 to-teal-600 border-0 text-white hover:shadow-lg transition-shadow h-full" data-testid="card-survey-leaderboard">
-                <CardContent className="p-3.5">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <ClipboardCheck className="h-4.5 w-4.5 text-emerald-200" />
-                    <h3 className="font-semibold text-sm text-white">
-                      {language === "hi" ? "सर्वे बोर्ड" : language === "pa" ? "ਸਰਵੇ ਬੋਰਡ" : "Survey Board"}
-                    </h3>
-                  </div>
-                  {surveyTop3.length > 0 ? (
-                    <div className="space-y-1.5">
-                      {surveyTop3.map((entry, i) => {
-                        const isMe = entry.userId === user.id;
-                        const rankIcon = i === 0 ? <Crown className="h-3 w-3 text-yellow-300" /> : i === 1 ? <Medal className="h-3 w-3 text-gray-300" /> : <Medal className="h-3 w-3 text-amber-600" />;
-                        return (
-                          <div key={entry.userId} className={`flex items-center gap-2 ${isMe ? 'bg-white/15' : 'bg-white/5'} rounded-lg px-2 py-1`} data-testid={`survey-top-${i + 1}`}>
-                            {rankIcon}
-                            <Avatar className="w-5 h-5">
-                              {entry.hasPhoto ? <AvatarImage src={photoUrl(entry.userId)} /> : <AvatarFallback className="bg-white/20 text-white text-[8px]">{entry.name.charAt(0)}</AvatarFallback>}
-                            </Avatar>
-                            <span className="text-[10px] font-medium truncate flex-1">{entry.name.split(" ")[0]}</span>
-                            <span className="text-[10px] font-bold text-emerald-200">{entry.count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-white/60">
-                      {language === "hi" ? "सर्वे रैंकिंग" : language === "pa" ? "ਸਰਵੇ ਰੈਂਕਿੰਗ" : "Survey rankings"}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </Link>
+            <LeaderboardMiniCard
+              href="/leaderboard"
+              title={language === "hi" ? "लीडरबोर्ड" : language === "pa" ? "ਲੀਡਰਬੋਰਡ" : "Leaderboard"}
+              emptyLabel={language === "hi" ? "रैंकिंग देखें" : language === "pa" ? "ਰੈਂਕਿੰਗ ਵੇਖੋ" : "View rankings"}
+              icon={<Trophy className="h-4 w-4" />}
+              iconWrapClassName="bg-amber-50 text-amber-600"
+              entries={overallTop3}
+              userId={user.id}
+              testId="card-leaderboard"
+              entryTestIdPrefix="dashboard-top"
+              scoreClassName="text-amber-700"
+            />
+            <LeaderboardMiniCard
+              href="/survey-leaderboard"
+              title={language === "hi" ? "सर्वे बोर्ड" : language === "pa" ? "ਸਰਵੇ ਬੋਰਡ" : "Survey Board"}
+              emptyLabel={language === "hi" ? "सर्वे रैंकिंग" : language === "pa" ? "ਸਰਵੇ ਰੈਂਕਿੰਗ" : "Survey rankings"}
+              icon={<ClipboardCheck className="h-4 w-4" />}
+              iconWrapClassName="bg-emerald-50 text-emerald-600"
+              entries={surveyTop3}
+              userId={user.id}
+              testId="card-survey-leaderboard"
+              entryTestIdPrefix="survey-top"
+              scoreClassName="text-emerald-700"
+            />
           </div>
         </section>
         )}
 
         <section>
-          <div className="flex items-center gap-2 mb-3">
-            <ClipboardList className="h-4 w-4 text-blue-600" />
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('availableTasks')}</h2>
-          </div>
+          <SectionTitle title={t("availableTasks")} />
 
-          <div className="space-y-2.5">
+          <div className="space-y-2">
           {volunteerMappingTask && (() => {
             const VmIcon = iconMap[volunteerMappingTask.icon || "Users"] || Users;
             return (
-          <Link href="/task/volunteer-mapping">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-blue-100" data-testid="task-card-volunteer-mapping-priority">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                  style={{ background: `linear-gradient(135deg, ${volunteerMappingTask.color || "#3b82f6"}, ${volunteerMappingTask.color || "#3b82f6"}dd)` }}
-                >
-                  <VmIcon className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {getTaskName(language, volunteerMappingTask)}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {getTaskDesc(language, volunteerMappingTask)}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+              <DashboardTaskCard
+                href="/task/volunteer-mapping"
+                title={getTaskName(language, volunteerMappingTask)}
+                description={getTaskDesc(language, volunteerMappingTask)}
+                icon={<VmIcon className="h-5 w-5" />}
+                iconWrapClassName="bg-blue-50 text-blue-700"
+                testId="task-card-volunteer-mapping-priority"
+                featured
+              />
             );
           })()}
 
-          <Link href="/task/outdoor-ad">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-sky-100" data-testid="task-card-outdoor-ad-priority">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm">
-                  <ImageIcon className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {getFixedTaskLabel("outdoor-ad", language)}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi" ? "विज्ञापन स्थान विवरण जमा करें" : language === "pa" ? "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ" : "Submit ad location details"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <FixedTaskCard slug="outdoor-ad" language={language} featured />
 
           {!isMahilaSakhi && categories && categories.length > 0 && (
             <>
-              {/* All – task list sirf iske niche jab All selected ho */}
-              <div className="space-y-2.5">
-                <button
-                  type="button"
+              <div className="space-y-2">
+                <CategoryPickerItem
+                  selected={selectedCategoryId === null}
                   onClick={() => setSelectedCategoryId(null)}
-                  className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${selectedCategoryId === null ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
-                >
-                  <Card className="border-0 shadow-none">
-                    <CardContent className="p-4 flex items-center gap-3.5">
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-slate-500 to-slate-600 shadow-sm">
-                        <LayoutGrid className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-slate-800">
-                          {language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
-                        </h3>
-                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                          {language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedCategoryId === null ? "bg-blue-100" : "bg-slate-100"}`}>
-                          <ChevronRight className={`h-4 w-4 ${selectedCategoryId === null ? "text-blue-500" : "text-slate-500"}`} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </button>
+                  icon={<LayoutGrid className="h-5 w-5" />}
+                  title={language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
+                  subtitle={language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
+                />
                 {selectedCategoryId === null && (
-                  <div className="pl-0 space-y-2.5">
+                  <div className="space-y-2">
                     {renderTaskList(
                       filterCategoryFixedSlugs(uncategorizedFixedSlugs),
                       filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
@@ -987,7 +842,6 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 )}
               </div>
 
-              {/* Har category – task list sirf us category ke niche jab woh selected ho */}
               {categories.map((cat) => {
                 const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
                 const isSelected = selectedCategoryId === cat.id;
@@ -1005,33 +859,16 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                     ? "ਇਸ ਸ਼੍ਰੇਣੀ ਦੇ ਕੰਮ"
                     : "Tasks in this category";
                 return (
-                  <div key={cat.id} className="space-y-2.5">
-                    <button
-                      type="button"
+                  <div key={cat.id} className="space-y-2">
+                    <CategoryPickerItem
+                      selected={isSelected}
                       onClick={() => setSelectedCategoryId(cat.id)}
-                      className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${isSelected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"}`}
-                    >
-                      <Card className="border-0 shadow-none">
-                        <CardContent className="p-4 flex items-center gap-3.5">
-                          <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm">
-                            <FolderTree className="h-5 w-5 text-white" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm text-slate-800">{label}</h3>
-                            <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                              {hintText}
-                            </p>
-                          </div>
-                          <div className="flex-shrink-0">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
-                              <ChevronRight className={`h-4 w-4 ${isSelected ? "text-blue-500" : "text-slate-500"}`} />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </button>
+                      icon={<FolderTree className="h-5 w-5" />}
+                      title={label}
+                      subtitle={hintText}
+                    />
                     {isSelected && (
-                      <div className="pl-0 space-y-2.5">
+                      <div className="space-y-2">
                         {renderTaskList(catSlugs, catTasks)}
                       </div>
                     )}
@@ -1047,92 +884,63 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
             )}
 
-          <Link href="/task/bla">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200" data-testid="task-card-bla-priority">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-600 to-violet-600 shadow-sm">
-                  <Vote className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {getFixedTaskLabel("bla", language)}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
-                      : language === "pa"
-                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
-                      : "Select booth & BLA, verify mobile, upload documents"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-indigo-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+          <DashboardTaskCard
+            href="/task/bla"
+            title={getFixedTaskLabel("bla", language)}
+            description={
+              language === "hi"
+                ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
+                : language === "pa"
+                ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
+                : "Select booth & BLA, verify mobile, upload documents"
+            }
+            icon={<Vote className="h-5 w-5" />}
+            iconWrapClassName="bg-indigo-50 text-indigo-700"
+            testId="task-card-bla-priority"
+          />
 
           {isMahilaSakhi && (
-          <Link href="/task/mahila-samman-punjab-gov">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-mahila-samman-punjab">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि (पंजाब सरकार)" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)" : "Mahila Samman Rashi through Punjab Gov"}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "Every woman ₹1,000/month; SC/ST ₹1,500/month"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+            <DashboardTaskCard
+              href="/task/mahila-samman-punjab-gov"
+              title={
+                language === "hi"
+                  ? "महिला सम्मान राशि (पंजाब सरकार)"
+                  : language === "pa"
+                  ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)"
+                  : "Mahila Samman Rashi through Punjab Gov"
+              }
+              description={
+                language === "hi"
+                  ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
+                  : language === "pa"
+                  ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
+                  : "Every woman ₹1,000/month; SC/ST ₹1,500/month"
+              }
+              icon={<Users className="h-5 w-5" />}
+              iconWrapClassName="bg-purple-50 text-purple-700"
+              testId="task-card-mahila-samman-punjab"
+            />
           )}
 
           {!isMahilaSakhi && (
-          <Link href="/task/mahila-samman-rashi">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-mahila-samman">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
+            <DashboardTaskCard
+              href="/task/mahila-samman-rashi"
+              title={language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
+              description={
+                language === "hi"
+                  ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
+                  : language === "pa"
+                  ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
+                  : "₹1,000/month for every woman; ₹1,500 for SC/ST women"
+              }
+              icon={<Users className="h-5 w-5" />}
+              iconWrapClassName="bg-purple-50 text-purple-700"
+              testId="task-card-mahila-samman"
+            />
           )}
           </div>
         </section>
+      </div>
       </div>
     </div>
   );

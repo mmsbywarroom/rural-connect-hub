@@ -16,9 +16,14 @@ export interface ProfileCompletion {
 }
 
 export function getProfileCompletion(user: AppUser): ProfileCompletion {
+  // Required for task access: name + self photo only.
+  // Fields 3–9 (documents + wing) are optional for profile completion.
   const baseFields: { key: keyof AppUser; label: string; section: string }[] = [
     { key: "name", label: "Full Name", section: "Personal" },
     { key: "selfPhoto", label: "Self Photo", section: "Personal" },
+  ];
+
+  const optionalFields: { key: keyof AppUser; label: string; section: string }[] = [
     { key: "voterId", label: "Voter ID Number", section: "Documents" },
     { key: "aadhaarNumber", label: "Aadhaar Number", section: "Documents" },
     { key: "aadhaarPhoto", label: "Aadhaar Front Photo", section: "Documents" },
@@ -35,17 +40,20 @@ export function getProfileCompletion(user: AppUser): ProfileCompletion {
     );
   }
 
-  const fields: ProfileField[] = baseFields.map((f) => ({
+  const allFields = [...baseFields, ...optionalFields];
+  const fields: ProfileField[] = allFields.map((f) => ({
     key: f.key,
     label: f.label,
     section: f.section,
     filled: !!(user[f.key] && String(user[f.key]).trim()),
   }));
 
-  const filledCount = fields.filter((f) => f.filled).length;
-  const totalCount = fields.length;
-  const percentage = Math.round((filledCount / totalCount) * 100);
-  const missingFields = fields.filter((f) => !f.filled);
+  const requiredKeys = new Set(baseFields.map((f) => f.key));
+  const requiredFields = fields.filter((f) => requiredKeys.has(f.key as keyof AppUser));
+  const filledCount = requiredFields.filter((f) => f.filled).length;
+  const totalCount = requiredFields.length;
+  const percentage = totalCount === 0 ? 100 : Math.round((filledCount / totalCount) * 100);
+  const missingFields = requiredFields.filter((f) => !f.filled);
 
   return { percentage, filledCount, totalCount, fields, missingFields };
 }
