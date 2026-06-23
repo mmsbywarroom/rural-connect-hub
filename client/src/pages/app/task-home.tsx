@@ -260,12 +260,27 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const surveyTop3 = (surveyLeaderboard || []).filter(e => e.count > 0).slice(0, 3);
   const isMahilaSakhi = user.role === "mahila_sakhi";
+  const volunteerMappingTask = tasks?.find((t) => t.name === "Volunteer Mapping");
 
-  /** Fixed slugs + dynamic tasks list – jis category ke niche dikhana hai wahi pass karo. Mahila Samman sirf upar alag dikhaya hai. */
+  const DASHBOARD_TOP_SLUGS = new Set(["outdoor-ad"]);
+  const DASHBOARD_BOTTOM_SLUGS = new Set(["bla", "mahila-samman-rashi"]);
+
+  function filterCategoryFixedSlugs(slugs: string[]) {
+    return slugs.filter((slug) => !DASHBOARD_TOP_SLUGS.has(slug) && !DASHBOARD_BOTTOM_SLUGS.has(slug));
+  }
+
+  function filterCategoryTasks(taskList: TaskConfig[]) {
+    return taskList.filter((t) => t.name !== "Volunteer Mapping");
+  }
+
+  /** Fixed slugs + dynamic tasks list – pinned tasks (VM, outdoor, BLA, MSR) shown separately on dashboard. */
   function renderTaskList(fixedSlugs: string[], taskList: TaskConfig[]) {
-    const fixedSlugsFiltered = fixedSlugs.filter((slug) => slug !== "mahila-samman-rashi");
+    const fixedSlugsFiltered = fixedSlugs.filter(
+      (slug) => !DASHBOARD_TOP_SLUGS.has(slug) && !DASHBOARD_BOTTOM_SLUGS.has(slug),
+    );
+    const dynamicTasks = filterCategoryTasks(taskList);
     const hasFixed = fixedSlugsFiltered.length > 0;
-    const hasDynamic = taskList.length > 0;
+    const hasDynamic = dynamicTasks.length > 0;
     return (
       <>
         {fixedSlugsFiltered.includes("nasha-viruddh-yuddh") && (
@@ -582,7 +597,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <Skeleton className="h-[72px] w-full rounded-xl" />
           </>
         )}
-        {taskList.map((task) => {
+        {dynamicTasks.map((task) => {
           const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
           const count = submissionCounts?.[task.id] || 0;
           return (
@@ -878,92 +893,59 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           </div>
 
           <div className="space-y-2.5">
-          <Link href="/task/bla">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200 border-2 border-indigo-100" data-testid="task-card-bla-priority">
+          {volunteerMappingTask && (() => {
+            const VmIcon = iconMap[volunteerMappingTask.icon || "Users"] || Users;
+            return (
+          <Link href="/task/volunteer-mapping">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-blue-100" data-testid="task-card-volunteer-mapping-priority">
               <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-600 to-violet-600 shadow-sm">
-                  <Vote className="h-5 w-5 text-white" />
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                  style={{ background: `linear-gradient(135deg, ${volunteerMappingTask.color || "#3b82f6"}, ${volunteerMappingTask.color || "#3b82f6"}dd)` }}
+                >
+                  <VmIcon className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm text-slate-800">
-                    {getFixedTaskLabel("bla", language)}
+                    {getTaskName(language, volunteerMappingTask)}
                   </h3>
                   <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
-                      : language === "pa"
-                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
-                      : "Select booth & BLA, verify mobile, upload documents"}
+                    {getTaskDesc(language, volunteerMappingTask)}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-indigo-600" />
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </Link>
+            );
+          })()}
 
-          {/* Mahila Samman Rashi through Punjab Gov – only for Mahila Sakhis */}
-          {isMahilaSakhi && (
-          <Link href="/task/mahila-samman-punjab-gov">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 border-2 border-purple-100" data-testid="task-card-mahila-samman-punjab">
+          <Link href="/task/outdoor-ad">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-sky-100" data-testid="task-card-outdoor-ad-priority">
               <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 shadow-sm">
+                  <ImageIcon className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि (पंजाब सरकार)" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)" : "Mahila Samman Rashi through Punjab Gov"}
+                    {getFixedTaskLabel("outdoor-ad", language)}
                   </h3>
                   <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "Every woman ₹1,000/month; SC/ST ₹1,500/month"}
+                    {language === "hi" ? "विज्ञापन स्थान विवरण जमा करें" : language === "pa" ? "ਇਸ਼ਤਿਹਾਰ ਸਥਾਨ ਵੇਰਵੇ ਜਮ੍ਹਾਂ ਕਰੋ" : "Submit ad location details"}
                   </p>
                 </div>
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </Link>
-          )}
-
-          {/* Original Mahila Samman Rashi – only for non-Sakhi users */}
-          {!isMahilaSakhi && (
-          <Link href="/task/mahila-samman-rashi">
-            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200 border-2 border-purple-100" data-testid="task-card-mahila-samman">
-              <CardContent className="p-4 flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm text-slate-800">
-                    {language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                    {language === "hi"
-                      ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
-                      : language === "pa"
-                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                      : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
-                  </p>
-                </div>
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                    <ChevronRight className="h-4 w-4 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          )}
 
           {!isMahilaSakhi && categories && categories.length > 0 && (
             <>
@@ -997,7 +979,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 </button>
                 {selectedCategoryId === null && (
                   <div className="pl-0 space-y-2.5">
-                    {renderTaskList(uncategorizedFixedSlugs.filter((slug) => slug !== "mahila-samman-rashi"), tasks?.filter((t) => !(t as any).categoryId) ?? [])}
+                    {renderTaskList(
+                      filterCategoryFixedSlugs(uncategorizedFixedSlugs),
+                      filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
+                    )}
                   </div>
                 )}
               </div>
@@ -1006,8 +991,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               {categories.map((cat) => {
                 const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
                 const isSelected = selectedCategoryId === cat.id;
-                const catSlugs = cat.fixedTaskSlugs ?? [];
-                const catTasks = tasks?.filter((t) => (t as any).categoryId === cat.id) ?? [];
+                const catSlugs = filterCategoryFixedSlugs(cat.fixedTaskSlugs ?? []);
+                const catTasks = filterCategoryTasks(tasks?.filter((t) => (t as any).categoryId === cat.id) ?? []);
                 const fixedNames = catSlugs.map((slug) => getFixedTaskLabel(slug, language));
                 const dynamicNames = catTasks.map((t) => getTaskName(language, t));
                 const allNames = [...fixedNames, ...dynamicNames].filter(Boolean);
@@ -1056,7 +1041,96 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             </>
           )}
 
-          {(!categories || categories.length === 0) && renderTaskList(uncategorizedFixedSlugs, tasks?.filter((t) => !(t as any).categoryId) ?? [])}
+          {(!categories || categories.length === 0) && !isMahilaSakhi &&
+            renderTaskList(
+              filterCategoryFixedSlugs(uncategorizedFixedSlugs),
+              filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
+            )}
+
+          <Link href="/task/bla">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all duration-200" data-testid="task-card-bla-priority">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-indigo-600 to-violet-600 shadow-sm">
+                  <Vote className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800">
+                    {getFixedTaskLabel("bla", language)}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    {language === "hi"
+                      ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
+                      : language === "pa"
+                      ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
+                      : "Select booth & BLA, verify mobile, upload documents"}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-indigo-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {isMahilaSakhi && (
+          <Link href="/task/mahila-samman-punjab-gov">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-mahila-samman-punjab">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800">
+                    {language === "hi" ? "महिला सम्मान राशि (पंजाब सरकार)" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)" : "Mahila Samman Rashi through Punjab Gov"}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    {language === "hi"
+                      ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
+                      : language === "pa"
+                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
+                      : "Every woman ₹1,000/month; SC/ST ₹1,500/month"}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          )}
+
+          {!isMahilaSakhi && (
+          <Link href="/task/mahila-samman-rashi">
+            <Card className="group cursor-pointer bg-white border-slate-100 hover:border-purple-200 hover:shadow-md transition-all duration-200" data-testid="task-card-mahila-samman">
+              <CardContent className="p-4 flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-purple-600 to-pink-600 shadow-sm">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-slate-800">
+                    {language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
+                  </h3>
+                  <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    {language === "hi"
+                      ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
+                      : language === "pa"
+                      ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
+                      : "₹1,000/month for every woman; ₹1,500 for SC/ST women"}
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    <ChevronRight className="h-4 w-4 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          )}
           </div>
         </section>
       </div>
