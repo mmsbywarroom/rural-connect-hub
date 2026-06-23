@@ -200,7 +200,11 @@ function DashboardTaskCard({
   title,
   description,
   icon,
-  iconWrapClassName = "bg-blue-50 text-blue-700",
+  iconWrapClassName,
+  iconGradient,
+  hoverBorderClassName = "hover:border-blue-200",
+  chevronClassName = "text-blue-500",
+  chevronBgClassName = "bg-blue-50 group-hover:bg-blue-100",
   testId,
   featured = false,
 }: {
@@ -209,26 +213,38 @@ function DashboardTaskCard({
   description: string;
   icon: ReactNode;
   iconWrapClassName?: string;
+  iconGradient?: string;
+  hoverBorderClassName?: string;
+  chevronClassName?: string;
+  chevronBgClassName?: string;
   testId?: string;
   featured?: boolean;
 }) {
   return (
     <Link href={href}>
       <Card
-        className={`group cursor-pointer border bg-white shadow-sm hover:shadow-md transition-all ${
-          featured ? "border-blue-200 ring-1 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+        className={`group cursor-pointer border bg-white shadow-sm hover:shadow-md transition-all duration-200 ${
+          featured ? "border-blue-200 ring-1 ring-blue-100" : `border-slate-100 ${hoverBorderClassName}`
         }`}
         data-testid={testId}
       >
-        <CardContent className="p-3.5 flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${iconWrapClassName}`}>
+        <CardContent className="p-4 flex items-center gap-3.5">
+          <div
+            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+              iconGradient ? `bg-gradient-to-br ${iconGradient} text-white` : iconWrapClassName
+            }`}
+          >
             {icon}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+            <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
             <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{description}</p>
           </div>
-          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 shrink-0" />
+          <div className="shrink-0">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${chevronBgClassName}`}>
+              <ChevronRight className={`h-4 w-4 ${chevronClassName}`} />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </Link>
@@ -239,6 +255,7 @@ function CategoryPickerItem({
   selected,
   onClick,
   icon,
+  iconGradient,
   title,
   subtitle,
   testId,
@@ -246,6 +263,7 @@ function CategoryPickerItem({
   selected: boolean;
   onClick: () => void;
   icon: ReactNode;
+  iconGradient: string;
   title: string;
   subtitle: string;
   testId?: string;
@@ -254,20 +272,22 @@ function CategoryPickerItem({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg border transition-colors ${
-        selected ? "border-blue-600 bg-blue-50/60" : "border-slate-200 bg-white hover:bg-slate-50"
+      className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${
+        selected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
       }`}
       data-testid={testId}
     >
-      <div className="p-3.5 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
+      <div className="p-4 flex items-center gap-3.5">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br ${iconGradient} text-white`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+          <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
           <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{subtitle}</p>
         </div>
-        <ChevronRight className={`h-4 w-4 shrink-0 ${selected ? "text-blue-600" : "text-slate-400"}`} />
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${selected ? "bg-blue-100" : "bg-slate-100"}`}>
+          <ChevronRight className={`h-4 w-4 ${selected ? "text-blue-500" : "text-slate-500"}`} />
+        </div>
       </div>
     </button>
   );
@@ -276,7 +296,10 @@ function CategoryPickerItem({
 type FixedTaskMeta = {
   href: string;
   icon: ReactNode;
-  iconWrapClassName: string;
+  iconGradient: string;
+  hoverBorderClassName: string;
+  chevronClassName: string;
+  chevronBgClassName: string;
   testId: string;
   title: Record<Language, string>;
   description: Record<Language, string>;
@@ -286,7 +309,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "nasha-viruddh-yuddh": {
     href: "/task/nasha-viruddh-yuddh",
     icon: <ShieldAlert className="h-5 w-5" />,
-    iconWrapClassName: "bg-red-50 text-red-700",
+    iconGradient: "from-red-600 to-rose-600",
+    hoverBorderClassName: "hover:border-red-200",
+    chevronClassName: "text-red-500",
+    chevronBgClassName: "bg-red-50 group-hover:bg-red-100",
     testId: "task-card-nvy",
     title: { en: "Nasha Viruddh Yuddh", hi: "नशा विरुद्ध युद्ध", pa: "ਨਸ਼ਾ ਵਿਰੁੱਧ ਯੁੱਧ" },
     description: {
@@ -298,7 +324,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "road-report": {
     href: "/task/road-report",
     icon: <RouteIcon className="h-5 w-5" />,
-    iconWrapClassName: "bg-blue-50 text-blue-700",
+    iconGradient: "from-blue-600 to-sky-500",
+    hoverBorderClassName: "hover:border-blue-200",
+    chevronClassName: "text-blue-500",
+    chevronBgClassName: "bg-blue-50 group-hover:bg-blue-100",
     testId: "task-card-road",
     title: { en: "Road Condition Report", hi: "सड़क खराबी सूचना", pa: "ਸੜਕ ਖਰਾਬੀ ਸੂਚਨਾ" },
     description: {
@@ -310,7 +339,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "harr-sirr-te-chatt": {
     href: "/task/harr-sirr-te-chatt",
     icon: <Home className="h-5 w-5" />,
-    iconWrapClassName: "bg-orange-50 text-orange-700",
+    iconGradient: "from-orange-500 to-red-500",
+    hoverBorderClassName: "hover:border-orange-200",
+    chevronClassName: "text-orange-500",
+    chevronBgClassName: "bg-orange-50 group-hover:bg-orange-100",
     testId: "task-card-hstc",
     title: { en: "Harr Sirr te Chatt", hi: "हर सिर ते छत", pa: "ਹਰ ਸਿਰ ਤੇ ਛੱਤ" },
     description: {
@@ -322,7 +354,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "sukh-dukh-saanjha-karo": {
     href: "/task/sukh-dukh-saanjha-karo",
     icon: <Heart className="h-5 w-5" />,
-    iconWrapClassName: "bg-purple-50 text-purple-700",
+    iconGradient: "from-purple-500 to-pink-500",
+    hoverBorderClassName: "hover:border-purple-200",
+    chevronClassName: "text-purple-500",
+    chevronBgClassName: "bg-purple-50 group-hover:bg-purple-100",
     testId: "task-card-sdsk",
     title: { en: "Sukh-Dukh Saanjha Karo", hi: "सुख-दुख सांझा करो", pa: "ਸੁਖ-ਦੁੱਖ ਸਾਂਝਾ ਕਰੋ" },
     description: {
@@ -334,7 +369,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   sunwai: {
     href: "/task/sunwai",
     icon: <MessageSquare className="h-5 w-5" />,
-    iconWrapClassName: "bg-teal-50 text-teal-700",
+    iconGradient: "from-teal-500 to-cyan-600",
+    hoverBorderClassName: "hover:border-teal-200",
+    chevronClassName: "text-teal-500",
+    chevronBgClassName: "bg-teal-50 group-hover:bg-teal-100",
     testId: "task-card-sunwai",
     title: { en: "Sunwai (Hearing)", hi: "सुनवाई", pa: "ਸੁਣਵਾਈ" },
     description: {
@@ -346,7 +384,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "outdoor-ad": {
     href: "/task/outdoor-ad",
     icon: <ImageIcon className="h-5 w-5" />,
-    iconWrapClassName: "bg-sky-50 text-sky-700",
+    iconGradient: "from-blue-500 to-blue-700",
+    hoverBorderClassName: "hover:border-blue-200",
+    chevronClassName: "text-blue-500",
+    chevronBgClassName: "bg-blue-50 group-hover:bg-blue-100",
     testId: "task-card-outdoor-ad",
     title: { en: "Outdoor Advertisement", hi: "आउटडोर विज्ञापन", pa: "ਆਊਟਡੋਰ ਇਸ਼ਤਿਹਾਰ" },
     description: {
@@ -358,7 +399,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "gov-school": {
     href: "/task/gov-school",
     icon: <GraduationCap className="h-5 w-5" />,
-    iconWrapClassName: "bg-green-50 text-green-700",
+    iconGradient: "from-green-500 to-emerald-600",
+    hoverBorderClassName: "hover:border-green-200",
+    chevronClassName: "text-green-500",
+    chevronBgClassName: "bg-green-50 group-hover:bg-green-100",
     testId: "task-card-gov-school",
     title: { en: "Gov School Work", hi: "सरकारी स्कूल कार्य", pa: "ਸਰਕਾਰੀ ਸਕੂਲ ਕੰਮ" },
     description: {
@@ -370,7 +414,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   appointment: {
     href: "/task/appointment",
     icon: <CalendarCheck className="h-5 w-5" />,
-    iconWrapClassName: "bg-violet-50 text-violet-700",
+    iconGradient: "from-purple-500 to-indigo-600",
+    hoverBorderClassName: "hover:border-purple-200",
+    chevronClassName: "text-purple-500",
+    chevronBgClassName: "bg-purple-50 group-hover:bg-purple-100",
     testId: "task-card-appointment",
     title: { en: "Appointment", hi: "मुलाकात", pa: "ਮੁਲਾਕਾਤ" },
     description: {
@@ -382,7 +429,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "event-venue": {
     href: "/task/event-venue",
     icon: <Building2 className="h-5 w-5" />,
-    iconWrapClassName: "bg-emerald-50 text-emerald-700",
+    iconGradient: "from-emerald-500 to-teal-600",
+    hoverBorderClassName: "hover:border-emerald-200",
+    chevronClassName: "text-emerald-600",
+    chevronBgClassName: "bg-emerald-50 group-hover:bg-emerald-100",
     testId: "task-card-event-venue",
     title: { en: "Event Venues", hi: "इवेंट स्थल", pa: "ਇਵੈਂਟ ਸਥਾਨ" },
     description: {
@@ -394,7 +444,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "tirth-yatra": {
     href: "/task/tirth-yatra",
     icon: <Users className="h-5 w-5" />,
-    iconWrapClassName: "bg-emerald-50 text-emerald-700",
+    iconGradient: "from-emerald-600 to-teal-700",
+    hoverBorderClassName: "hover:border-emerald-200",
+    chevronClassName: "text-emerald-600",
+    chevronBgClassName: "bg-emerald-50 group-hover:bg-emerald-100",
     testId: "task-card-tirth-yatra",
     title: { en: "Tirth Yatra", hi: "तीर्थ यात्रा", pa: "ਤੀਰਥ ਯਾਤਰਾ" },
     description: {
@@ -406,7 +459,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   "voter-registration": {
     href: "/task/voter-registration",
     icon: <Vote className="h-5 w-5" />,
-    iconWrapClassName: "bg-blue-50 text-blue-700",
+    iconGradient: "from-blue-500 to-cyan-600",
+    hoverBorderClassName: "hover:border-blue-200",
+    chevronClassName: "text-blue-500",
+    chevronBgClassName: "bg-blue-50 group-hover:bg-blue-100",
     testId: "task-card-voter-registration",
     title: { en: "Voter Registration", hi: "मतदाता पंजीकरण", pa: "ਵੋਟਰ ਰਜਿਸਟ੍ਰੇਸ਼ਨ" },
     description: {
@@ -418,7 +474,10 @@ const FIXED_TASK_META: Record<string, FixedTaskMeta> = {
   bla: {
     href: "/task/bla",
     icon: <Users className="h-5 w-5" />,
-    iconWrapClassName: "bg-indigo-50 text-indigo-700",
+    iconGradient: "from-indigo-600 to-blue-600",
+    hoverBorderClassName: "hover:border-indigo-200",
+    chevronClassName: "text-indigo-600",
+    chevronBgClassName: "bg-indigo-50 group-hover:bg-indigo-100",
     testId: "task-card-bla",
     title: { en: "Booth Level Agent (BLA)", hi: "Booth Level Agent (BLA)", pa: "ਬੂਥ ਲੈਵਲ ਏਜੰਟ (BLA)" },
     description: {
@@ -438,7 +497,10 @@ function FixedTaskCard({ slug, language, featured = false }: { slug: string; lan
       title={meta.title[language]}
       description={meta.description[language]}
       icon={meta.icon}
-      iconWrapClassName={meta.iconWrapClassName}
+      iconGradient={meta.iconGradient}
+      hoverBorderClassName={meta.hoverBorderClassName}
+      chevronClassName={meta.chevronClassName}
+      chevronBgClassName={meta.chevronBgClassName}
       testId={meta.testId}
       featured={featured}
     />
@@ -450,18 +512,18 @@ function LeaderboardMiniCard({
   title,
   emptyLabel,
   icon,
-  iconWrapClassName,
+  cardGradient,
   entries,
   userId,
   testId,
   entryTestIdPrefix,
-  scoreClassName = "text-slate-600",
+  scoreClassName = "text-yellow-300",
 }: {
   href: string;
   title: string;
   emptyLabel: string;
   icon: ReactNode;
-  iconWrapClassName: string;
+  cardGradient: string;
   entries: LeaderboardEntry[];
   userId: string;
   testId: string;
@@ -470,13 +532,11 @@ function LeaderboardMiniCard({
 }) {
   return (
     <Link href={href}>
-      <Card className="border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow h-full" data-testid={testId}>
+      <Card className={`cursor-pointer border-0 text-white hover:shadow-lg transition-shadow h-full bg-gradient-to-br ${cardGradient}`} data-testid={testId}>
         <CardContent className="p-3.5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconWrapClassName}`}>
-              {icon}
-            </div>
-            <h3 className="font-medium text-sm text-slate-900">{title}</h3>
+          <div className="flex items-center gap-2 mb-2.5">
+            {icon}
+            <h3 className="font-semibold text-sm text-white">{title}</h3>
           </div>
           {entries.length > 0 ? (
             <div className="space-y-1.5">
@@ -484,14 +544,14 @@ function LeaderboardMiniCard({
                 const isMe = entry.userId === userId;
                 const rankIcon =
                   i === 0 ? (
-                    <Crown className="h-3 w-3 text-amber-500" />
+                    <Crown className="h-3 w-3 text-yellow-300" />
                   ) : (
-                    <Medal className={`h-3 w-3 ${i === 1 ? "text-slate-400" : "text-amber-600"}`} />
+                    <Medal className={`h-3 w-3 ${i === 1 ? "text-gray-300" : "text-amber-600"}`} />
                   );
                 return (
                   <div
                     key={entry.userId}
-                    className={`flex items-center gap-2 rounded-md px-2 py-1 ${isMe ? "bg-blue-50" : "bg-slate-50"}`}
+                    className={`flex items-center gap-2 rounded-lg px-2 py-1 ${isMe ? "bg-white/15" : "bg-white/5"}`}
                     data-testid={`${entryTestIdPrefix}-${i + 1}`}
                   >
                     {rankIcon}
@@ -499,17 +559,17 @@ function LeaderboardMiniCard({
                       {entry.hasPhoto ? (
                         <AvatarImage src={photoUrl(entry.userId)} />
                       ) : (
-                        <AvatarFallback className="bg-slate-200 text-slate-600 text-[8px]">{entry.name.charAt(0)}</AvatarFallback>
+                        <AvatarFallback className="bg-white/20 text-white text-[8px]">{entry.name.charAt(0)}</AvatarFallback>
                       )}
                     </Avatar>
-                    <span className="text-[10px] font-medium text-slate-700 truncate flex-1">{entry.name.split(" ")[0]}</span>
-                    <span className={`text-[10px] font-semibold ${scoreClassName}`}>{entry.count}</span>
+                    <span className="text-[10px] font-medium truncate flex-1">{entry.name.split(" ")[0]}</span>
+                    <span className={`text-[10px] font-bold ${scoreClassName}`}>{entry.count}</span>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-slate-500">{emptyLabel}</p>
+            <p className="text-xs text-white/60">{emptyLabel}</p>
           )}
         </CardContent>
       </Card>
@@ -599,16 +659,29 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
         )}
         {dynamicTasks.map((task) => {
           const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
+          const color = task.color || "#3b82f6";
           return (
-            <DashboardTaskCard
-              key={task.id}
-              href={getTaskRoute(task)}
-              title={getTaskName(language, task)}
-              description={getTaskDesc(language, task)}
-              icon={<IconComponent className="h-5 w-5" />}
-              iconWrapClassName="bg-blue-50 text-blue-700"
-              testId={`task-card-${task.id}`}
-            />
+            <Link key={task.id} href={getTaskRoute(task)}>
+              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid={`task-card-${task.id}`}>
+                <CardContent className="p-4 flex items-center gap-3.5">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}
+                  >
+                    <IconComponent className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, task)}</h3>
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, task)}</p>
+                  </div>
+                  <div className="shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <ChevronRight className="h-4 w-4 text-blue-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           );
         })}
         {!isLoading && !hasFixed && !hasDynamic && (
@@ -637,7 +710,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-900 text-white">
+      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md">
         <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={onProfile} className="flex items-center gap-3 min-w-0 text-left">
@@ -743,10 +816,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <div className="space-y-2">
               {activeSurveys.map((survey) => (
                 <Link key={survey.id} href={`/survey/${survey.id}`}>
-                  <Card className="border border-emerald-200 bg-white shadow-sm hover:shadow-md transition-shadow" data-testid={`survey-card-${survey.id}`}>
-                    <CardContent className="p-3.5 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-                        <ClipboardCheck className="h-5 w-5" />
+                  <Card className="group cursor-pointer border-emerald-100 bg-white hover:border-emerald-300 hover:shadow-md transition-all duration-200" data-testid={`survey-card-${survey.id}`}>
+                    <CardContent className="p-4 flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
+                        <ClipboardCheck className="h-5 w-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-sm text-slate-900 leading-tight">
@@ -761,7 +834,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                           {survey.questions?.length || 0} {language === "hi" ? "प्रश्न" : language === "pa" ? "ਸਵਾਲ" : "questions"}
                         </Badge>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
+                      <ChevronRight className="h-4 w-4 text-emerald-600 shrink-0" />
                     </CardContent>
                   </Card>
                 </Link>
@@ -777,25 +850,25 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
               href="/leaderboard"
               title={language === "hi" ? "लीडरबोर्ड" : language === "pa" ? "ਲੀਡਰਬੋਰਡ" : "Leaderboard"}
               emptyLabel={language === "hi" ? "रैंकिंग देखें" : language === "pa" ? "ਰੈਂਕਿੰਗ ਵੇਖੋ" : "View rankings"}
-              icon={<Trophy className="h-4 w-4" />}
-              iconWrapClassName="bg-amber-50 text-amber-600"
+              icon={<Trophy className="h-4.5 w-4.5 text-yellow-300" />}
+              cardGradient="from-indigo-500 to-purple-600"
               entries={overallTop3}
               userId={user.id}
               testId="card-leaderboard"
               entryTestIdPrefix="dashboard-top"
-              scoreClassName="text-amber-700"
+              scoreClassName="text-yellow-300"
             />
             <LeaderboardMiniCard
               href="/survey-leaderboard"
               title={language === "hi" ? "सर्वे बोर्ड" : language === "pa" ? "ਸਰਵੇ ਬੋਰਡ" : "Survey Board"}
               emptyLabel={language === "hi" ? "सर्वे रैंकिंग" : language === "pa" ? "ਸਰਵੇ ਰੈਂਕਿੰਗ" : "Survey rankings"}
-              icon={<ClipboardCheck className="h-4 w-4" />}
-              iconWrapClassName="bg-emerald-50 text-emerald-600"
+              icon={<ClipboardCheck className="h-4.5 w-4.5 text-emerald-200" />}
+              cardGradient="from-emerald-500 to-teal-600"
               entries={surveyTop3}
               userId={user.id}
               testId="card-survey-leaderboard"
               entryTestIdPrefix="survey-top"
-              scoreClassName="text-emerald-700"
+              scoreClassName="text-emerald-200"
             />
           </div>
         </section>
@@ -807,16 +880,29 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           <div className="space-y-2">
           {volunteerMappingTask && (() => {
             const VmIcon = iconMap[volunteerMappingTask.icon || "Users"] || Users;
+            const vmColor = volunteerMappingTask.color || "#3b82f6";
             return (
-              <DashboardTaskCard
-                href="/task/volunteer-mapping"
-                title={getTaskName(language, volunteerMappingTask)}
-                description={getTaskDesc(language, volunteerMappingTask)}
-                icon={<VmIcon className="h-5 w-5" />}
-                iconWrapClassName="bg-blue-50 text-blue-700"
-                testId="task-card-volunteer-mapping-priority"
-                featured
-              />
+              <Link href="/task/volunteer-mapping">
+                <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-blue-100" data-testid="task-card-volunteer-mapping-priority">
+                  <CardContent className="p-4 flex items-center gap-3.5">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
+                      style={{ background: `linear-gradient(135deg, ${vmColor}, ${vmColor}dd)` }}
+                    >
+                      <VmIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, volunteerMappingTask)}</h3>
+                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, volunteerMappingTask)}</p>
+                    </div>
+                    <div className="shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                        <ChevronRight className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             );
           })()}
 
@@ -829,6 +915,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                   selected={selectedCategoryId === null}
                   onClick={() => setSelectedCategoryId(null)}
                   icon={<LayoutGrid className="h-5 w-5" />}
+                  iconGradient="from-slate-500 to-slate-600"
                   title={language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
                   subtitle={language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
                 />
@@ -864,6 +951,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                       selected={isSelected}
                       onClick={() => setSelectedCategoryId(cat.id)}
                       icon={<FolderTree className="h-5 w-5" />}
+                      iconGradient="from-blue-500 to-indigo-600"
                       title={label}
                       subtitle={hintText}
                     />
@@ -895,7 +983,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 : "Select booth & BLA, verify mobile, upload documents"
             }
             icon={<Vote className="h-5 w-5" />}
-            iconWrapClassName="bg-indigo-50 text-indigo-700"
+            iconGradient="from-indigo-600 to-violet-600"
+            hoverBorderClassName="hover:border-indigo-200"
+            chevronClassName="text-indigo-600"
+            chevronBgClassName="bg-indigo-50 group-hover:bg-indigo-100"
             testId="task-card-bla-priority"
           />
 
@@ -917,7 +1008,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                   : "Every woman ₹1,000/month; SC/ST ₹1,500/month"
               }
               icon={<Users className="h-5 w-5" />}
-              iconWrapClassName="bg-purple-50 text-purple-700"
+              iconGradient="from-purple-600 to-pink-600"
+              hoverBorderClassName="hover:border-purple-200"
+              chevronClassName="text-purple-600"
+              chevronBgClassName="bg-purple-50 group-hover:bg-purple-100"
               testId="task-card-mahila-samman-punjab"
             />
           )}
@@ -934,7 +1028,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                   : "₹1,000/month for every woman; ₹1,500 for SC/ST women"
               }
               icon={<Users className="h-5 w-5" />}
-              iconWrapClassName="bg-purple-50 text-purple-700"
+              iconGradient="from-purple-600 to-pink-600"
+              hoverBorderClassName="hover:border-purple-200"
+              chevronClassName="text-purple-600"
+              chevronBgClassName="bg-purple-50 group-hover:bg-purple-100"
               testId="task-card-mahila-samman"
             />
           )}
