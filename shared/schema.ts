@@ -259,6 +259,7 @@ export const mappedVolunteers = pgTable("mapped_volunteers", {
   name: text("name").notNull(),
   mobileNumber: text("mobile_number").notNull(),
   category: text("category").notNull(), // Active, Inactive, VIP
+  volunteerPhoto: text("volunteer_photo"),
   voterId: text("voter_id"),
   aadhaarPhoto: text("aadhaar_photo"),
   aadhaarPhotoBack: text("aadhaar_photo_back"),

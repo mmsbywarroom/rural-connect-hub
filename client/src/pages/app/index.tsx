@@ -528,11 +528,9 @@ export default function VolunteerPortal() {
       return <TaskCscReport user={user} />;
     }
     if (location === "/task/volunteer-mapping" || location === "/app/task/volunteer-mapping") {
-      if (!profileComplete) return <ProfileGate />;
       return <TaskVolunteerMapping user={user} />;
     }
     if (location === "/task/supporter-mapping" || location === "/app/task/supporter-mapping") {
-      if (!profileComplete) return <ProfileGate />;
       return <TaskSupporterMapping user={user} />;
     }
     if (location === "/task/harr-sirr-te-chatt" || location === "/app/task/harr-sirr-te-chatt") {

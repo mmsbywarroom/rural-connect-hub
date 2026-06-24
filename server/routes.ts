@@ -3440,6 +3440,7 @@ export async function registerRoutes(
       if (!vol) return res.status(404).json({ error: "Volunteer not found" });
       res.json({
         name: vol.name,
+        volunteerPhoto: vol.volunteerPhoto,
         aadhaarPhoto: vol.aadhaarPhoto,
         aadhaarPhotoBack: vol.aadhaarPhotoBack,
         voterCardPhoto: vol.voterCardPhoto,
@@ -3456,6 +3457,7 @@ export async function registerRoutes(
       const vol = await storage.getMappedVolunteer(req.params.id);
       if (!vol) return res.status(404).json({ error: "Volunteer not found" });
       const fieldMap: Record<string, string | null> = {
+        volunteerPhoto: vol.volunteerPhoto,
         aadhaarPhoto: vol.aadhaarPhoto,
         aadhaarPhotoBack: vol.aadhaarPhotoBack,
         voterCardPhoto: vol.voterCardPhoto,

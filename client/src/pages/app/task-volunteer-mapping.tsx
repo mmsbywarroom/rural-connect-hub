@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, type RefObject } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { useOcr, type OcrResult } from "@/hooks/use-ocr";
 import { useTranslation } from "@/lib/i18n";
 import { UnitSelector, UnitSwitcherBar, UnitSubmissionHistory, type SelectedUnit } from "@/components/unit-selector";
 import { VoterDetailsCard } from "@/components/voter-details-card";
+import { DualPhotoField, DualPhotoSlot } from "@/components/dual-photo-slot";
 import { compressImage } from "@/lib/image-compress";
 import type { AppUser } from "@shared/schema";
 
@@ -39,6 +40,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
   const [category, setCategory] = useState<Category | null>(null);
   const [mobileNumber, setMobileNumber] = useState("");
   const [name, setName] = useState("");
+  const [volunteerPhoto, setVolunteerPhoto] = useState<string | null>(null);
   const [voterId, setVoterId] = useState("");
   const [aadhaarPhoto, setAadhaarPhoto] = useState<string | null>(null);
   const [aadhaarPhotoBack, setAadhaarPhotoBack] = useState<string | null>(null);
@@ -52,11 +54,6 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const [lastCheckedMobile, setLastCheckedMobile] = useState("");
   const [ocrData, setOcrData] = useState<OcrData>({});
-  
-  const aadhaarPhotoRef = useRef<HTMLInputElement>(null);
-  const aadhaarPhotoBackRef = useRef<HTMLInputElement>(null);
-  const voterPhotoRef = useRef<HTMLInputElement>(null);
-  const voterPhotoBackRef = useRef<HTMLInputElement>(null);
 
   const checkDuplicateMutation = useMutation({
     mutationFn: async (mobile: string) => {
@@ -113,6 +110,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
         mobileNumber,
         category,
         voterId: voterId.trim() || null,
+        volunteerPhoto,
         aadhaarPhoto,
         aadhaarPhotoBack,
         voterCardPhoto,
@@ -134,7 +132,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
     },
   });
 
-  const handlePhotoCapture = async (setter: (val: string | null) => void, ref: React.RefObject<HTMLInputElement | null>) => {
+  const handlePhotoCapture = async (setter: (val: string | null) => void, ref: RefObject<HTMLInputElement | null>) => {
     const file = ref.current?.files?.[0];
     if (file) {
       try {
@@ -146,7 +144,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
 
   const handlePhotoCaptureWithOcr = async (
     setter: (val: string | null) => void,
-    ref: React.RefObject<HTMLInputElement | null>,
+    ref: RefObject<HTMLInputElement | null>,
     ocrType: "aadhaarFront" | "aadhaarBack" | "voterId"
   ) => {
     const file = ref.current?.files?.[0];
@@ -248,6 +246,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
     setCategory(null);
     setMobileNumber("");
     setName("");
+    setVolunteerPhoto(null);
     setVoterId("");
     setAadhaarPhoto(null);
     setAadhaarPhotoBack(null);
@@ -286,6 +285,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
             setCategory(null);
             setMobileNumber("");
             setName("");
+            setVolunteerPhoto(null);
             setVoterId("");
             setAadhaarPhoto(null);
             setAadhaarPhotoBack(null);
@@ -484,6 +484,17 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
                 />
               </div>
 
+              <DualPhotoField
+                label={t("selfPhoto")}
+                optionalLabel={t("optional")}
+                photo={volunteerPhoto}
+                testId="volunteer-photo"
+                cameraLabel={t("camera")}
+                galleryLabel={t("gallery")}
+                onFileSelected={(ref) => handlePhotoCapture(setVolunteerPhoto, ref)}
+                onClear={() => setVolunteerPhoto(null)}
+              />
+
               {category !== "Active" && (
                 <div>
                   <label className="text-sm font-medium text-slate-700 mb-1.5 block">{t('phone')} <span className="text-red-500">*</span></label>
@@ -558,56 +569,47 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">{t('aadhaarCardPhoto')} <span className="text-slate-400">({t('optional')})</span></label>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <input type="file" accept="image/*" capture="environment" ref={aadhaarPhotoRef} className="hidden" onChange={() => handlePhotoCaptureWithOcr(setAadhaarPhoto, aadhaarPhotoRef, "aadhaarFront")} />
-                    <button
-                      onClick={() => aadhaarPhotoRef.current?.click()}
-                      className={`w-full h-16 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 ${aadhaarPhoto ? "border-green-500 bg-green-50" : "border-slate-300"}`}
-                      data-testid="button-upload-aadhaar-front"
-                    >
-                      {processingType === "aadhaarFront" ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" /> : aadhaarPhoto ? <Check className="h-4 w-4 text-green-600" /> : <Camera className="h-4 w-4 text-slate-400" />}
-                      <span className="text-xs">{processingType === "aadhaarFront" ? t('reading') : aadhaarPhoto ? t('frontDone') : t('front')}</span>
-                    </button>
-                  </div>
-                  <div>
-                    <input type="file" accept="image/*" capture="environment" ref={aadhaarPhotoBackRef} className="hidden" onChange={() => handlePhotoCaptureWithOcr(setAadhaarPhotoBack, aadhaarPhotoBackRef, "aadhaarBack")} />
-                    <button
-                      onClick={() => aadhaarPhotoBackRef.current?.click()}
-                      className={`w-full h-16 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 ${aadhaarPhotoBack ? "border-green-500 bg-green-50" : "border-slate-300"}`}
-                      data-testid="button-upload-aadhaar-back"
-                    >
-                      {processingType === "aadhaarBack" ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" /> : aadhaarPhotoBack ? <Check className="h-4 w-4 text-green-600" /> : <Camera className="h-4 w-4 text-slate-400" />}
-                      <span className="text-xs">{processingType === "aadhaarBack" ? t('reading') : aadhaarPhotoBack ? t('backDone') : t('backSide')}</span>
-                    </button>
-                  </div>
+                  <DualPhotoSlot
+                    photo={aadhaarPhoto}
+                    slotLabel={aadhaarPhoto ? t('frontDone') : t('front')}
+                    processing={processingType === "aadhaarFront"}
+                    testId="button-upload-aadhaar-front"
+                    cameraLabel={t('camera')}
+                    galleryLabel={t('gallery')}
+                    onFileSelected={(ref) => handlePhotoCaptureWithOcr(setAadhaarPhoto, ref, "aadhaarFront")}
+                  />
+                  <DualPhotoSlot
+                    photo={aadhaarPhotoBack}
+                    slotLabel={aadhaarPhotoBack ? t('backDone') : t('backSide')}
+                    processing={processingType === "aadhaarBack"}
+                    testId="button-upload-aadhaar-back"
+                    cameraLabel={t('camera')}
+                    galleryLabel={t('gallery')}
+                    onFileSelected={(ref) => handlePhotoCaptureWithOcr(setAadhaarPhotoBack, ref, "aadhaarBack")}
+                  />
                 </div>
               </div>
 
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">{t('voterIdPhoto')} <span className="text-slate-400">({t('optional')})</span></label>
                 <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <input type="file" accept="image/*" capture="environment" ref={voterPhotoRef} className="hidden" onChange={() => handlePhotoCaptureWithOcr(setVoterCardPhoto, voterPhotoRef, "voterId")} />
-                    <button
-                      onClick={() => voterPhotoRef.current?.click()}
-                      className={`w-full h-16 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 ${voterCardPhoto ? "border-green-500 bg-green-50" : "border-slate-300"}`}
-                      data-testid="button-upload-voter-front"
-                    >
-                      {processingType === "voterId" ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" /> : voterCardPhoto ? <Check className="h-4 w-4 text-green-600" /> : <Camera className="h-4 w-4 text-slate-400" />}
-                      <span className="text-xs">{processingType === "voterId" ? t('reading') : voterCardPhoto ? t('frontDone') : t('front')}</span>
-                    </button>
-                  </div>
-                  <div>
-                    <input type="file" accept="image/*" capture="environment" ref={voterPhotoBackRef} className="hidden" onChange={() => handlePhotoCapture(setVoterCardPhotoBack, voterPhotoBackRef)} />
-                    <button
-                      onClick={() => voterPhotoBackRef.current?.click()}
-                      className={`w-full h-16 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 ${voterCardPhotoBack ? "border-green-500 bg-green-50" : "border-slate-300"}`}
-                      data-testid="button-upload-voter-back"
-                    >
-                      {voterCardPhotoBack ? <Check className="h-4 w-4 text-green-600" /> : <Camera className="h-4 w-4 text-slate-400" />}
-                      <span className="text-xs">{voterCardPhotoBack ? t('backDone') : t('backSide')}</span>
-                    </button>
-                  </div>
+                  <DualPhotoSlot
+                    photo={voterCardPhoto}
+                    slotLabel={voterCardPhoto ? t('frontDone') : t('front')}
+                    processing={processingType === "voterId"}
+                    testId="button-upload-voter-front"
+                    cameraLabel={t('camera')}
+                    galleryLabel={t('gallery')}
+                    onFileSelected={(ref) => handlePhotoCaptureWithOcr(setVoterCardPhoto, ref, "voterId")}
+                  />
+                  <DualPhotoSlot
+                    photo={voterCardPhotoBack}
+                    slotLabel={voterCardPhotoBack ? t('backDone') : t('backSide')}
+                    testId="button-upload-voter-back"
+                    cameraLabel={t('camera')}
+                    galleryLabel={t('gallery')}
+                    onFileSelected={(ref) => handlePhotoCapture(setVoterCardPhotoBack, ref)}
+                  />
                 </div>
               </div>
 
