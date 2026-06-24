@@ -14,9 +14,13 @@ interface BirthdayUser {
   id: string;
   name: string;
   ocrDob: string | null;
-  selfPhoto: string | null;
+  hasPhoto?: boolean;
   mobileNumber: string | null;
   role: string | null;
+}
+
+function userPhotoUrl(userId: string) {
+  return `/api/app/user/${userId}/photo`;
 }
 
 function getNextBirthday(dobStr: string): Date {
@@ -323,8 +327,8 @@ export default function BirthdayManagerPage() {
               >
                 <CardContent className="flex items-center gap-4 py-3 px-4">
                   <Avatar className="w-11 h-11 min-w-[44px] min-h-[44px] overflow-hidden">
-                    {user.selfPhoto ? (
-                      <AvatarImage src={user.selfPhoto} className="object-cover w-full h-full" />
+                    {user.hasPhoto ? (
+                      <AvatarImage src={userPhotoUrl(user.id)} className="object-cover w-full h-full" />
                     ) : (
                       <AvatarFallback className="bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-300 text-sm font-bold">
                         {user.name.charAt(0).toUpperCase()}

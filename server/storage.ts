@@ -260,6 +260,42 @@ export interface IStorage {
 
   // App Users (Volunteer Portal)
   getAppUsers(): Promise<AppUser[]>;
+  listAppUsersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    role?: string;
+    status?: string;
+    villageIds?: string[];
+  }): Promise<{
+    items: AppUser[];
+    total: number;
+    limit: number;
+    offset: number;
+    stats: {
+      total: number;
+      active: number;
+      blocked: number;
+      volunteers: number;
+      postHolders: number;
+      approved: number;
+      pending: number;
+    };
+  }>;
+  listBirthdaysForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<{
+    items: { id: string; name: string; ocrDob: string | null; hasPhoto: boolean; mobileNumber: string | null; role: string | null }[];
+    total: number;
+    limit: number;
+    offset: number;
+  }>;
+  getAppUserVoterIds(): Promise<string[]>;
+  getBirthdaysMetadataAll(): Promise<
+    { id: string; name: string; ocrDob: string | null; hasPhoto: boolean; mobileNumber: string | null; role: string | null }[]
+  >;
   getAppUser(id: string): Promise<AppUser | undefined>;
   getAppUserByMobile(mobileNumber: string): Promise<AppUser | undefined>;
   getAppUserByEmail(email: string): Promise<AppUser | undefined>;
@@ -284,6 +320,11 @@ export interface IStorage {
   // Mapped Volunteers
   getMappedVolunteers(): Promise<MappedVolunteer[]>;
   getMappedVolunteersForList(): Promise<MappedVolunteer[]>;
+  listMappedVolunteersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<{ items: MappedVolunteer[]; total: number; limit: number; offset: number }>;
   getMappedVolunteer(id: string): Promise<MappedVolunteer | undefined>;
   getMappedVolunteersByUser(appUserId: string): Promise<MappedVolunteer[]>;
   getMappedVolunteersByUserAndVillage(appUserId: string, villageId: string): Promise<MappedVolunteer[]>;
@@ -295,6 +336,11 @@ export interface IStorage {
   // Supporters
   getSupporters(): Promise<Supporter[]>;
   getSupportersForList(): Promise<Supporter[]>;
+  listSupportersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): Promise<{ items: Supporter[]; total: number; limit: number; offset: number }>;
   getSupporter(id: string): Promise<Supporter | undefined>;
   getSupportersByUser(appUserId: string): Promise<Supporter[]>;
   getSupportersByUserAndVillage(appUserId: string, villageId: string): Promise<Supporter[]>;
@@ -935,6 +981,228 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(appUsers).orderBy(desc(appUsers.createdAt));
   }
 
+  async listAppUsersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    role?: string;
+    status?: string;
+    villageIds?: string[];
+  }) {
+    const limit = Math.min(Math.max(Number(opts?.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+    const role = opts?.role && opts.role !== "all" ? opts.role : undefined;
+    const status = opts?.status && opts.status !== "all" ? opts.status : undefined;
+    const villageIds = opts?.villageIds?.filter(Boolean) ?? [];
+
+    const photoFlag = (col: typeof appUsers.selfPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const scopeConditions = [];
+    if (villageIds.length > 0) {
+      scopeConditions.push(inArray(appUsers.mappedAreaId, villageIds));
+    }
+    const scopeWhere = scopeConditions.length ? and(...scopeConditions) : undefined;
+
+    const listConditions = [...scopeConditions];
+    if (safeSearch.length > 0) {
+      listConditions.push(
+        or(
+          ilike(appUsers.name, `%${safeSearch}%`),
+          ilike(appUsers.mobileNumber, `%${safeSearch}%`),
+          ilike(appUsers.email, `%${safeSearch}%`),
+        )!,
+      );
+    }
+    if (role) listConditions.push(eq(appUsers.role, role));
+    if (status === "active") {
+      listConditions.push(or(eq(appUsers.isActive, true), isNull(appUsers.isActive))!);
+    } else if (status === "blocked") {
+      listConditions.push(eq(appUsers.isActive, false));
+    }
+    const listWhere = listConditions.length ? and(...listConditions) : undefined;
+
+    const [statsRow] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        active: sql<number>`count(*) filter (where coalesce(${appUsers.isActive}, true))::int`,
+        blocked: sql<number>`count(*) filter (where ${appUsers.isActive} = false)::int`,
+        volunteers: sql<number>`count(*) filter (where ${appUsers.role} = 'volunteer')::int`,
+        postHolders: sql<number>`count(*) filter (where ${appUsers.role} = 'party_post_holder')::int`,
+        approved: sql<number>`count(*) filter (where ${appUsers.isApproved} = true)::int`,
+        pending: sql<number>`count(*) filter (where coalesce(${appUsers.isApproved}, false) = false)::int`,
+      })
+      .from(appUsers)
+      .where(scopeWhere);
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(appUsers)
+      .where(listWhere);
+
+    const rows = await db
+      .select({
+        id: appUsers.id,
+        mobileNumber: appUsers.mobileNumber,
+        email: appUsers.email,
+        name: appUsers.name,
+        role: appUsers.role,
+        roleType: appUsers.roleType,
+        voterId: appUsers.voterId,
+        aadhaarNumber: appUsers.aadhaarNumber,
+        currentPosition: appUsers.currentPosition,
+        level: appUsers.level,
+        mappedAreaId: appUsers.mappedAreaId,
+        mappedAreaName: appUsers.mappedAreaName,
+        mappedZone: appUsers.mappedZone,
+        mappedDistrict: appUsers.mappedDistrict,
+        mappedHalka: appUsers.mappedHalka,
+        mappedBlockNumber: appUsers.mappedBlockNumber,
+        wing: appUsers.wing,
+        otherWingName: appUsers.otherWingName,
+        govWing: appUsers.govWing,
+        govPositionId: appUsers.govPositionId,
+        jurisdictionVillageIds: appUsers.jurisdictionVillageIds,
+        ocrName: appUsers.ocrName,
+        ocrAadhaarNumber: appUsers.ocrAadhaarNumber,
+        ocrVoterId: appUsers.ocrVoterId,
+        ocrDob: appUsers.ocrDob,
+        ocrGender: appUsers.ocrGender,
+        ocrAddress: appUsers.ocrAddress,
+        registrationSource: appUsers.registrationSource,
+        isActive: appUsers.isActive,
+        isApproved: appUsers.isApproved,
+        createdAt: appUsers.createdAt,
+        selfPhoto: photoFlag(appUsers.selfPhoto),
+        aadhaarPhoto: photoFlag(appUsers.aadhaarPhoto),
+        aadhaarPhotoBack: photoFlag(appUsers.aadhaarPhotoBack),
+        voterCardPhoto: photoFlag(appUsers.voterCardPhoto),
+        voterCardPhotoBack: photoFlag(appUsers.voterCardPhotoBack),
+      })
+      .from(appUsers)
+      .where(listWhere)
+      .orderBy(desc(appUsers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const items = rows.map((row) => ({
+      ...row,
+      selfPhoto: row.selfPhoto ? "1" : null,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    })) as AppUser[];
+
+    return {
+      items,
+      total: countRow?.n ?? 0,
+      limit,
+      offset,
+      stats: {
+        total: statsRow?.total ?? 0,
+        active: statsRow?.active ?? 0,
+        blocked: statsRow?.blocked ?? 0,
+        volunteers: statsRow?.volunteers ?? 0,
+        postHolders: statsRow?.postHolders ?? 0,
+        approved: statsRow?.approved ?? 0,
+        pending: statsRow?.pending ?? 0,
+      },
+    };
+  }
+
+  async listBirthdaysForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }) {
+    const limit = Math.min(Math.max(Number(opts?.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+
+    const activeWhere = or(eq(appUsers.isActive, true), isNull(appUsers.isActive));
+    const whereClause =
+      safeSearch.length > 0
+        ? and(
+            activeWhere,
+            or(
+              ilike(appUsers.name, `%${safeSearch}%`),
+              ilike(appUsers.mobileNumber, `%${safeSearch}%`),
+            ),
+          )
+        : activeWhere;
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(appUsers)
+      .where(whereClause);
+
+    const rows = await db
+      .select({
+        id: appUsers.id,
+        name: appUsers.name,
+        ocrDob: appUsers.ocrDob,
+        mobileNumber: appUsers.mobileNumber,
+        role: appUsers.role,
+        hasPhoto: sql<boolean>`(${appUsers.selfPhoto} IS NOT NULL AND ${appUsers.selfPhoto} <> '')`,
+      })
+      .from(appUsers)
+      .where(whereClause)
+      .orderBy(desc(appUsers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        ocrDob: r.ocrDob,
+        mobileNumber: r.mobileNumber,
+        role: r.role,
+        hasPhoto: !!r.hasPhoto,
+      })),
+      total: countRow?.n ?? 0,
+      limit,
+      offset,
+    };
+  }
+
+  async getAppUserVoterIds(): Promise<string[]> {
+    const rows = await db
+      .select({ voterId: appUsers.voterId })
+      .from(appUsers)
+      .where(and(sql`${appUsers.voterId} IS NOT NULL`, sql`${appUsers.voterId} <> ''`));
+    return rows.map((r) => (r.voterId || "").trim().toUpperCase()).filter(Boolean);
+  }
+
+  async getBirthdaysMetadataAll() {
+    const activeWhere = or(eq(appUsers.isActive, true), isNull(appUsers.isActive));
+    const rows = await db
+      .select({
+        id: appUsers.id,
+        name: appUsers.name,
+        ocrDob: appUsers.ocrDob,
+        mobileNumber: appUsers.mobileNumber,
+        role: appUsers.role,
+        hasPhoto: sql<boolean>`(${appUsers.selfPhoto} IS NOT NULL AND ${appUsers.selfPhoto} <> '')`,
+      })
+      .from(appUsers)
+      .where(activeWhere)
+      .orderBy(desc(appUsers.createdAt));
+
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      ocrDob: r.ocrDob,
+      mobileNumber: r.mobileNumber,
+      role: r.role,
+      hasPhoto: !!r.hasPhoto,
+    }));
+  }
+
   async getAppUser(id: string): Promise<AppUser | undefined> {
     const [user] = await db.select().from(appUsers).where(eq(appUsers.id, id));
     return user;
@@ -1065,6 +1333,75 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async listMappedVolunteersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }) {
+    const limit = Math.min(Math.max(Number(opts?.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+
+    const hasBlob = (col: typeof mappedVolunteers.volunteerPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const whereClause =
+      safeSearch.length > 0
+        ? or(
+            ilike(mappedVolunteers.name, `%${safeSearch}%`),
+            ilike(mappedVolunteers.mobileNumber, `%${safeSearch}%`),
+            ilike(mappedVolunteers.voterId, `%${safeSearch}%`),
+          )
+        : undefined;
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(mappedVolunteers)
+      .where(whereClause);
+
+    const rows = await db
+      .select({
+        id: mappedVolunteers.id,
+        addedByUserId: mappedVolunteers.addedByUserId,
+        name: mappedVolunteers.name,
+        mobileNumber: mappedVolunteers.mobileNumber,
+        category: mappedVolunteers.category,
+        voterId: mappedVolunteers.voterId,
+        ocrName: mappedVolunteers.ocrName,
+        ocrAadhaarNumber: mappedVolunteers.ocrAadhaarNumber,
+        ocrVoterId: mappedVolunteers.ocrVoterId,
+        ocrDob: mappedVolunteers.ocrDob,
+        ocrGender: mappedVolunteers.ocrGender,
+        ocrAddress: mappedVolunteers.ocrAddress,
+        isVerified: mappedVolunteers.isVerified,
+        selectedVillageId: mappedVolunteers.selectedVillageId,
+        selectedVillageName: mappedVolunteers.selectedVillageName,
+        createdAt: mappedVolunteers.createdAt,
+        volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
+        aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),
+        aadhaarPhotoBack: hasBlob(mappedVolunteers.aadhaarPhotoBack),
+        voterCardPhoto: hasBlob(mappedVolunteers.voterCardPhoto),
+        voterCardPhotoBack: hasBlob(mappedVolunteers.voterCardPhotoBack),
+      })
+      .from(mappedVolunteers)
+      .where(whereClause)
+      .orderBy(desc(mappedVolunteers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const items = rows.map((row) => ({
+      ...row,
+      volunteerPhoto: row.volunteerPhoto ? "1" : null,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    })) as MappedVolunteer[];
+
+    return { items, total: countRow?.n ?? 0, limit, offset };
+  }
+
   async getMappedVolunteer(id: string): Promise<MappedVolunteer | undefined> {
     const [vol] = await db.select().from(mappedVolunteers).where(eq(mappedVolunteers.id, id));
     return vol;
@@ -1137,6 +1474,71 @@ export class DatabaseStorage implements IStorage {
       voterCardPhoto: row.voterCardPhoto ? "1" : null,
       voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
     }));
+  }
+
+  async listSupportersForAdmin(opts?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }) {
+    const limit = Math.min(Math.max(Number(opts?.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const rawSearch = (opts?.search ?? "").trim();
+    const safeSearch = rawSearch.replace(/[%_\\]/g, "");
+
+    const hasBlob = (col: typeof supporters.aadhaarPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const whereClause =
+      safeSearch.length > 0
+        ? or(
+            ilike(supporters.name, `%${safeSearch}%`),
+            ilike(supporters.mobileNumber, `%${safeSearch}%`),
+            ilike(supporters.voterId, `%${safeSearch}%`),
+          )
+        : undefined;
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(supporters)
+      .where(whereClause);
+
+    const rows = await db
+      .select({
+        id: supporters.id,
+        addedByUserId: supporters.addedByUserId,
+        name: supporters.name,
+        mobileNumber: supporters.mobileNumber,
+        voterId: supporters.voterId,
+        ocrName: supporters.ocrName,
+        ocrAadhaarNumber: supporters.ocrAadhaarNumber,
+        ocrVoterId: supporters.ocrVoterId,
+        ocrDob: supporters.ocrDob,
+        ocrGender: supporters.ocrGender,
+        ocrAddress: supporters.ocrAddress,
+        selectedVillageId: supporters.selectedVillageId,
+        selectedVillageName: supporters.selectedVillageName,
+        createdAt: supporters.createdAt,
+        aadhaarPhoto: hasBlob(supporters.aadhaarPhoto),
+        aadhaarPhotoBack: hasBlob(supporters.aadhaarPhotoBack),
+        voterCardPhoto: hasBlob(supporters.voterCardPhoto),
+        voterCardPhotoBack: hasBlob(supporters.voterCardPhotoBack),
+      })
+      .from(supporters)
+      .where(whereClause)
+      .orderBy(desc(supporters.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const items = rows.map((row) => ({
+      ...row,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    })) as Supporter[];
+
+    return { items, total: countRow?.n ?? 0, limit, offset };
   }
 
   async getSupporter(id: string): Promise<Supporter | undefined> {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -62,6 +62,23 @@ type AppUserFormData = z.infer<typeof appUserSchema>;
 type AdminFormData = z.infer<typeof adminSchema>;
 
 const LEVELS = ["State", "Zone", "District", "Halka", "Block", "Village/Ward"];
+const USER_PAGE_SIZE = 50;
+
+type AppUsersPageResponse = {
+  items: AppUser[];
+  total: number;
+  limit: number;
+  offset: number;
+  stats: {
+    total: number;
+    active: number;
+    blocked: number;
+    volunteers: number;
+    postHolders: number;
+    approved: number;
+    pending: number;
+  };
+};
 
 export default function UserManagementPage() {
   const { toast } = useToast();
@@ -80,6 +97,50 @@ export default function UserManagementPage() {
   })();
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [pageIndex, setPageIndex] = useState(0);
+
+  const adminAssignedVillages: string[] = (() => {
+    try {
+      const stored = localStorage.getItem("adminAssignedVillages");
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  })();
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [search, roleFilter, statusFilter]);
+
+  const { data: usersPage, isLoading: usersLoading } = useQuery<AppUsersPageResponse>({
+    queryKey: ["/api/admin/app-users", pageIndex, search, roleFilter, statusFilter, adminAssignedVillages.join(",")],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set("limit", String(USER_PAGE_SIZE));
+      params.set("offset", String(pageIndex * USER_PAGE_SIZE));
+      if (search.trim()) params.set("search", search.trim());
+      if (roleFilter !== "all") params.set("role", roleFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (adminAssignedVillages.length > 0) {
+        params.set("villageIds", adminAssignedVillages.join(","));
+      }
+      const res = await fetch(`/api/admin/app-users?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    },
+  });
+
+  const appUsers = usersPage?.items ?? [];
+  const listTotal = usersPage?.total ?? 0;
+  const stats = usersPage?.stats ?? {
+    total: 0,
+    active: 0,
+    blocked: 0,
+    volunteers: 0,
+    postHolders: 0,
+    approved: 0,
+    pending: 0,
+  };
+  const canPrevPage = pageIndex > 0;
+  const canNextPage = (pageIndex + 1) * USER_PAGE_SIZE < listTotal;
 
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const [editUser, setEditUser] = useState<{ open: boolean; id: string; name: string; role: string; wing: string; govWing: string; currentPosition: string; level: string }>({
@@ -95,10 +156,6 @@ export default function UserManagementPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [reset2faTarget, setReset2faTarget] = useState<{ open: boolean; id: string; name: string } | null>(null);
-
-  const { data: appUsers, isLoading: usersLoading } = useQuery<AppUser[]>({
-    queryKey: ["/api/admin/app-users"],
-  });
 
   const { data: managers, isLoading: managersLoading } = useQuery<OfficeManager[]>({
     queryKey: ["/api/office-managers"],
@@ -289,51 +346,43 @@ export default function UserManagementPage() {
     },
   });
 
-  const adminAssignedVillages: string[] = (() => {
+  const handleExportUsers = async () => {
     try {
-      const stored = localStorage.getItem("adminAssignedVillages");
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  })();
-
-  const areaFilteredUsers = adminAssignedVillages.length > 0
-    ? appUsers?.filter(u => u.mappedAreaId && adminAssignedVillages.includes(u.mappedAreaId)) || []
-    : appUsers || [];
-
-  const filteredUsers = areaFilteredUsers.filter((u) => {
-    const matchesSearch = !search ||
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      (u.mobileNumber || "").includes(search);
-    const matchesRole = roleFilter === "all" || u.role === roleFilter;
-    const matchesStatus = statusFilter === "all" ||
-      (statusFilter === "active" && u.isActive !== false) ||
-      (statusFilter === "blocked" && u.isActive === false);
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const handleExportUsers = () => {
-    if (!filteredUsers.length) return;
-    const headers = ["Name", "Mobile", "Role", "Wing", "Position", "Level", "Village", "Zone", "District", "Halka", "Block", "Source", "Status", "Joined"];
-    const rows = filteredUsers.map(u => [
-      u.name, u.mobileNumber, u.role === "party_post_holder" ? "Post Holder" : "Volunteer",
-      u.wing || "", u.currentPosition || "", u.level || "", u.mappedAreaName || "",
-      u.mappedZone || "", u.mappedDistrict || "", u.mappedHalka || "", u.mappedBlockNumber || "",
-      u.registrationSource === "google" ? "Google" : "Email OTP",
-      u.isActive !== false ? "Active" : "Blocked",
-      u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "",
-    ]);
-    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
-    downloadCSV(csv, "app_users.csv");
-  };
-
-  const stats = {
-    total: areaFilteredUsers.length,
-    active: areaFilteredUsers.filter(u => u.isActive !== false).length,
-    blocked: areaFilteredUsers.filter(u => u.isActive === false).length,
-    volunteers: areaFilteredUsers.filter(u => u.role === "volunteer").length,
-    postHolders: areaFilteredUsers.filter(u => u.role === "party_post_holder").length,
-    approved: areaFilteredUsers.filter(u => u.isApproved).length,
-    pending: areaFilteredUsers.filter(u => !u.isApproved).length,
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      if (roleFilter !== "all") params.set("role", roleFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (adminAssignedVillages.length > 0) {
+        params.set("villageIds", adminAssignedVillages.join(","));
+      }
+      const allUsers: AppUser[] = [];
+      let offset = 0;
+      const batch = 200;
+      while (true) {
+        params.set("limit", String(batch));
+        params.set("offset", String(offset));
+        const res = await fetch(`/api/admin/app-users?${params}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Export failed");
+        const page: AppUsersPageResponse = await res.json();
+        allUsers.push(...page.items);
+        if (allUsers.length >= page.total || page.items.length === 0) break;
+        offset += batch;
+      }
+      if (!allUsers.length) return;
+      const headers = ["Name", "Mobile", "Role", "Wing", "Position", "Level", "Village", "Zone", "District", "Halka", "Block", "Source", "Status", "Joined"];
+      const rows = allUsers.map(u => [
+        u.name, u.mobileNumber, u.role === "party_post_holder" ? "Post Holder" : "Volunteer",
+        u.wing || "", u.currentPosition || "", u.level || "", u.mappedAreaName || "",
+        u.mappedZone || "", u.mappedDistrict || "", u.mappedHalka || "", u.mappedBlockNumber || "",
+        u.registrationSource === "google" ? "Google" : "Email OTP",
+        u.isActive !== false ? "Active" : "Blocked",
+        u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "",
+      ]);
+      const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+      downloadCSV(csv, "app_users.csv");
+    } catch {
+      toast({ title: "Failed to export users", variant: "destructive" });
+    }
   };
 
   return (
@@ -449,7 +498,7 @@ export default function UserManagementPage() {
                 <div className="space-y-2">
                   {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
-              ) : !filteredUsers.length ? (
+              ) : !appUsers.length ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p data-testid="text-no-users">No users found</p>
@@ -471,7 +520,7 @@ export default function UserManagementPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredUsers.map((user) => {
+                      {appUsers.map((user) => {
                         const profile = getProfileCompletion(user);
                         return (
                         <TableRow key={user.id} className={user.isActive === false ? "opacity-60" : ""} data-testid={`row-user-${user.id}`}>
@@ -576,9 +625,36 @@ export default function UserManagementPage() {
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground" data-testid="text-showing-count">
-                Showing {filteredUsers.length} of {areaFilteredUsers.length} users
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4">
+                <p className="text-xs text-muted-foreground" data-testid="text-showing-count">
+                  {listTotal === 0
+                    ? "Showing 0 users"
+                    : `Showing ${pageIndex * USER_PAGE_SIZE + 1}–${Math.min((pageIndex + 1) * USER_PAGE_SIZE, listTotal)} of ${listTotal} users`}
+                </p>
+                {listTotal > USER_PAGE_SIZE && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!canPrevPage}
+                      onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Page {pageIndex + 1} of {Math.ceil(listTotal / USER_PAGE_SIZE) || 1}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!canNextPage}
+                      onClick={() => setPageIndex((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

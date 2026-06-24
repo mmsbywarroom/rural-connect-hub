@@ -42,6 +42,59 @@ function truncateId(id: string): string {
   return id.length > 8 ? id.slice(0, 8) + "..." : id;
 }
 
+const EXPORT_PAGE_SIZE = 50;
+
+type Paginated<T> = { items: T[]; total: number; limit: number; offset: number };
+
+function ListPagination({
+  pageIndex,
+  pageSize,
+  total,
+  onPageChange,
+}: {
+  pageIndex: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (total <= pageSize) return null;
+  const canPrev = pageIndex > 0;
+  const canNext = (pageIndex + 1) * pageSize < total;
+  return (
+    <div className="flex items-center justify-between gap-3 mt-4">
+      <p className="text-xs text-muted-foreground">
+        Showing {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, total)} of {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={!canPrev} onClick={() => onPageChange(pageIndex - 1)}>
+          Previous
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Page {pageIndex + 1} of {Math.ceil(total / pageSize) || 1}
+        </span>
+        <Button variant="outline" size="sm" disabled={!canNext} onClick={() => onPageChange(pageIndex + 1)}>
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+async function fetchAllPaginated<T>(baseUrl: string, pageSize = 200): Promise<T[]> {
+  const all: T[] = [];
+  let offset = 0;
+  while (true) {
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    const res = await fetch(`${baseUrl}${sep}limit=${pageSize}&offset=${offset}`, { credentials: "include" });
+    if (!res.ok) throw new Error("Fetch failed");
+    const page: Paginated<T> = await res.json();
+    all.push(...page.items);
+    if (all.length >= page.total || page.items.length === 0) break;
+    offset += pageSize;
+  }
+  return all;
+}
+
 interface DocumentData {
   name: string;
   aadhaarPhoto?: string | null;
@@ -174,6 +227,9 @@ export default function DataExportPage() {
   const [batchDeleteConfirm, setBatchDeleteConfirm] = useState<{ open: boolean; type: "user" | "volunteer" | "supporter"; count: number }>({
     open: false, type: "user", count: 0,
   });
+  const [usersPageIndex, setUsersPageIndex] = useState(0);
+  const [volunteersPageIndex, setVolunteersPageIndex] = useState(0);
+  const [supportersPageIndex, setSupportersPageIndex] = useState(0);
 
   const editMutation = useMutation({
     mutationFn: async (data: { id: string; updates: Record<string, string> }) => {
@@ -290,7 +346,7 @@ export default function DataExportPage() {
     },
   });
 
-  const { data: appUsers, isLoading: usersLoading } = useQuery<{
+  const { data: appUsersPage, isLoading: usersLoading } = useQuery<Paginated<{
     id: string;
     mobileNumber: string;
     name: string;
@@ -318,17 +374,50 @@ export default function DataExportPage() {
     selfPhoto: string | null;
     isActive: boolean | null;
     createdAt: string | null;
-  }[]>({
-    queryKey: ["/api/export/app-users"],
+  }>>({
+    queryKey: ["/api/export/app-users", usersPageIndex],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: String(EXPORT_PAGE_SIZE),
+        offset: String(usersPageIndex * EXPORT_PAGE_SIZE),
+      });
+      const res = await fetch(`/api/export/app-users?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch app users");
+      return res.json();
+    },
   });
+  const appUsers = appUsersPage?.items ?? [];
+  const appUsersTotal = appUsersPage?.total ?? 0;
 
-  const { data: mappedVolunteers, isLoading: volunteersLoading } = useQuery<MappedVolunteerWithName[]>({
-    queryKey: ["/api/mapped-volunteers"],
+  const { data: mappedVolunteersPage, isLoading: volunteersLoading } = useQuery<Paginated<MappedVolunteerWithName>>({
+    queryKey: ["/api/mapped-volunteers", volunteersPageIndex],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: String(EXPORT_PAGE_SIZE),
+        offset: String(volunteersPageIndex * EXPORT_PAGE_SIZE),
+      });
+      const res = await fetch(`/api/mapped-volunteers?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch mapped volunteers");
+      return res.json();
+    },
   });
+  const mappedVolunteers = mappedVolunteersPage?.items ?? [];
+  const mappedVolunteersTotal = mappedVolunteersPage?.total ?? 0;
 
-  const { data: supportersList, isLoading: supportersLoading } = useQuery<SupporterWithName[]>({
-    queryKey: ["/api/supporters"],
+  const { data: supportersPage, isLoading: supportersLoading } = useQuery<Paginated<SupporterWithName>>({
+    queryKey: ["/api/supporters", supportersPageIndex],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: String(EXPORT_PAGE_SIZE),
+        offset: String(supportersPageIndex * EXPORT_PAGE_SIZE),
+      });
+      const res = await fetch(`/api/supporters?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch supporters");
+      return res.json();
+    },
   });
+  const supportersList = supportersPage?.items ?? [];
+  const supportersTotal = supportersPage?.total ?? 0;
 
   const parsedSubmissions = submissions?.map((s) => {
     let parsed: Record<string, unknown> = {};
@@ -360,37 +449,42 @@ export default function DataExportPage() {
     downloadCSV([headerRow, ...dataRows].join("\n"), "task-submissions.csv");
   };
 
-  const handleExportUsers = () => {
-    if (!appUsers?.length) return;
-    const headerRow = ["Name", "Mobile", "Role", "Zone", "District", "Halka (AC)", "Block", "Unit", "Position", "Level", "Wing", "Voter ID", "Aadhaar Number", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Created Date"]
-      .map(escapeCSVField)
-      .join(",");
-    const dataRows = appUsers.map((u) => {
-      const fields = [
-        u.name,
-        u.mobileNumber,
-        u.role,
-        u.mappedZone ?? "",
-        u.mappedDistrict ?? "",
-        u.mappedHalka ?? "",
-        u.mappedBlockNumber ?? "",
-        u.mappedAreaName ?? "",
-        u.currentPosition ?? "",
-        u.level ?? "",
-        u.wing ?? "",
-        u.voterId ?? "",
-        u.aadhaarNumber ?? "",
-        u.ocrName ?? "",
-        u.ocrAadhaarNumber ?? "",
-        u.ocrVoterId ?? "",
-        u.ocrDob ?? "",
-        u.ocrGender ?? "",
-        u.ocrAddress ?? "",
-        u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "",
-      ];
-      return fields.map(escapeCSVField).join(",");
-    });
-    downloadCSV([headerRow, ...dataRows].join("\n"), "app-users.csv");
+  const handleExportUsers = async () => {
+    try {
+      const all = await fetchAllPaginated<typeof appUsers[0]>("/api/export/app-users");
+      if (!all.length) return;
+      const headerRow = ["Name", "Mobile", "Role", "Zone", "District", "Halka (AC)", "Block", "Unit", "Position", "Level", "Wing", "Voter ID", "Aadhaar Number", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Created Date"]
+        .map(escapeCSVField)
+        .join(",");
+      const dataRows = all.map((u) => {
+        const fields = [
+          u.name,
+          u.mobileNumber,
+          u.role,
+          u.mappedZone ?? "",
+          u.mappedDistrict ?? "",
+          u.mappedHalka ?? "",
+          u.mappedBlockNumber ?? "",
+          u.mappedAreaName ?? "",
+          u.currentPosition ?? "",
+          u.level ?? "",
+          u.wing ?? "",
+          u.voterId ?? "",
+          u.aadhaarNumber ?? "",
+          u.ocrName ?? "",
+          u.ocrAadhaarNumber ?? "",
+          u.ocrVoterId ?? "",
+          u.ocrDob ?? "",
+          u.ocrGender ?? "",
+          u.ocrAddress ?? "",
+          u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "",
+        ];
+        return fields.map(escapeCSVField).join(",");
+      });
+      downloadCSV([headerRow, ...dataRows].join("\n"), "app-users.csv");
+    } catch {
+      toast({ title: "Failed to export users", variant: "destructive" });
+    }
   };
 
   const attachmentLink = (type: "mapped-volunteers" | "supporters", id: string, field: string, hasData: string | null | undefined) => {
@@ -398,12 +492,14 @@ export default function DataExportPage() {
     return `${window.location.origin}/api/export/${type}/${id}/attachment/${field}`;
   };
 
-  const handleExportVolunteers = () => {
-    if (!mappedVolunteers?.length) return;
+  const handleExportVolunteers = async () => {
+    try {
+      const all = await fetchAllPaginated<MappedVolunteerWithName>("/api/mapped-volunteers");
+      if (!all.length) return;
     const headerRow = ["Name", "Mobile", "Category", "Voter ID", "Verified", "Added By", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Aadhaar Photo Front", "Aadhaar Photo Back", "Voter Card Front", "Voter Card Back", "Village/Unit", "Created Date"]
       .map(escapeCSVField)
       .join(",");
-    const dataRows = mappedVolunteers.map((v) => {
+    const dataRows = all.map((v) => {
       const fields = [
         v.name,
         v.mobileNumber,
@@ -427,14 +523,19 @@ export default function DataExportPage() {
       return fields.map(escapeCSVField).join(",");
     });
     downloadCSV([headerRow, ...dataRows].join("\n"), "mapped-volunteers.csv");
+    } catch {
+      toast({ title: "Failed to export volunteers", variant: "destructive" });
+    }
   };
 
-  const handleExportSupporters = () => {
-    if (!supportersList?.length) return;
+  const handleExportSupporters = async () => {
+    try {
+      const all = await fetchAllPaginated<SupporterWithName>("/api/supporters");
+      if (!all.length) return;
     const headerRow = ["Name", "Mobile", "Added By", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Aadhaar Photo Front", "Aadhaar Photo Back", "Voter Card Front", "Voter Card Back", "Village/Unit", "Created Date"]
       .map(escapeCSVField)
       .join(",");
-    const dataRows = supportersList.map((s) => {
+    const dataRows = all.map((s) => {
       const fields = [
         s.name,
         s.mobileNumber,
@@ -455,6 +556,9 @@ export default function DataExportPage() {
       return fields.map(escapeCSVField).join(",");
     });
     downloadCSV([headerRow, ...dataRows].join("\n"), "supporters.csv");
+    } catch {
+      toast({ title: "Failed to export supporters", variant: "destructive" });
+    }
   };
 
   const hasUserDocs = (user: { aadhaarPhoto: string | null; aadhaarPhotoBack: string | null; voterCardPhoto: string | null; voterCardPhotoBack: string | null; selfPhoto?: string | null }) => {
@@ -503,7 +607,7 @@ export default function DataExportPage() {
                   <Button
                     variant="outline"
                     onClick={handleExportUsers}
-                    disabled={!appUsers?.length}
+                    disabled={!appUsersTotal}
                     data-testid="button-export-users"
                   >
                     <Download className="h-4 w-4 mr-2" />
@@ -517,7 +621,7 @@ export default function DataExportPage() {
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
-              ) : !appUsers?.length ? (
+              ) : !appUsersTotal ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Database className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p data-testid="text-no-users">No app users found</p>
@@ -664,6 +768,12 @@ export default function DataExportPage() {
                   </Table>
                 </div>
               )}
+              <ListPagination
+                pageIndex={usersPageIndex}
+                pageSize={EXPORT_PAGE_SIZE}
+                total={appUsersTotal}
+                onPageChange={setUsersPageIndex}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -689,7 +799,7 @@ export default function DataExportPage() {
                     <Button
                       variant="outline"
                       onClick={handleExportVolunteers}
-                      disabled={!mappedVolunteers?.length}
+                      disabled={!mappedVolunteersTotal}
                       data-testid="button-export-volunteers"
                     >
                       <Download className="h-4 w-4 mr-2" />
@@ -697,29 +807,11 @@ export default function DataExportPage() {
                     </Button>
                   </div>
                 </div>
-                {mappedVolunteers && mappedVolunteers.length > 0 && (
+                {mappedVolunteersTotal > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
                     <div>
                       <p className="font-semibold text-slate-700 text-xs">Total volunteers</p>
-                      <p className="text-sm text-slate-900">{mappedVolunteers.length}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">Unique mobiles</p>
-                      <p className="text-sm text-slate-900">
-                        {new Set(mappedVolunteers.map(v => v.mobileNumber)).size}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">With Aadhaar attached</p>
-                      <p className="text-sm text-slate-900">
-                        {mappedVolunteers.filter(v => v.aadhaarPhoto || v.aadhaarPhotoBack || v.ocrAadhaarNumber).length}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">With Voter ID attached</p>
-                      <p className="text-sm text-slate-900">
-                        {mappedVolunteers.filter(v => v.voterCardPhoto || v.voterCardPhotoBack || v.ocrVoterId).length}
-                      </p>
+                      <p className="text-sm text-slate-900">{mappedVolunteersTotal.toLocaleString()}</p>
                     </div>
                   </div>
                 )}
@@ -730,7 +822,7 @@ export default function DataExportPage() {
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
-              ) : !mappedVolunteers?.length ? (
+              ) : !mappedVolunteersTotal ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Database className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p data-testid="text-no-volunteers">No mapped volunteers found</p>
@@ -824,6 +916,12 @@ export default function DataExportPage() {
                   </Table>
                 </div>
               )}
+              <ListPagination
+                pageIndex={volunteersPageIndex}
+                pageSize={EXPORT_PAGE_SIZE}
+                total={mappedVolunteersTotal}
+                onPageChange={setVolunteersPageIndex}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -849,7 +947,7 @@ export default function DataExportPage() {
                     <Button
                       variant="outline"
                       onClick={handleExportSupporters}
-                      disabled={!supportersList?.length}
+                      disabled={!supportersTotal}
                       data-testid="button-export-supporters"
                     >
                       <Download className="h-4 w-4 mr-2" />
@@ -857,29 +955,11 @@ export default function DataExportPage() {
                     </Button>
                   </div>
                 </div>
-                {supportersList && supportersList.length > 0 && (
+                {supportersTotal > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
                     <div>
                       <p className="font-semibold text-slate-700 text-xs">Total supporters</p>
-                      <p className="text-sm text-slate-900">{supportersList.length}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">Unique mobiles</p>
-                      <p className="text-sm text-slate-900">
-                        {new Set(supportersList.map(s => s.mobileNumber)).size}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">With Aadhaar attached</p>
-                      <p className="text-sm text-slate-900">
-                        {supportersList.filter(s => s.aadhaarPhoto || s.aadhaarPhotoBack || s.ocrAadhaarNumber).length}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-700 text-xs">With Voter ID attached</p>
-                      <p className="text-sm text-slate-900">
-                        {supportersList.filter(s => s.voterCardPhoto || s.voterCardPhotoBack || s.ocrVoterId).length}
-                      </p>
+                      <p className="text-sm text-slate-900">{supportersTotal.toLocaleString()}</p>
                     </div>
                   </div>
                 )}
@@ -890,7 +970,7 @@ export default function DataExportPage() {
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
                 </div>
-              ) : !supportersList?.length ? (
+              ) : !supportersTotal ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Database className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p data-testid="text-no-supporters">No supporters found</p>
@@ -974,6 +1054,12 @@ export default function DataExportPage() {
                   </Table>
                 </div>
               )}
+              <ListPagination
+                pageIndex={supportersPageIndex}
+                pageSize={EXPORT_PAGE_SIZE}
+                total={supportersTotal}
+                onPageChange={setSupportersPageIndex}
+              />
             </CardContent>
           </Card>
         </TabsContent>

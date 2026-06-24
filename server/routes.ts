@@ -11,6 +11,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, sendCustomSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
+import { parseListParams } from "./pagination";
 import bcrypt from "bcryptjs";
 import { sql, count, eq, desc, gte, lte, and, or, inArray, ilike } from "drizzle-orm";
 import {
@@ -2239,14 +2240,20 @@ export async function registerRoutes(
   // Mapped Volunteers
   app.get("/api/mapped-volunteers", async (req, res) => {
     try {
-      const volunteers = await storage.getMappedVolunteersForList();
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const page = await storage.listMappedVolunteersForAdmin({
+        limit: p.limit,
+        offset: p.offset,
+        search,
+      });
       const allUsers = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-      const enriched = volunteers.map(v => ({
+      const enriched = page.items.map(v => ({
         ...v,
         addedByName: userMap.get(v.addedByUserId) || v.addedByUserId,
       }));
-      res.json(enriched);
+      res.json({ ...page, items: enriched });
     } catch (error) {
       console.error("[mapped-volunteers] List failed:", error);
       res.status(500).json({ error: "Failed to fetch mapped volunteers" });
@@ -2335,14 +2342,20 @@ export async function registerRoutes(
   // Supporters
   app.get("/api/supporters", async (req, res) => {
     try {
-      const supportersList = await storage.getSupportersForList();
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const page = await storage.listSupportersForAdmin({
+        limit: p.limit,
+        offset: p.offset,
+        search,
+      });
       const allUsers = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(allUsers.map(u => [u.id, u.name]));
-      const enriched = supportersList.map(s => ({
+      const enriched = page.items.map(s => ({
         ...s,
         addedByName: userMap.get(s.addedByUserId) || s.addedByUserId,
       }));
-      res.json(enriched);
+      res.json({ ...page, items: enriched });
     } catch (error) {
       console.error("[supporters] List failed:", error);
       res.status(500).json({ error: "Failed to fetch supporters" });
@@ -3117,21 +3130,43 @@ export async function registerRoutes(
     }
   });
 
-  // Admin - List All App Users
+  // Admin - List All App Users (paginated, lightweight — no photo blobs)
   app.get("/api/admin/app-users", async (req, res) => {
     try {
-      const users = await storage.getAppUsers();
-      const lightweight = users.map(({ selfPhoto, aadhaarPhoto, aadhaarPhotoBack, voterCardPhoto, voterCardPhotoBack, ...rest }) => ({
-        ...rest,
-        selfPhoto: selfPhoto ? true : null,
-        aadhaarPhoto: aadhaarPhoto ? true : null,
-        aadhaarPhotoBack: aadhaarPhotoBack ? true : null,
-        voterCardPhoto: voterCardPhoto ? true : null,
-        voterCardPhotoBack: voterCardPhotoBack ? true : null,
-      }));
-      res.json(lightweight);
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const role = typeof req.query.role === "string" ? req.query.role : undefined;
+      const status = typeof req.query.status === "string" ? req.query.status : undefined;
+      const villageIdsRaw = req.query.villageIds;
+      const villageIds =
+        typeof villageIdsRaw === "string"
+          ? villageIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+          : Array.isArray(villageIdsRaw)
+            ? villageIdsRaw.map(String).filter(Boolean)
+            : undefined;
+
+      const page = await storage.listAppUsersForAdmin({
+        limit: p.limit,
+        offset: p.offset,
+        search,
+        role,
+        status,
+        villageIds,
+      });
+      res.json(page);
     } catch (error) {
+      console.error("[admin/app-users] List failed:", error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Lightweight voter IDs for cross-reference (voter database badges)
+  app.get("/api/admin/app-users/voter-ids", async (_req, res) => {
+    try {
+      const voterIds = await storage.getAppUserVoterIds();
+      res.json(voterIds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch voter IDs" });
     }
   });
 
@@ -3301,21 +3336,21 @@ export async function registerRoutes(
     }
   });
 
-  // Birthday Management - Get all users with DOB info
+  // Birthday Management - lightweight metadata (no photo blobs in JSON)
   app.get("/api/admin/birthdays", async (req, res) => {
     try {
-      const users = await storage.getAppUsers();
-      const birthdayList = users
-        .filter((u: any) => u.isActive !== false)
-        .map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          ocrDob: u.ocrDob || null,
-          selfPhoto: u.selfPhoto || null,
-          mobileNumber: u.mobileNumber || null,
-          role: u.role || null,
-        }));
-      res.json(birthdayList);
+      if (req.query.paginated === "true") {
+        const p = parseListParams(req.query as Record<string, unknown>);
+        const search = typeof req.query.search === "string" ? req.query.search : undefined;
+        const page = await storage.listBirthdaysForAdmin({
+          limit: p.limit,
+          offset: p.offset,
+          search,
+        });
+        return res.json(page);
+      }
+      const items = await storage.getBirthdaysMetadataAll();
+      res.json(items);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch birthday data" });
     }
@@ -3406,19 +3441,17 @@ export async function registerRoutes(
     }
   });
 
-  // Data Export - All app users
+  // Data Export - App users (paginated, lightweight)
   app.get("/api/export/app-users", async (req, res) => {
     try {
-      const users = await storage.getAppUsers();
-      const lightweight = users.map(({ selfPhoto, aadhaarPhoto, aadhaarPhotoBack, voterCardPhoto, voterCardPhotoBack, ...rest }) => ({
-        ...rest,
-        selfPhoto: selfPhoto ? true : null,
-        aadhaarPhoto: aadhaarPhoto ? true : null,
-        aadhaarPhotoBack: aadhaarPhotoBack ? true : null,
-        voterCardPhoto: voterCardPhoto ? true : null,
-        voterCardPhotoBack: voterCardPhotoBack ? true : null,
-      }));
-      res.json(lightweight);
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
+      const page = await storage.listAppUsersForAdmin({
+        limit: p.limit,
+        offset: p.offset,
+        search,
+      });
+      res.json(page);
     } catch (error) {
       res.status(500).json({ error: "Failed to export app users" });
     }

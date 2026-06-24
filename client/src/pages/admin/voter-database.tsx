@@ -103,13 +103,11 @@ export default function VoterDatabasePage() {
     },
   });
 
-  const { data: appUsersData } = useQuery<any[]>({
-    queryKey: ['/api/export/app-users'],
+  const { data: appUserVoterIds = [] } = useQuery<string[]>({
+    queryKey: ['/api/admin/app-users/voter-ids'],
   });
 
-  const appUserVoterIds = new Set(
-    (appUsersData || []).filter(u => u.voterId).map(u => u.voterId.toUpperCase())
-  );
+  const voterIdSet = new Set(appUserVoterIds);
 
   const handleSearch = () => {
     setSearchTerm(search);
@@ -193,7 +191,7 @@ export default function VoterDatabasePage() {
                   <TableBody>
                     {records.map((voter) => {
                       const displayName = voter.fullName || [voter.engFirstName, voter.engMiddleName, voter.engLastName].filter(Boolean).join(" ") || "—";
-                      const isMapped = voter.vcardId ? appUserVoterIds.has(voter.vcardId.toUpperCase()) : false;
+                      const isMapped = voter.vcardId ? voterIdSet.has(voter.vcardId.toUpperCase()) : false;
                       return (
                         <TableRow
                           key={voter.id}
@@ -266,7 +264,7 @@ export default function VoterDatabasePage() {
               <Vote className="h-5 w-5 text-blue-600" />
               Voter Details
               {selectedVoter?.vcardId && <Badge variant="outline">{selectedVoter.vcardId}</Badge>}
-              {selectedVoter?.vcardId && appUserVoterIds.has(selectedVoter.vcardId.toUpperCase()) && (
+              {selectedVoter?.vcardId && voterIdSet.has(selectedVoter.vcardId.toUpperCase()) && (
                 <Badge variant="default">Mapped to User</Badge>
               )}
             </DialogTitle>
