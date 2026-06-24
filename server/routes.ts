@@ -2239,8 +2239,8 @@ export async function registerRoutes(
   // Mapped Volunteers
   app.get("/api/mapped-volunteers", async (req, res) => {
     try {
-      const volunteers = await storage.getMappedVolunteers();
-      const allUsers = await storage.getAppUsers();
+      const volunteers = await storage.getMappedVolunteersForList();
+      const allUsers = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(allUsers.map(u => [u.id, u.name]));
       const enriched = volunteers.map(v => ({
         ...v,
@@ -2248,6 +2248,7 @@ export async function registerRoutes(
       }));
       res.json(enriched);
     } catch (error) {
+      console.error("[mapped-volunteers] List failed:", error);
       res.status(500).json({ error: "Failed to fetch mapped volunteers" });
     }
   });
@@ -2334,8 +2335,8 @@ export async function registerRoutes(
   // Supporters
   app.get("/api/supporters", async (req, res) => {
     try {
-      const supportersList = await storage.getSupporters();
-      const allUsers = await storage.getAppUsers();
+      const supportersList = await storage.getSupportersForList();
+      const allUsers = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(allUsers.map(u => [u.id, u.name]));
       const enriched = supportersList.map(s => ({
         ...s,
@@ -2343,6 +2344,7 @@ export async function registerRoutes(
       }));
       res.json(enriched);
     } catch (error) {
+      console.error("[supporters] List failed:", error);
       res.status(500).json({ error: "Failed to fetch supporters" });
     }
   });
@@ -3539,6 +3541,103 @@ export async function registerRoutes(
 
   // ===== ANALYTICS APIs =====
 
+  type TaskReportRow = {
+    id: string;
+    appUserId: string;
+    createdAt: Date | string | null;
+    data: Record<string, string>;
+  };
+
+  type TaskReportField = { fieldKey: string; label: string; fieldType: string };
+
+  function filterTaskReportRowsByDate(
+    rows: TaskReportRow[],
+    startDate?: string,
+    endDate?: string
+  ): TaskReportRow[] {
+    let filtered = rows;
+    if (startDate) {
+      const start = new Date(startDate);
+      filtered = filtered.filter((r) => r.createdAt && new Date(r.createdAt) >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((r) => r.createdAt && new Date(r.createdAt) <= end);
+    }
+    return filtered;
+  }
+
+  const FIXED_TASK_REPORT_FIELDS: Record<string, TaskReportField[]> = {
+    "Volunteer Mapping": [
+      { fieldKey: "name", label: "Volunteer Name", fieldType: "text" },
+      { fieldKey: "mobileNumber", label: "Mobile", fieldType: "phone" },
+      { fieldKey: "category", label: "Category", fieldType: "dropdown" },
+      { fieldKey: "voterId", label: "Voter ID", fieldType: "text" },
+      { fieldKey: "isVerified", label: "OTP Verified", fieldType: "toggle" },
+      { fieldKey: "selectedVillageName", label: "Unit/Village", fieldType: "text" },
+    ],
+    "Supporter Mapping": [
+      { fieldKey: "name", label: "Supporter Name", fieldType: "text" },
+      { fieldKey: "mobileNumber", label: "Mobile", fieldType: "phone" },
+      { fieldKey: "voterId", label: "Voter ID", fieldType: "text" },
+      { fieldKey: "selectedVillageName", label: "Unit/Village", fieldType: "text" },
+    ],
+    "CSC/Camp Report": [
+      { fieldKey: "status", label: "Status", fieldType: "dropdown" },
+      { fieldKey: "notWorkingReason", label: "Not Working Reason", fieldType: "dropdown" },
+      { fieldKey: "selectedVillageName", label: "Unit/Village", fieldType: "text" },
+    ],
+  };
+
+  async function loadFixedTaskReportRows(taskName: string): Promise<TaskReportRow[] | null> {
+    if (taskName === "Volunteer Mapping") {
+      const volunteers = await storage.getMappedVolunteersForList();
+      return volunteers.map((v) => ({
+        id: v.id,
+        appUserId: v.addedByUserId,
+        createdAt: v.createdAt,
+        data: {
+          name: v.name,
+          mobileNumber: v.mobileNumber,
+          category: v.category,
+          voterId: v.voterId ?? "",
+          isVerified: v.isVerified ? "Yes" : "No",
+          selectedVillageName: v.selectedVillageName ?? "",
+        },
+      }));
+    }
+    if (taskName === "Supporter Mapping") {
+      const supportersList = await storage.getSupportersForList();
+      return supportersList.map((s) => ({
+        id: s.id,
+        appUserId: s.addedByUserId,
+        createdAt: s.createdAt,
+        data: {
+          name: s.name,
+          mobileNumber: s.mobileNumber,
+          voterId: s.voterId ?? "",
+          selectedVillageName: s.selectedVillageName ?? "",
+        },
+      }));
+    }
+    if (taskName === "CSC/Camp Report") {
+      const reports = await storage.getCscReports();
+      return reports.map((r) => ({
+        id: r.id,
+        appUserId: r.appUserId,
+        createdAt: r.createdAt,
+        data: {
+          status: r.status,
+          notWorkingReason: r.notWorkingReason ?? "",
+          otherReason: r.otherReason ?? "",
+          selectedVillageName: r.selectedVillageName ?? "",
+        },
+      }));
+    }
+    return null;
+  }
+
   app.get("/api/analytics/overview", async (req, res) => {
     try {
       const allTasks = await storage.getTaskConfigs();
@@ -3725,27 +3824,53 @@ export async function registerRoutes(
       const taskConfig = await storage.getTaskConfig(taskId);
       if (!taskConfig) return res.status(404).json({ error: "Task not found" });
 
-      let submissions = await storage.getTaskSubmissions(taskId);
+      const fixedRows = await loadFixedTaskReportRows(taskConfig.name);
+      let reportRows: TaskReportRow[];
 
-      if (startDate) {
-        submissions = submissions.filter(s => s.createdAt && new Date(s.createdAt) >= new Date(startDate as string));
-      }
-      if (endDate) {
-        const end = new Date(endDate as string);
-        end.setHours(23, 59, 59, 999);
-        submissions = submissions.filter(s => s.createdAt && new Date(s.createdAt) <= end);
+      if (fixedRows) {
+        reportRows = filterTaskReportRowsByDate(
+          fixedRows,
+          typeof startDate === "string" ? startDate : undefined,
+          typeof endDate === "string" ? endDate : undefined
+        );
+      } else {
+        let submissions = await storage.getTaskSubmissions(taskId);
+        if (startDate) {
+          submissions = submissions.filter(s => s.createdAt && new Date(s.createdAt) >= new Date(startDate as string));
+        }
+        if (endDate) {
+          const end = new Date(endDate as string);
+          end.setHours(23, 59, 59, 999);
+          submissions = submissions.filter(s => s.createdAt && new Date(s.createdAt) <= end);
+        }
+        reportRows = submissions.map((sub) => {
+          let parsedData: Record<string, string> = {};
+          try {
+            const raw = JSON.parse(sub.data);
+            for (const [key, value] of Object.entries(raw)) {
+              parsedData[key] = value == null ? "" : String(value);
+            }
+          } catch (e) {}
+          return {
+            id: sub.id,
+            appUserId: sub.appUserId,
+            createdAt: sub.createdAt,
+            data: parsedData,
+          };
+        });
       }
 
       const allUsers = await storage.getAppUsers();
-      const fields = await storage.getFormFields(taskId);
+      const fixedFields = FIXED_TASK_REPORT_FIELDS[taskConfig.name];
+      const fields = fixedFields ? [] : await storage.getFormFields(taskId);
 
-      const allFields = [
-        ...fields,
+      const allFields: TaskReportField[] = fixedFields ?? [
+        ...fields.map((f) => ({ fieldKey: f.fieldKey, label: f.label, fieldType: f.fieldType })),
         {
           fieldKey: "__whatsappConsent",
           label: "WhatsApp Consent",
           fieldType: "toggle",
-        } as any,
+        },
       ];
 
       const userMap = new Map(allUsers.map(u => [u.id, u]));
@@ -3759,7 +3884,7 @@ export async function registerRoutes(
         }
       }
 
-      for (const sub of submissions) {
+      for (const sub of reportRows) {
         const user = userMap.get(sub.appUserId);
         if (!userBreakdown[sub.appUserId]) {
           userBreakdown[sub.appUserId] = {
@@ -3777,41 +3902,36 @@ export async function registerRoutes(
           userBreakdown[sub.appUserId].lastSubmission = subDate;
         }
 
-        try {
-          const data = JSON.parse(sub.data);
-          for (const [key, value] of Object.entries(data)) {
-            if (fieldValueCounts[key] && typeof value === "string") {
-              fieldValueCounts[key][value] = (fieldValueCounts[key][value] || 0) + 1;
-            }
+        for (const [key, value] of Object.entries(sub.data)) {
+          if (fieldValueCounts[key] && typeof value === "string" && value) {
+            fieldValueCounts[key][value] = (fieldValueCounts[key][value] || 0) + 1;
           }
-        } catch (e) {}
+        }
       }
 
       const dailyTrend: Record<string, number> = {};
-      for (const sub of submissions) {
+      for (const sub of reportRows) {
         const dateKey = sub.createdAt ? new Date(sub.createdAt).toISOString().split("T")[0] : "unknown";
         dailyTrend[dateKey] = (dailyTrend[dateKey] || 0) + 1;
       }
 
-      const uniqueUsers = new Set(submissions.map(s => s.appUserId));
+      const uniqueUsers = new Set(reportRows.map(s => s.appUserId));
 
-      const flatSubmissions = submissions.map(sub => {
+      const flatSubmissions = reportRows.map(sub => {
         const user = userMap.get(sub.appUserId);
-        let parsedData: Record<string, any> = {};
-        try { parsedData = JSON.parse(sub.data); } catch (e) {}
         return {
           id: sub.id,
           userName: user?.name || "Unknown",
           userMobile: user?.mobileNumber || "",
           createdAt: sub.createdAt,
-          ...parsedData,
+          ...sub.data,
         };
       });
 
       res.json({
         task: taskConfig,
         summary: {
-          totalSubmissions: submissions.length,
+          totalSubmissions: reportRows.length,
           uniqueUsers: uniqueUsers.size,
           dateRange: {
             from: startDate || null,
@@ -3906,8 +4026,14 @@ export async function registerRoutes(
   app.get("/api/admin/user-tree", async (req, res) => {
     try {
       const allUsers = await storage.getAppUsers();
-      const allVolunteers = await storage.getMappedVolunteers();
-      const allSupporters = await storage.getSupporters();
+      const allVolunteers = await db.select({
+        id: mappedVolunteers.id,
+        addedByUserId: mappedVolunteers.addedByUserId,
+      }).from(mappedVolunteers);
+      const allSupporters = await db.select({
+        id: supporters.id,
+        addedByUserId: supporters.addedByUserId,
+      }).from(supporters);
 
       const volCountByUser = new Map<string, number>();
       const supCountByUser = new Map<string, number>();
@@ -6874,8 +7000,8 @@ export async function registerRoutes(
 
   app.get("/api/sheets/mapped-volunteers", sheetsApiKeyMiddleware, async (_req, res) => {
     try {
-      const volunteers = await storage.getMappedVolunteers();
-      const appUsersList = await storage.getAppUsers();
+      const volunteers = await storage.getMappedVolunteersForList();
+      const appUsersList = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(appUsersList.map(u => [u.id, u.name]));
       const data = volunteers.map(v => ({
         id: v.id,
@@ -6903,8 +7029,8 @@ export async function registerRoutes(
 
   app.get("/api/sheets/supporters", sheetsApiKeyMiddleware, async (_req, res) => {
     try {
-      const supporters = await storage.getSupporters();
-      const appUsersList = await storage.getAppUsers();
+      const supporters = await storage.getSupportersForList();
+      const appUsersList = await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers);
       const userMap = new Map(appUsersList.map(u => [u.id, u.name]));
       const data = supporters.map(s => ({
         id: s.id,

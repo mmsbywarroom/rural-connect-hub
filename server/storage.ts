@@ -283,6 +283,7 @@ export interface IStorage {
 
   // Mapped Volunteers
   getMappedVolunteers(): Promise<MappedVolunteer[]>;
+  getMappedVolunteersForList(): Promise<MappedVolunteer[]>;
   getMappedVolunteer(id: string): Promise<MappedVolunteer | undefined>;
   getMappedVolunteersByUser(appUserId: string): Promise<MappedVolunteer[]>;
   getMappedVolunteersByUserAndVillage(appUserId: string, villageId: string): Promise<MappedVolunteer[]>;
@@ -293,6 +294,7 @@ export interface IStorage {
 
   // Supporters
   getSupporters(): Promise<Supporter[]>;
+  getSupportersForList(): Promise<Supporter[]>;
   getSupporter(id: string): Promise<Supporter | undefined>;
   getSupportersByUser(appUserId: string): Promise<Supporter[]>;
   getSupportersByUserAndVillage(appUserId: string, villageId: string): Promise<Supporter[]>;
@@ -1022,6 +1024,47 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(mappedVolunteers).orderBy(desc(mappedVolunteers.createdAt));
   }
 
+  async getMappedVolunteersForList(): Promise<MappedVolunteer[]> {
+    const hasBlob = (col: typeof mappedVolunteers.volunteerPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const rows = await db
+      .select({
+        id: mappedVolunteers.id,
+        addedByUserId: mappedVolunteers.addedByUserId,
+        name: mappedVolunteers.name,
+        mobileNumber: mappedVolunteers.mobileNumber,
+        category: mappedVolunteers.category,
+        voterId: mappedVolunteers.voterId,
+        ocrName: mappedVolunteers.ocrName,
+        ocrAadhaarNumber: mappedVolunteers.ocrAadhaarNumber,
+        ocrVoterId: mappedVolunteers.ocrVoterId,
+        ocrDob: mappedVolunteers.ocrDob,
+        ocrGender: mappedVolunteers.ocrGender,
+        ocrAddress: mappedVolunteers.ocrAddress,
+        isVerified: mappedVolunteers.isVerified,
+        selectedVillageId: mappedVolunteers.selectedVillageId,
+        selectedVillageName: mappedVolunteers.selectedVillageName,
+        createdAt: mappedVolunteers.createdAt,
+        volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
+        aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),
+        aadhaarPhotoBack: hasBlob(mappedVolunteers.aadhaarPhotoBack),
+        voterCardPhoto: hasBlob(mappedVolunteers.voterCardPhoto),
+        voterCardPhotoBack: hasBlob(mappedVolunteers.voterCardPhotoBack),
+      })
+      .from(mappedVolunteers)
+      .orderBy(desc(mappedVolunteers.createdAt));
+
+    return rows.map((row) => ({
+      ...row,
+      volunteerPhoto: row.volunteerPhoto ? "1" : null,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    }));
+  }
+
   async getMappedVolunteer(id: string): Promise<MappedVolunteer | undefined> {
     const [vol] = await db.select().from(mappedVolunteers).where(eq(mappedVolunteers.id, id));
     return vol;
@@ -1057,6 +1100,43 @@ export class DatabaseStorage implements IStorage {
   // Supporters
   async getSupporters(): Promise<Supporter[]> {
     return db.select().from(supporters).orderBy(desc(supporters.createdAt));
+  }
+
+  async getSupportersForList(): Promise<Supporter[]> {
+    const hasBlob = (col: typeof supporters.aadhaarPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const rows = await db
+      .select({
+        id: supporters.id,
+        addedByUserId: supporters.addedByUserId,
+        name: supporters.name,
+        mobileNumber: supporters.mobileNumber,
+        voterId: supporters.voterId,
+        ocrName: supporters.ocrName,
+        ocrAadhaarNumber: supporters.ocrAadhaarNumber,
+        ocrVoterId: supporters.ocrVoterId,
+        ocrDob: supporters.ocrDob,
+        ocrGender: supporters.ocrGender,
+        ocrAddress: supporters.ocrAddress,
+        selectedVillageId: supporters.selectedVillageId,
+        selectedVillageName: supporters.selectedVillageName,
+        createdAt: supporters.createdAt,
+        aadhaarPhoto: hasBlob(supporters.aadhaarPhoto),
+        aadhaarPhotoBack: hasBlob(supporters.aadhaarPhotoBack),
+        voterCardPhoto: hasBlob(supporters.voterCardPhoto),
+        voterCardPhotoBack: hasBlob(supporters.voterCardPhotoBack),
+      })
+      .from(supporters)
+      .orderBy(desc(supporters.createdAt));
+
+    return rows.map((row) => ({
+      ...row,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    }));
   }
 
   async getSupporter(id: string): Promise<Supporter | undefined> {
