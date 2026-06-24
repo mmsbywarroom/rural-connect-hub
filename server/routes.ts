@@ -3853,9 +3853,79 @@ export async function registerRoutes(
     try {
       const { taskId } = req.params;
       const { startDate, endDate } = req.query;
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const start = typeof startDate === "string" ? startDate : undefined;
+      const end = typeof endDate === "string" ? endDate : undefined;
 
       const taskConfig = await storage.getTaskConfig(taskId);
       if (!taskConfig) return res.status(404).json({ error: "Task not found" });
+
+      const userRows = await db.select({
+        id: appUsers.id,
+        name: appUsers.name,
+        mobileNumber: appUsers.mobileNumber,
+        role: appUsers.role,
+      }).from(appUsers);
+      const userMap = new Map(userRows.map((u) => [u.id, u]));
+
+      if (taskConfig.name === "Volunteer Mapping") {
+        const [aggregates, page] = await Promise.all([
+          storage.getMappedVolunteersReportAggregates({ startDate: start, endDate: end }),
+          storage.listMappedVolunteersReportRows({
+            limit: p.limit,
+            offset: p.offset,
+            startDate: start,
+            endDate: end,
+          }),
+        ]);
+
+        const allFields = FIXED_TASK_REPORT_FIELDS["Volunteer Mapping"];
+        const flatSubmissions = page.items.map((vol) => {
+          const user = userMap.get(vol.addedByUserId);
+          return {
+            id: vol.id,
+            userName: user?.name || "Unknown",
+            userMobile: user?.mobileNumber || "",
+            createdAt: vol.createdAt,
+            name: vol.name,
+            mobileNumber: vol.mobileNumber,
+            category: vol.category,
+            voterId: vol.voterId ?? "",
+            isVerified: vol.isVerified ? "Yes" : "No",
+            selectedVillageName: vol.selectedVillageName ?? "",
+          };
+        });
+
+        res.json({
+          task: taskConfig,
+          summary: {
+            totalSubmissions: aggregates.totalSubmissions,
+            uniqueUsers: aggregates.uniqueUsers,
+            dateRange: { from: start || null, to: end || null },
+          },
+          dailyTrend: aggregates.dailyTrend,
+          userBreakdown: aggregates.userBreakdown.map((ub) => {
+            const user = userMap.get(ub.userId);
+            return {
+              userId: ub.userId,
+              userName: user?.name || "Unknown",
+              mobile: user?.mobileNumber || "",
+              role: user?.role || "",
+              count: ub.count,
+              lastSubmission: ub.lastSubmission ? ub.lastSubmission.toISOString() : null,
+            };
+          }),
+          fieldAnalytics: [{
+            fieldKey: "category",
+            fieldLabel: "Category",
+            values: aggregates.categoryBreakdown.map((c) => ({ value: c.value, count: c.count })),
+          }],
+          submissions: flatSubmissions,
+          submissionsTotal: page.total,
+          fields: allFields,
+        });
+        return;
+      }
 
       const fixedRows = await loadFixedTaskReportRows(taskConfig.name);
       let reportRows: TaskReportRow[];
@@ -3863,8 +3933,8 @@ export async function registerRoutes(
       if (fixedRows) {
         reportRows = filterTaskReportRowsByDate(
           fixedRows,
-          typeof startDate === "string" ? startDate : undefined,
-          typeof endDate === "string" ? endDate : undefined
+          start,
+          end
         );
       } else {
         let submissions = await storage.getTaskSubmissions(taskId);
@@ -3893,7 +3963,6 @@ export async function registerRoutes(
         });
       }
 
-      const allUsers = await storage.getAppUsers();
       const fixedFields = FIXED_TASK_REPORT_FIELDS[taskConfig.name];
       const fields = fixedFields ? [] : await storage.getFormFields(taskId);
 
@@ -3905,8 +3974,6 @@ export async function registerRoutes(
           fieldType: "toggle",
         },
       ];
-
-      const userMap = new Map(allUsers.map(u => [u.id, u]));
 
       const userBreakdown: Record<string, { userId: string; userName: string; mobile: string; role: string; count: number; lastSubmission: string | null }> = {};
 
@@ -3989,66 +4056,45 @@ export async function registerRoutes(
 
   app.get("/api/analytics/user-report", async (req, res) => {
     try {
-      // Lightweight selects to avoid pulling base64/photo/PDF fields
-      const allUsers = await db.select({
-        id: appUsers.id,
-        name: appUsers.name,
-        mobileNumber: appUsers.mobileNumber,
-        role: appUsers.role,
-        isActive: appUsers.isActive,
-        createdAt: appUsers.createdAt,
-        voterId: appUsers.voterId,
-        mappedAreaName: appUsers.mappedAreaName,
-        mappedZone: appUsers.mappedZone,
-        mappedDistrict: appUsers.mappedDistrict,
-        mappedHalka: appUsers.mappedHalka,
-        mappedBlockNumber: appUsers.mappedBlockNumber,
-      }).from(appUsers);
+      const p = parseListParams(req.query as Record<string, unknown>);
+      const search = typeof req.query.search === "string" ? req.query.search : undefined;
 
-      const allSubmissions = await db.select({
-        appUserId: taskSubmissions.appUserId,
-        taskConfigId: taskSubmissions.taskConfigId,
-        createdAt: taskSubmissions.createdAt,
-      }).from(taskSubmissions);
+      const [globalStats, activityStats, page] = await Promise.all([
+        storage.getUserReportGlobalStats(),
+        storage.getUserActivityStats(),
+        storage.listAppUsersForAdmin({ limit: p.limit, offset: p.offset, search }),
+      ]);
 
-      const subsStatsByUser = new Map<string, { total: number; taskIds: Set<string>; lastCreatedAt: any }>();
-      for (const sub of allSubmissions) {
-        const key = sub.appUserId;
-        const entry = subsStatsByUser.get(key) || { total: 0, taskIds: new Set<string>(), lastCreatedAt: null };
-        entry.total += 1;
-        entry.taskIds.add(sub.taskConfigId);
-
-        const subTime = sub.createdAt ? new Date(sub.createdAt).getTime() : 0;
-        const lastTime = entry.lastCreatedAt ? new Date(entry.lastCreatedAt).getTime() : 0;
-        if (subTime > lastTime) entry.lastCreatedAt = sub.createdAt;
-        subsStatsByUser.set(key, entry);
-      }
-
-      const userStats = allUsers.map(user => {
-        const entry = subsStatsByUser.get(user.id);
-        return {
-          id: user.id,
-          name: user.name,
-          mobileNumber: user.mobileNumber,
-          role: user.role,
-          isActive: user.isActive,
-          createdAt: user.createdAt,
-          voterId: user.voterId,
-          mappedAreaName: user.mappedAreaName,
-          mappedZone: user.mappedZone,
-          mappedDistrict: user.mappedDistrict,
-          mappedHalka: user.mappedHalka,
-          mappedBlockNumber: user.mappedBlockNumber,
-          totalSubmissions: entry?.total || 0,
-          tasksCompleted: entry?.taskIds.size || 0,
-          lastSubmission: entry?.lastCreatedAt || null,
-        };
-      });
+      const users = page.items
+        .map((user) => {
+          const act = activityStats.get(user.id);
+          return {
+            id: user.id,
+            name: user.name,
+            mobileNumber: user.mobileNumber,
+            role: user.role,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            voterId: user.voterId,
+            mappedAreaName: user.mappedAreaName,
+            mappedZone: user.mappedZone,
+            mappedDistrict: user.mappedDistrict,
+            mappedHalka: user.mappedHalka,
+            mappedBlockNumber: user.mappedBlockNumber,
+            totalSubmissions: act?.totalSubmissions || 0,
+            tasksCompleted: act?.tasksCompleted || 0,
+            lastSubmission: act?.lastSubmission || null,
+          };
+        })
+        .sort((a, b) => b.totalSubmissions - a.totalSubmissions);
 
       res.json({
-        users: userStats.sort((a, b) => b.totalSubmissions - a.totalSubmissions),
-        totalUsers: allUsers.length,
-        activeUsers: allUsers.filter(u => u.isActive).length,
+        users,
+        totalUsers: globalStats.totalUsers,
+        activeUsers: globalStats.activeUsers,
+        total: page.total,
+        limit: page.limit,
+        offset: page.offset,
       });
     } catch (error) {
       console.error("User report error:", error);
@@ -4058,7 +4104,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/user-tree", async (req, res) => {
     try {
-      const allUsers = await storage.getAppUsers();
+      const allUsers = await storage.getAppUsersForTree();
       const allVolunteers = await db.select({
         id: mappedVolunteers.id,
         addedByUserId: mappedVolunteers.addedByUserId,
@@ -4077,26 +4123,23 @@ export async function registerRoutes(
         supCountByUser.set(s.addedByUserId, (supCountByUser.get(s.addedByUserId) || 0) + 1);
       }
 
-      const docFields: { key: string; label: string }[] = [
-        { key: "name", label: "Full Name" },
-        { key: "selfPhoto", label: "Self Photo" },
-        { key: "voterId", label: "Voter ID" },
-        { key: "aadhaarNumber", label: "Aadhaar Number" },
-        { key: "aadhaarPhoto", label: "Aadhaar Front" },
-        { key: "aadhaarPhotoBack", label: "Aadhaar Back" },
-        { key: "voterCardPhoto", label: "Voter Card Front" },
-        { key: "voterCardPhotoBack", label: "Voter Card Back" },
-        { key: "wing", label: "Wing" },
-      ];
-
       const usersWithStats = allUsers.map((u) => {
         const uploaded: string[] = [];
         const missing: string[] = [];
-        for (const f of docFields) {
-          const val = (u as Record<string, unknown>)[f.key];
-          const filled = !!(val && String(val).trim());
-          if (filled) uploaded.push(f.label);
-          else missing.push(f.label);
+        const docChecks: { label: string; filled: boolean }[] = [
+          { label: "Full Name", filled: !!(u.name && u.name.trim()) },
+          { label: "Self Photo", filled: u.hasSelfPhoto },
+          { label: "Voter ID", filled: !!(u.voterId && u.voterId.trim()) },
+          { label: "Aadhaar Number", filled: !!(u.aadhaarNumber && u.aadhaarNumber.trim()) },
+          { label: "Aadhaar Front", filled: u.hasAadhaarPhoto },
+          { label: "Aadhaar Back", filled: u.hasAadhaarPhotoBack },
+          { label: "Voter Card Front", filled: u.hasVoterCardPhoto },
+          { label: "Voter Card Back", filled: u.hasVoterCardPhotoBack },
+          { label: "Wing", filled: !!(u.wing && u.wing.trim()) },
+        ];
+        for (const check of docChecks) {
+          if (check.filled) uploaded.push(check.label);
+          else missing.push(check.label);
         }
         if (u.role === "party_post_holder") {
           const posFilled = !!(u.currentPosition && String(u.currentPosition).trim());

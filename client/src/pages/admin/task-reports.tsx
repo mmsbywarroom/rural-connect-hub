@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ interface TaskReportData {
   userBreakdown: { userId: string; userName: string; mobile: string; role: string; count: number; lastSubmission: string }[];
   fieldAnalytics: { fieldKey: string; fieldLabel: string; values: { value: string; count: number }[] }[];
   submissions: Record<string, string>[];
+  submissionsTotal?: number;
   fields: { fieldKey: string; label: string; fieldType: string }[];
 }
 
@@ -70,19 +71,27 @@ export default function TaskReportsPage() {
   const [appliedStartDate, setAppliedStartDate] = useState<string>("");
   const [appliedEndDate, setAppliedEndDate] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(0);
+  const [submissionsPage, setSubmissionsPage] = useState(0);
+
+  useEffect(() => {
+    setSubmissionsPage(0);
+    setCurrentPage(0);
+  }, [selectedTaskId, appliedStartDate, appliedEndDate]);
 
   const { data: taskConfigs, isLoading: configsLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/task-configs"],
   });
 
   const { data: reportData, isLoading: reportLoading } = useQuery<TaskReportData>({
-    queryKey: ["/api/analytics/task-report", selectedTaskId, appliedStartDate, appliedEndDate],
+    queryKey: ["/api/analytics/task-report", selectedTaskId, appliedStartDate, appliedEndDate, submissionsPage],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (appliedStartDate) params.set("startDate", appliedStartDate);
       if (appliedEndDate) params.set("endDate", appliedEndDate);
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(submissionsPage * PAGE_SIZE));
       const qs = params.toString();
-      const url = `/api/analytics/task-report/${selectedTaskId}${qs ? `?${qs}` : ""}`;
+      const url = `/api/analytics/task-report/${selectedTaskId}?${qs}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch task report");
       return res.json();
@@ -143,8 +152,9 @@ export default function TaskReportsPage() {
     downloadCSV([headerRow, dataRow].join("\n"), `user-${user.userName}.csv`);
   };
 
-  const totalPages = reportData?.submissions ? Math.ceil(reportData.submissions.length / PAGE_SIZE) : 0;
-  const paginatedSubmissions = reportData?.submissions?.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE) ?? [];
+  const submissionsTotal = reportData?.submissionsTotal ?? reportData?.submissions?.length ?? 0;
+  const totalPages = Math.ceil(submissionsTotal / PAGE_SIZE) || 0;
+  const paginatedSubmissions = reportData?.submissions ?? [];
 
   return (
     <div className="space-y-6">
@@ -437,14 +447,14 @@ export default function TaskReportsPage() {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between gap-4 mt-4">
                       <p className="text-sm text-muted-foreground" data-testid="text-pagination-info">
-                        Page {currentPage + 1} of {totalPages} ({reportData.submissions.length} total)
+                        Page {submissionsPage + 1} of {totalPages} ({submissionsTotal} total)
                       </p>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={currentPage === 0}
-                          onClick={() => setCurrentPage((p) => p - 1)}
+                          disabled={submissionsPage === 0}
+                          onClick={() => setSubmissionsPage((p) => p - 1)}
                           data-testid="button-prev-page"
                         >
                           <ChevronLeft className="h-4 w-4 mr-1" />
@@ -453,8 +463,8 @@ export default function TaskReportsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={currentPage >= totalPages - 1}
-                          onClick={() => setCurrentPage((p) => p + 1)}
+                          disabled={submissionsPage >= totalPages - 1}
+                          onClick={() => setSubmissionsPage((p) => p + 1)}
                           data-testid="button-next-page"
                         >
                           Next

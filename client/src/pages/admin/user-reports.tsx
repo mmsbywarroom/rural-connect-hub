@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,9 @@ interface UserListResponse {
   users: UserReport[];
   totalUsers: number;
   activeUsers: number;
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 interface UserDetailResponse {
@@ -89,9 +92,25 @@ function downloadCSV(csvContent: string, filename: string) {
 export default function UserReportsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [pageIndex, setPageIndex] = useState(0);
+  const PAGE_SIZE = 50;
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [searchTerm]);
 
   const { data: userListData, isLoading: listLoading } = useQuery<UserListResponse>({
-    queryKey: ["/api/analytics/user-report"],
+    queryKey: ["/api/analytics/user-report", pageIndex, searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(pageIndex * PAGE_SIZE),
+      });
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      const res = await fetch(`/api/analytics/user-report?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch user report");
+      return res.json();
+    },
   });
 
   const { data: userDetailData, isLoading: detailLoading } = useQuery<UserDetailResponse>({
@@ -99,11 +118,8 @@ export default function UserReportsPage() {
     enabled: !!selectedUserId,
   });
 
-  const filteredUsers = userListData?.users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.mobileNumber.includes(searchTerm)
-  );
+  const filteredUsers = userListData?.users ?? [];
+  const listTotal = userListData?.total ?? 0;
 
   const handleExportUserList = () => {
     if (!userListData?.users.length) return;
@@ -423,7 +439,7 @@ export default function UserReportsPage() {
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
-          ) : !filteredUsers?.length ? (
+          ) : !listTotal ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p data-testid="text-no-users">No users found</p>
@@ -502,6 +518,21 @@ export default function UserReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          {listTotal > PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-3 mt-4">
+              <p className="text-xs text-muted-foreground">
+                Showing {pageIndex * PAGE_SIZE + 1}–{Math.min((pageIndex + 1) * PAGE_SIZE, listTotal)} of {listTotal}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={pageIndex === 0} onClick={() => setPageIndex((p) => p - 1)}>
+                  Previous
+                </Button>
+                <Button variant="outline" size="sm" disabled={(pageIndex + 1) * PAGE_SIZE >= listTotal} onClick={() => setPageIndex((p) => p + 1)}>
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

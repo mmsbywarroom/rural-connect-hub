@@ -7,7 +7,7 @@ import {
   submissionBoothForMatch,
 } from "./bla-booth";
 import { mergeBlaSubmissionRow, splitBlaSubmissionWrite } from "./bla-submission-write";
-import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike } from "drizzle-orm";
+import { eq, desc, and, or, isNull, asc, sql, count, inArray, getTableColumns, ilike, gte, lte } from "drizzle-orm";
 import {
   users, villages, issues, wings, govWings, govPositions, positions, departments, leadershipFlags,
   volunteers, familyMembers, visitors, volunteerVisits, officeManagers,
@@ -296,6 +296,43 @@ export interface IStorage {
   getBirthdaysMetadataAll(): Promise<
     { id: string; name: string; ocrDob: string | null; hasPhoto: boolean; mobileNumber: string | null; role: string | null }[]
   >;
+  getAppUsersForTree(): Promise<
+    {
+      id: string;
+      name: string;
+      mobileNumber: string | null;
+      email: string | null;
+      role: string;
+      mappedAreaName: string | null;
+      currentPosition: string | null;
+      level: string | null;
+      voterId: string | null;
+      aadhaarNumber: string | null;
+      wing: string | null;
+      hasSelfPhoto: boolean;
+      hasAadhaarPhoto: boolean;
+      hasAadhaarPhotoBack: boolean;
+      hasVoterCardPhoto: boolean;
+      hasVoterCardPhotoBack: boolean;
+    }[]
+  >;
+  getUserActivityStats(): Promise<
+    Map<string, { totalSubmissions: number; tasksCompleted: number; lastSubmission: Date | null }>
+  >;
+  getUserReportGlobalStats(): Promise<{ totalUsers: number; activeUsers: number }>;
+  getMappedVolunteersReportAggregates(opts?: { startDate?: string; endDate?: string }): Promise<{
+    totalSubmissions: number;
+    uniqueUsers: number;
+    dailyTrend: { date: string; count: number }[];
+    userBreakdown: { userId: string; count: number; lastSubmission: Date | null }[];
+    categoryBreakdown: { value: string; count: number }[];
+  }>;
+  listMappedVolunteersReportRows(opts?: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ items: MappedVolunteer[]; total: number; limit: number; offset: number }>;
   getAppUser(id: string): Promise<AppUser | undefined>;
   getAppUserByMobile(mobileNumber: string): Promise<AppUser | undefined>;
   getAppUserByEmail(email: string): Promise<AppUser | undefined>;
@@ -1203,6 +1240,241 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getAppUsersForTree() {
+    const hasBlob = (col: typeof appUsers.selfPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const rows = await db
+      .select({
+        id: appUsers.id,
+        name: appUsers.name,
+        mobileNumber: appUsers.mobileNumber,
+        email: appUsers.email,
+        role: appUsers.role,
+        mappedAreaName: appUsers.mappedAreaName,
+        currentPosition: appUsers.currentPosition,
+        level: appUsers.level,
+        voterId: appUsers.voterId,
+        aadhaarNumber: appUsers.aadhaarNumber,
+        wing: appUsers.wing,
+        hasSelfPhoto: hasBlob(appUsers.selfPhoto),
+        hasAadhaarPhoto: hasBlob(appUsers.aadhaarPhoto),
+        hasAadhaarPhotoBack: hasBlob(appUsers.aadhaarPhotoBack),
+        hasVoterCardPhoto: hasBlob(appUsers.voterCardPhoto),
+        hasVoterCardPhotoBack: hasBlob(appUsers.voterCardPhotoBack),
+      })
+      .from(appUsers)
+      .orderBy(asc(appUsers.name));
+
+    return rows.map((r) => ({
+      ...r,
+      hasSelfPhoto: !!r.hasSelfPhoto,
+      hasAadhaarPhoto: !!r.hasAadhaarPhoto,
+      hasAadhaarPhotoBack: !!r.hasAadhaarPhotoBack,
+      hasVoterCardPhoto: !!r.hasVoterCardPhoto,
+      hasVoterCardPhotoBack: !!r.hasVoterCardPhotoBack,
+    }));
+  }
+
+  async getUserActivityStats() {
+    const stats = new Map<string, { totalSubmissions: number; tasksCompleted: number; lastSubmission: Date | null }>();
+
+    const subCounts = await db
+      .select({
+        appUserId: taskSubmissions.appUserId,
+        total: sql<number>`count(*)::int`,
+        lastCreatedAt: sql<Date | null>`max(${taskSubmissions.createdAt})`,
+      })
+      .from(taskSubmissions)
+      .groupBy(taskSubmissions.appUserId);
+
+    const taskDistinct = await db
+      .select({
+        appUserId: taskSubmissions.appUserId,
+        tasks: sql<number>`count(distinct ${taskSubmissions.taskConfigId})::int`,
+      })
+      .from(taskSubmissions)
+      .groupBy(taskSubmissions.appUserId);
+
+    const taskDistinctMap = new Map(taskDistinct.map((r) => [r.appUserId, r.tasks]));
+
+    for (const row of subCounts) {
+      stats.set(row.appUserId, {
+        totalSubmissions: row.total,
+        tasksCompleted: taskDistinctMap.get(row.appUserId) || 0,
+        lastSubmission: row.lastCreatedAt ? new Date(row.lastCreatedAt) : null,
+      });
+    }
+
+    const addGroupCounts = async (
+      table: typeof mappedVolunteers | typeof supporters | typeof cscReports,
+      userCol: typeof mappedVolunteers.addedByUserId | typeof cscReports.appUserId,
+    ) => {
+      const rows = await db
+        .select({
+          userId: userCol,
+          total: sql<number>`count(*)::int`,
+          lastCreatedAt: sql<Date | null>`max(${table.createdAt})`,
+        })
+        .from(table)
+        .groupBy(userCol);
+
+      for (const row of rows) {
+        const entry = stats.get(row.userId) || { totalSubmissions: 0, tasksCompleted: 0, lastSubmission: null };
+        entry.totalSubmissions += row.total;
+        const lastAt = row.lastCreatedAt ? new Date(row.lastCreatedAt) : null;
+        if (lastAt && (!entry.lastSubmission || lastAt > entry.lastSubmission)) {
+          entry.lastSubmission = lastAt;
+        }
+        stats.set(row.userId, entry);
+      }
+    };
+
+    await addGroupCounts(mappedVolunteers, mappedVolunteers.addedByUserId);
+    await addGroupCounts(supporters, supporters.addedByUserId);
+    await addGroupCounts(cscReports, cscReports.appUserId);
+
+    return stats;
+  }
+
+  async getUserReportGlobalStats() {
+    const [row] = await db
+      .select({
+        totalUsers: sql<number>`count(*)::int`,
+        activeUsers: sql<number>`count(*) filter (where coalesce(${appUsers.isActive}, true))::int`,
+      })
+      .from(appUsers);
+    return { totalUsers: row?.totalUsers ?? 0, activeUsers: row?.activeUsers ?? 0 };
+  }
+
+  private mappedVolunteersDateWhere(startDate?: string, endDate?: string) {
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(mappedVolunteers.createdAt, new Date(startDate)));
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(mappedVolunteers.createdAt, end));
+    }
+    return conditions.length ? and(...conditions) : undefined;
+  }
+
+  async getMappedVolunteersReportAggregates(opts?: { startDate?: string; endDate?: string }) {
+    const where = this.mappedVolunteersDateWhere(opts?.startDate, opts?.endDate);
+
+    const [summary] = await db
+      .select({
+        totalSubmissions: sql<number>`count(*)::int`,
+        uniqueUsers: sql<number>`count(distinct ${mappedVolunteers.addedByUserId})::int`,
+      })
+      .from(mappedVolunteers)
+      .where(where);
+
+    const dailyTrend = await db
+      .select({
+        date: sql<string>`to_char(${mappedVolunteers.createdAt}, 'YYYY-MM-DD')`,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(mappedVolunteers)
+      .where(where)
+      .groupBy(sql`to_char(${mappedVolunteers.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${mappedVolunteers.createdAt}, 'YYYY-MM-DD')`);
+
+    const userBreakdown = await db
+      .select({
+        userId: mappedVolunteers.addedByUserId,
+        count: sql<number>`count(*)::int`,
+        lastSubmission: sql<Date | null>`max(${mappedVolunteers.createdAt})`,
+      })
+      .from(mappedVolunteers)
+      .where(where)
+      .groupBy(mappedVolunteers.addedByUserId)
+      .orderBy(desc(sql`count(*)`));
+
+    const categoryBreakdown = await db
+      .select({
+        value: mappedVolunteers.category,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(mappedVolunteers)
+      .where(where)
+      .groupBy(mappedVolunteers.category)
+      .orderBy(desc(sql`count(*)`));
+
+    return {
+      totalSubmissions: summary?.totalSubmissions ?? 0,
+      uniqueUsers: summary?.uniqueUsers ?? 0,
+      dailyTrend: dailyTrend.map((r) => ({ date: r.date, count: r.count })),
+      userBreakdown: userBreakdown.map((r) => ({
+        userId: r.userId,
+        count: r.count,
+        lastSubmission: r.lastSubmission ? new Date(r.lastSubmission) : null,
+      })),
+      categoryBreakdown: categoryBreakdown.map((r) => ({ value: r.value || "Unknown", count: r.count })),
+    };
+  }
+
+  async listMappedVolunteersReportRows(opts?: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const limit = Math.min(Math.max(Number(opts?.limit ?? 50) || 50, 1), 200);
+    const offset = Math.max(Number(opts?.offset ?? 0) || 0, 0);
+    const where = this.mappedVolunteersDateWhere(opts?.startDate, opts?.endDate);
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(mappedVolunteers)
+      .where(where);
+
+    const hasBlob = (col: typeof mappedVolunteers.volunteerPhoto) =>
+      sql<boolean>`(${col} IS NOT NULL AND ${col} <> '')`;
+
+    const rows = await db
+      .select({
+        id: mappedVolunteers.id,
+        addedByUserId: mappedVolunteers.addedByUserId,
+        name: mappedVolunteers.name,
+        mobileNumber: mappedVolunteers.mobileNumber,
+        category: mappedVolunteers.category,
+        voterId: mappedVolunteers.voterId,
+        ocrName: mappedVolunteers.ocrName,
+        ocrAadhaarNumber: mappedVolunteers.ocrAadhaarNumber,
+        ocrVoterId: mappedVolunteers.ocrVoterId,
+        ocrDob: mappedVolunteers.ocrDob,
+        ocrGender: mappedVolunteers.ocrGender,
+        ocrAddress: mappedVolunteers.ocrAddress,
+        isVerified: mappedVolunteers.isVerified,
+        selectedVillageId: mappedVolunteers.selectedVillageId,
+        selectedVillageName: mappedVolunteers.selectedVillageName,
+        createdAt: mappedVolunteers.createdAt,
+        volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
+        aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),
+        aadhaarPhotoBack: hasBlob(mappedVolunteers.aadhaarPhotoBack),
+        voterCardPhoto: hasBlob(mappedVolunteers.voterCardPhoto),
+        voterCardPhotoBack: hasBlob(mappedVolunteers.voterCardPhotoBack),
+      })
+      .from(mappedVolunteers)
+      .where(where)
+      .orderBy(desc(mappedVolunteers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const items = rows.map((row) => ({
+      ...row,
+      volunteerPhoto: row.volunteerPhoto ? "1" : null,
+      aadhaarPhoto: row.aadhaarPhoto ? "1" : null,
+      aadhaarPhotoBack: row.aadhaarPhotoBack ? "1" : null,
+      voterCardPhoto: row.voterCardPhoto ? "1" : null,
+      voterCardPhotoBack: row.voterCardPhotoBack ? "1" : null,
+    })) as MappedVolunteer[];
+
+    return { items, total: countRow?.n ?? 0, limit, offset };
+  }
+
   async getAppUser(id: string): Promise<AppUser | undefined> {
     const [user] = await db.select().from(appUsers).where(eq(appUsers.id, id));
     return user;
@@ -1752,9 +2024,10 @@ export class DatabaseStorage implements IStorage {
       const term = `%${search.trim().toLowerCase()}%`;
       return db.select().from(voterList)
         .where(sql`(LOWER(${voterList.vcardId}) LIKE ${term} OR LOWER(${voterList.fullName}) LIKE ${term} OR LOWER(${voterList.engFirstName}) LIKE ${term} OR LOWER(${voterList.engLastName}) LIKE ${term} OR LOWER(${voterList.mobileNo1}) LIKE ${term} OR LOWER(${voterList.boothNo}) LIKE ${term} OR LOWER(${voterList.engVillage}) LIKE ${term})`)
+        .orderBy(asc(voterList.srno), asc(voterList.vcardId))
         .limit(limit).offset(offset);
     }
-    return db.select().from(voterList).limit(limit).offset(offset);
+    return db.select().from(voterList).orderBy(asc(voterList.srno), asc(voterList.vcardId)).limit(limit).offset(offset);
   }
 
   async getVoterListCount(search?: string): Promise<number> {
