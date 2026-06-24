@@ -2280,8 +2280,13 @@ export async function registerRoutes(
       const data = insertMappedVolunteerSchema.parse(req.body);
       const volunteer = await storage.createMappedVolunteer(data);
       res.json(volunteer);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid volunteer data" });
+    } catch (error: any) {
+      console.error("[mapped-volunteers] Create failed:", error?.message || error);
+      const message =
+        error?.issues?.[0]?.message ||
+        error?.message ||
+        "Invalid volunteer data";
+      res.status(400).json({ error: message });
     }
   });
 

@@ -5,6 +5,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase, populateVillageTranslations } from "./seed";
 import { startTaskReminderScheduler } from "./task-reminders";
+import { applySchemaPatches } from "./schema-patches";
 
 const app = express();
 const httpServer = createServer(app);
@@ -64,6 +65,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await applySchemaPatches();
   await seedDatabase();
   await populateVillageTranslations();
   await registerRoutes(httpServer, app);

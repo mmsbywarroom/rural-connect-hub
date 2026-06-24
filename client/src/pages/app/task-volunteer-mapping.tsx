@@ -127,8 +127,16 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/app/my-submissions", user.id] });
       setStep("success");
     },
-    onError: () => {
-      toast({ title: t('error'), description: t('failedAddVolunteer'), variant: "destructive" });
+    onError: (error: Error) => {
+      let description = t("failedAddVolunteer");
+      try {
+        const match = error.message.match(/^\d+:\s*(\{.*\})$/);
+        if (match) {
+          const body = JSON.parse(match[1]);
+          if (body?.error) description = String(body.error);
+        }
+      } catch {}
+      toast({ title: t("error"), description, variant: "destructive" });
     },
   });
 
