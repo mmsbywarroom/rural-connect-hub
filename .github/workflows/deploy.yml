@@ -22,8 +22,28 @@ jobs:
         run: |
           npm ci
           NODE_ENV=production npm run build
-          npm prune --omit=dev
-          tar -czf release.tar.gz dist node_modules package.json package-lock.json ecosystem.config.cjs
+          # Do not bundle node_modules — install on EC2 to keep upload small.
+          tar -czf release.tar.gz dist package.json package-lock.json ecosystem.config.cjs deploy/
+          ls -lh release.tar.gz
+
+      - name: Prepare EC2 for deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          command_timeout: 5m
+          script: |
+            set -e
+            APP_PATH="${{ secrets.EC2_APP_PATH }}"
+            mkdir -p "$APP_PATH/deploy"
+            cd "$APP_PATH"
+            echo "==> Disk before deploy:"
+            df -h "$APP_PATH" || df -h
+            rm -f release.tar.gz
+            rm -rf node_modules dist
+            echo "==> EC2 ready for upload"
 
       - name: Upload release to EC2
         uses: appleboy/scp-action@v1.0.0
@@ -34,43 +54,30 @@ jobs:
           source: release.tar.gz
           target: ${{ secrets.EC2_APP_PATH }}
           overwrite: true
+          timeout: 120s
 
-      - name: Ensure deploy directory exists
+      - name: Extract on EC2, install deps, and restart
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
+          command_timeout: 15m
           script: |
-            mkdir -p "${{ secrets.EC2_APP_PATH }}/deploy"
-
-      - name: Upload deploy scripts to EC2
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: deploy/nginx-site.conf,deploy/apply-nginx.sh
-          target: ${{ secrets.EC2_APP_PATH }}/deploy
-          overwrite: true
-
-      - name: Extract on EC2 and restart app
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script_stop: true
-          script: |
-            cd "${{ secrets.EC2_APP_PATH }}"
+            set -e
+            APP_PATH="${{ secrets.EC2_APP_PATH }}"
+            cd "$APP_PATH"
             tar -xzf release.tar.gz
             rm -f release.tar.gz
+            npm ci --omit=dev
             chmod +x deploy/apply-nginx.sh
-            bash deploy/apply-nginx.sh "${{ secrets.EC2_APP_PATH }}" || echo "Nginx apply skipped (check SSL paths on server)"
+            bash deploy/apply-nginx.sh "$APP_PATH" || echo "Nginx apply skipped (check SSL paths on server)"
             if pm2 describe rural-connect-hub >/dev/null 2>&1; then
               pm2 restart rural-connect-hub
             else
               pm2 start ecosystem.config.cjs
             fi
             pm2 save
+            echo "==> Disk after deploy:"
+            df -h "$APP_PATH" || df -h
