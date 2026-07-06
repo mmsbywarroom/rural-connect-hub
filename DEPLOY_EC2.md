@@ -150,6 +150,29 @@ sudo systemctl status nginx
 
 ## Troubleshooting
 
+### GitHub Actions deploy fail ho raha hai
+
+**Upload pass, Extract fail** = EC2 par disk full ya `npm install` fail.
+
+EC2 par SSH karke yeh chalao:
+
+```bash
+cd ~/rural-connect-hub
+git pull origin main
+bash deploy/ec2-recover.sh ~/rural-connect-hub
+```
+
+Agar disk full ho:
+
+```bash
+df -h /
+sudo apt-get clean
+sudo journalctl --vacuum-size=50M
+rm -rf ~/rural-connect-hub/node_modules
+```
+
+Phir GitHub Actions se deploy dubara run karo, ya `ec2-recover.sh` chalao.
+
 ### Blank white page / `ERR_CONTENT_LENGTH_MISMATCH`
 
 JS/CSS files (~2MB) proxy ke through truncate ho rahe the. Fix: nginx ab `/assets/` seedha `dist/public` se serve karta hai. `git push origin main` ke baad Actions deploy complete hone do, phir hard refresh (`Ctrl+Shift+R`).
