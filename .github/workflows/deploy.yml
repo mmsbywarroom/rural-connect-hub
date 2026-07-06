@@ -35,6 +35,16 @@ jobs:
           target: ${{ secrets.EC2_APP_PATH }}
           overwrite: true
 
+      - name: Upload deploy scripts to EC2
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: deploy/nginx-site.conf,deploy/apply-nginx.sh
+          target: ${{ secrets.EC2_APP_PATH }}/deploy
+          overwrite: true
+
       - name: Extract on EC2 and restart app
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -46,6 +56,8 @@ jobs:
             cd "${{ secrets.EC2_APP_PATH }}"
             tar -xzf release.tar.gz
             rm -f release.tar.gz
+            chmod +x deploy/apply-nginx.sh
+            bash deploy/apply-nginx.sh "${{ secrets.EC2_APP_PATH }}" || echo "Nginx apply skipped (check SSL paths on server)"
             if pm2 describe rural-connect-hub >/dev/null 2>&1; then
               pm2 restart rural-connect-hub
             else

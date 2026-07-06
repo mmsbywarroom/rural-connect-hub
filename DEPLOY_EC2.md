@@ -109,15 +109,18 @@ DNS propagate hone mein 5–30 min lag sakte hain.
 
 ### EC2 par SSL + nginx
 
+Auto-deploy ab har release par `deploy/apply-nginx.sh` chalata hai — static JS/CSS seedha disk se serve hote hain.
+
+Manual update (pehli baar ya SSL issue ho to):
+
 ```bash
-sudo nano /etc/nginx/sites-available/rural-connect-hub
+cd ~/rural-connect-hub
+bash deploy/apply-nginx.sh ~/rural-connect-hub
 ```
 
-`server_name` ko apne domain se replace karo, ya `deploy/nginx-domain.conf` dekho.
+Purana template: `deploy/nginx-domain.conf` (sirf HTTP, SSL se pehle).
 
 ```bash
-sudo nginx -t
-sudo systemctl reload nginx
 sudo certbot --nginx -d balbirs.com -d www.balbirs.com
 ```
 
@@ -141,6 +144,23 @@ pm2 logs rural-connect-hub    # live logs
 pm2 restart rural-connect-hub
 curl -I http://127.0.0.1:8080 # local test
 sudo systemctl status nginx
+```
+
+---
+
+## Troubleshooting
+
+### Blank white page / `ERR_CONTENT_LENGTH_MISMATCH`
+
+JS/CSS files (~2MB) proxy ke through truncate ho rahe the. Fix: nginx ab `/assets/` seedha `dist/public` se serve karta hai. `git push origin main` ke baad Actions deploy complete hone do, phir hard refresh (`Ctrl+Shift+R`).
+
+EC2 par turant fix (SSH):
+
+```bash
+cd ~/rural-connect-hub
+git pull origin main   # ya latest deploy ka wait karo
+bash deploy/apply-nginx.sh ~/rural-connect-hub
+pm2 restart rural-connect-hub
 ```
 
 ---
