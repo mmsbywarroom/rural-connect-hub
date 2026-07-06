@@ -35,6 +35,16 @@ jobs:
           target: ${{ secrets.EC2_APP_PATH }}
           overwrite: true
 
+      - name: Ensure deploy directory exists
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          script: |
+            mkdir -p "${{ secrets.EC2_APP_PATH }}/deploy"
+
       - name: Upload deploy scripts to EC2
         uses: appleboy/scp-action@v1.0.0
         with:
