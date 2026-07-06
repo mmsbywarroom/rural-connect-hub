@@ -58,6 +58,10 @@ fi
 
 sudo ln -sf "$TARGET" /etc/nginx/sites-enabled/rural-connect-hub
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl reload nginx
-echo "Nginx updated: static assets from $APP_ROOT/dist/public"
+if sudo nginx -t; then
+  sudo systemctl reload nginx
+  echo "Nginx updated: static assets from $APP_ROOT/dist/public"
+else
+  echo "WARNING: nginx config test failed; leaving current nginx config in place" >&2
+  exit 0
+fi

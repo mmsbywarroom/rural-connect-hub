@@ -22,7 +22,6 @@ jobs:
         run: |
           npm ci
           NODE_ENV=production npm run build
-          # Do not bundle node_modules — install on EC2 to keep upload small.
           tar -czf release.tar.gz dist package.json package-lock.json ecosystem.config.cjs deploy/
           ls -lh release.tar.gz
 
@@ -42,7 +41,13 @@ jobs:
             echo "==> Disk before deploy:"
             df -h "$APP_PATH" || df -h
             rm -f release.tar.gz
-            rm -rf node_modules dist
+            if [ ! -f /swapfile ]; then
+              echo "==> Creating 2G swap for npm install"
+              sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+            fi
             echo "==> EC2 ready for upload"
 
       - name: Upload release to EC2
@@ -63,16 +68,19 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
             set -e
             APP_PATH="${{ secrets.EC2_APP_PATH }}"
             cd "$APP_PATH"
             tar -xzf release.tar.gz
             rm -f release.tar.gz
-            npm ci --omit=dev
+            sed -i 's/\r$//' deploy/apply-nginx.sh deploy/nginx-site.conf 2>/dev/null || true
+            export NODE_OPTIONS="--max-old-space-size=768"
+            rm -rf node_modules
+            npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
             chmod +x deploy/apply-nginx.sh
-            bash deploy/apply-nginx.sh "$APP_PATH" || echo "Nginx apply skipped (check SSL paths on server)"
+            bash deploy/apply-nginx.sh "$APP_PATH" || echo "WARNING: nginx apply failed"
             if pm2 describe rural-connect-hub >/dev/null 2>&1; then
               pm2 restart rural-connect-hub
             else
