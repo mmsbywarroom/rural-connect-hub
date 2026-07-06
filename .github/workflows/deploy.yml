@@ -39,15 +39,9 @@ jobs:
             mkdir -p "$APP_PATH/deploy"
             cd "$APP_PATH"
             echo "==> Disk before deploy:"
-            df -h "$APP_PATH" || df -h
+            df -h / || df -h
             rm -f release.tar.gz
-            if [ ! -f /swapfile ]; then
-              echo "==> Creating 2G swap for npm install"
-              sudo fallocate -l 2G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
-              sudo chmod 600 /swapfile
-              sudo mkswap /swapfile
-              sudo swapon /swapfile
-            fi
+            rm -rf node_modules/.cache ~/.npm/_cacache 2>/dev/null || true
             echo "==> EC2 ready for upload"
 
       - name: Upload release to EC2
@@ -76,9 +70,16 @@ jobs:
             tar -xzf release.tar.gz
             rm -f release.tar.gz
             sed -i 's/\r$//' deploy/apply-nginx.sh deploy/nginx-site.conf 2>/dev/null || true
-            export NODE_OPTIONS="--max-old-space-size=768"
-            rm -rf node_modules
-            npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
+            LOCK_HASH="$(md5sum package-lock.json | awk '{print $1}')"
+            if [ -f .deploy-lock-hash ] && [ "$(cat .deploy-lock-hash)" = "$LOCK_HASH" ] && [ -d node_modules ]; then
+              echo "==> Reusing existing node_modules"
+            else
+              echo "==> Installing production dependencies"
+              export NODE_OPTIONS="--max-old-space-size=768"
+              rm -rf node_modules
+              npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
+              echo "$LOCK_HASH" > .deploy-lock-hash
+            fi
             chmod +x deploy/apply-nginx.sh
             bash deploy/apply-nginx.sh "$APP_PATH" || echo "WARNING: nginx apply failed"
             if pm2 describe rural-connect-hub >/dev/null 2>&1; then
@@ -88,4 +89,4 @@ jobs:
             fi
             pm2 save
             echo "==> Disk after deploy:"
-            df -h "$APP_PATH" || df -h
+            df -h / || df -h
