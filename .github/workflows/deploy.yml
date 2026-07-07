@@ -76,6 +76,8 @@ jobs:
             set -e
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             APP_PATH="${{ secrets.EC2_APP_PATH }}"
+            PM2_BIN="$(command -v pm2 || true)"
+            NPM_BIN="$(command -v npm || true)"
             cd "$APP_PATH"
             test -f release.tar.gz
             tar -xzf release.tar.gz
@@ -84,20 +86,28 @@ jobs:
             sed -i 's/\r$//' deploy/apply-nginx.sh deploy/nginx-site.conf 2>/dev/null || true
             if [ ! -d node_modules/express ]; then
               echo "==> Installing production dependencies on EC2"
+              if [ -z "$NPM_BIN" ]; then
+                echo "ERROR: npm not found in PATH"
+                exit 1
+              fi
               rm -rf node_modules
               export NODE_OPTIONS="--max-old-space-size=768"
-              /usr/bin/npm ci --omit=dev --no-audit --no-fund
+              "$NPM_BIN" ci --omit=dev --no-audit --no-fund
             else
               echo "==> Reusing existing node_modules"
             fi
             test -d node_modules/express
             chmod +x deploy/apply-nginx.sh
-            bash deploy/apply-nginx.sh "$APP_PATH" || echo "WARNING: nginx apply failed"
-            if /usr/bin/pm2 describe rural-connect-hub >/dev/null 2>&1; then
-              /usr/bin/pm2 restart rural-connect-hub
-            else
-              /usr/bin/pm2 start ecosystem.config.cjs
+            bash deploy/apply-nginx.sh "$APP_PATH" || echo "WARNING: nginx apply skipped"
+            if [ -z "$PM2_BIN" ]; then
+              echo "ERROR: pm2 not found in PATH"
+              exit 1
             fi
-            /usr/bin/pm2 save
+            if "$PM2_BIN" describe rural-connect-hub >/dev/null 2>&1; then
+              "$PM2_BIN" restart rural-connect-hub --update-env
+            else
+              "$PM2_BIN" start ecosystem.config.cjs
+            fi
+            "$PM2_BIN" save
             echo "==> Deploy complete"
             df -h /
