@@ -33,12 +33,13 @@ server {
     root $APP_ROOT/dist/public;
 
     location /assets/ {
-        try_files \$uri =404;
+        alias $APP_ROOT/dist/public/assets/;
         expires 7d;
         add_header Cache-Control "public";
     }
 
     location / {
+        client_max_body_size 50M;
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -58,6 +59,8 @@ fi
 
 sudo ln -sf "$TARGET" /etc/nginx/sites-enabled/rural-connect-hub
 sudo rm -f /etc/nginx/sites-enabled/default
+chmod 755 /home/ubuntu 2>/dev/null || true
+chmod -R a+rX "$APP_ROOT/dist/public" 2>/dev/null || true
 if sudo nginx -t; then
   sudo systemctl reload nginx
   echo "Nginx updated: static assets from $APP_ROOT/dist/public"

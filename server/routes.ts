@@ -2285,15 +2285,66 @@ export async function registerRoutes(
 
   app.post("/api/mapped-volunteers", async (req, res) => {
     try {
-      const data = insertMappedVolunteerSchema.parse(req.body);
-      const volunteer = await storage.createMappedVolunteer(data);
+      const body = req.body as Record<string, unknown>;
+      const nullableText = (value: unknown) => {
+        if (value === undefined || value === null || value === "") return null;
+        return String(value);
+      };
+
+      const sanitized = {
+        addedByUserId: String(body.addedByUserId || ""),
+        name: String(body.name || "").trim(),
+        mobileNumber: normalizeMobile(String(body.mobileNumber || "")),
+        category: String(body.category || ""),
+        voterId: nullableText(body.voterId),
+        volunteerPhoto: nullableText(body.volunteerPhoto),
+        aadhaarPhoto: nullableText(body.aadhaarPhoto),
+        aadhaarPhotoBack: nullableText(body.aadhaarPhotoBack),
+        voterCardPhoto: nullableText(body.voterCardPhoto),
+        voterCardPhotoBack: nullableText(body.voterCardPhotoBack),
+        ocrName: nullableText(body.ocrName),
+        ocrAadhaarNumber: nullableText(body.ocrAadhaarNumber),
+        ocrVoterId: nullableText(body.ocrVoterId),
+        ocrDob: nullableText(body.ocrDob),
+        ocrGender: nullableText(body.ocrGender),
+        ocrAddress: nullableText(body.ocrAddress),
+        selectedVillageId: nullableText(body.selectedVillageId),
+        selectedVillageName: nullableText(body.selectedVillageName),
+        isVerified: Boolean(body.isVerified),
+      };
+
+      if (!sanitized.name) {
+        return res.status(400).json({ error: "Name is required" });
+      }
+      if (!isIndianMobile(sanitized.mobileNumber)) {
+        return res.status(400).json({ error: "Valid 10-digit mobile number required" });
+      }
+      if (!sanitized.addedByUserId) {
+        return res.status(400).json({ error: "User reference is required" });
+      }
+      if (!["Active", "Inactive", "VIP"].includes(sanitized.category)) {
+        return res.status(400).json({ error: "Invalid volunteer category" });
+      }
+
+      const parsed = insertMappedVolunteerSchema.safeParse(sanitized);
+      if (!parsed.success) {
+        console.error("[mapped-volunteers] Validation failed:", parsed.error.flatten());
+        return res.status(400).json({
+          error: parsed.error.issues[0]?.message || "Invalid volunteer data",
+        });
+      }
+
+      const volunteer = await storage.createMappedVolunteer(parsed.data);
       res.json(volunteer);
     } catch (error: any) {
-      console.error("[mapped-volunteers] Create failed:", error?.message || error);
-      const message =
-        error?.issues?.[0]?.message ||
-        error?.message ||
-        "Invalid volunteer data";
+      console.error("[mapped-volunteers] Create failed:", error);
+      if (error?.code === "23503") {
+        return res.status(400).json({ error: "Invalid user reference" });
+      }
+      if (error?.code === "42703") {
+        return res.status(500).json({ error: "Database schema outdated. Please restart the server." });
+      }
+      const message = error?.message || "Failed to add volunteer";
       res.status(400).json({ error: message });
     }
   });

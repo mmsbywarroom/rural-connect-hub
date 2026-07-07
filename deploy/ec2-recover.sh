@@ -33,15 +33,15 @@ if [ -f release.tar.gz ]; then
   rm -f release.tar.gz
 fi
 
-if [ ! -d node_modules/express ]; then
-  echo "==> Installing dependencies (this may take a few minutes)..."
-  rm -rf node_modules
-  export NODE_OPTIONS="--max-old-space-size=768"
-  npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
-fi
+echo "==> Installing dependencies and building latest code..."
+export NODE_OPTIONS="--max-old-space-size=768"
+rm -rf node_modules
+npm ci --no-audit --no-fund
+NODE_ENV=production npm run build
+npm prune --omit=dev
 
 if [ ! -f dist/index.cjs ]; then
-  echo "ERROR: dist/index.cjs missing. Run a GitHub deploy first or npm run build." >&2
+  echo "ERROR: dist/index.cjs missing after build." >&2
   exit 1
 fi
 
