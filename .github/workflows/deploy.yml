@@ -64,50 +64,25 @@ jobs:
           overwrite: true
           timeout: 120s
 
-      - name: Extract on EC2, install deps, and restart
+      - name: Extract on EC2 and restart
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
-          command_timeout: 20m
+          command_timeout: 10m
           script: |
-            set -e
             export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
             APP_PATH="${{ secrets.EC2_APP_PATH }}"
-            PM2_BIN="$(command -v pm2 || true)"
-            NPM_BIN="$(command -v npm || true)"
             cd "$APP_PATH"
+            echo "==> Extracting release..."
             test -f release.tar.gz
             tar -xzf release.tar.gz
             rm -f release.tar.gz
             test -f dist/index.cjs
-            sed -i 's/\r$//' deploy/apply-nginx.sh deploy/nginx-site.conf 2>/dev/null || true
-            if [ ! -d node_modules/express ]; then
-              echo "==> Installing production dependencies on EC2"
-              if [ -z "$NPM_BIN" ]; then
-                echo "ERROR: npm not found in PATH"
-                exit 1
-              fi
-              rm -rf node_modules
-              export NODE_OPTIONS="--max-old-space-size=768"
-              "$NPM_BIN" ci --omit=dev --no-audit --no-fund
-            else
-              echo "==> Reusing existing node_modules"
-            fi
-            test -d node_modules/express
-            chmod +x deploy/apply-nginx.sh
-            bash deploy/apply-nginx.sh "$APP_PATH" || echo "WARNING: nginx apply skipped"
-            if [ -z "$PM2_BIN" ]; then
-              echo "ERROR: pm2 not found in PATH"
-              exit 1
-            fi
-            if "$PM2_BIN" describe rural-connect-hub >/dev/null 2>&1; then
-              "$PM2_BIN" restart rural-connect-hub --update-env
-            else
-              "$PM2_BIN" start ecosystem.config.cjs
-            fi
-            "$PM2_BIN" save
+            echo "==> Restarting app (no SQL migration — DB already updated manually)"
+            bash -lc "cd '$APP_PATH' && pm2 restart rural-connect-hub --update-env || pm2 start ecosystem.config.cjs"
+            bash -lc "pm2 save"
             echo "==> Deploy complete"
             df -h /
