@@ -1665,6 +1665,7 @@ export class DatabaseStorage implements IStorage {
         isVerified: mappedVolunteers.isVerified,
         selectedVillageId: mappedVolunteers.selectedVillageId,
         selectedVillageName: mappedVolunteers.selectedVillageName,
+        voterMappingBoothId: mappedVolunteers.voterMappingBoothId,
         createdAt: mappedVolunteers.createdAt,
         volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
         aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),

@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Download, Database, FileText, ImageIcon, X, Pencil, Trash2, Ban, ShieldCheck, MoreHorizontal, RefreshCw } from "lucide-react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -30,6 +32,69 @@ type MappedVolunteerBoothSummary = {
   boothCounts: { boothId: string; volunteerCount: number }[];
   unmatchedSamples: { id: string; name: string; effectiveVoterId: string }[];
 };
+
+function downloadBoothSummaryPdf(summary: MappedVolunteerBoothSummary) {
+  const doc = new jsPDF();
+  const generatedAt = new Date().toLocaleString("en-IN");
+
+  doc.setFontSize(16);
+  doc.text("Mapped Volunteers - Booth Summary Report", 14, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Generated: ${generatedAt}`, 14, 26);
+  doc.setTextColor(0);
+
+  autoTable(doc, {
+    startY: 34,
+    head: [["Metric", "Count"]],
+    body: [
+      ["Total volunteers", String(summary.totalVolunteers)],
+      ["Booth matched", String(summary.matchedWithBooth)],
+      ["Missing Voter ID", String(summary.missingVoterId)],
+      ["Missing OCR Voter ID", String(summary.missingOcrVoterId)],
+      ["Both IDs missing", String(summary.missingBothIds)],
+      ["No booth match (has voter ID)", String(summary.unmatchedNoBooth)],
+      ["Distinct booths", String(summary.boothCounts.length)],
+    ],
+    theme: "grid",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [37, 99, 235] },
+  });
+
+  const afterSummaryY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 90;
+
+  doc.setFontSize(12);
+  doc.text("Volunteers per booth", 14, afterSummaryY + 12);
+
+  autoTable(doc, {
+    startY: afterSummaryY + 16,
+    head: [["Booth ID", "Volunteer count"]],
+    body: summary.boothCounts.map((b) => [b.boothId, String(b.volunteerCount)]),
+    theme: "striped",
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [37, 99, 235] },
+  });
+
+  if (summary.unmatchedSamples.length > 0) {
+    let startY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 120;
+    if (startY > 240) {
+      doc.addPage();
+      startY = 20;
+    }
+    doc.setFontSize(12);
+    doc.text("Unmatched volunteers (sample)", 14, startY + 10);
+    autoTable(doc, {
+      startY: startY + 14,
+      head: [["Name", "Voter ID used for match"]],
+      body: summary.unmatchedSamples.map((u) => [u.name, u.effectiveVoterId]),
+      theme: "striped",
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [220, 38, 38] },
+    });
+  }
+
+  doc.save(`mapped-volunteers-booth-summary-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
 
 function downloadCSV(csvContent: string, filename: string) {
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -836,6 +901,15 @@ export default function DataExportPage() {
                         Delete {selectedVolunteers.size} Selected
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      onClick={() => boothSummary && downloadBoothSummaryPdf(boothSummary)}
+                      disabled={!boothSummary}
+                      data-testid="button-download-booth-summary-pdf"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => matchBoothsMutation.mutate()}

@@ -64,6 +64,8 @@
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.5.0",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "livekit-client": "^2.17.2",
     "livekit-server-sdk": "^2.15.0",
     "lucide-react": "^0.453.0",
