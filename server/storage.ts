@@ -135,6 +135,18 @@ export type MahilaSammanSubmissionsPage = {
   offset: number;
 };
 
+export type MappedVolunteerBoothSummary = {
+  totalVolunteers: number;
+  missingVoterId: number;
+  missingOcrVoterId: number;
+  missingBothIds: number;
+  hasEffectiveVoterId: number;
+  matchedWithBooth: number;
+  unmatchedNoBooth: number;
+  boothCounts: { boothId: string; volunteerCount: number }[];
+  unmatchedSamples: { id: string; name: string; effectiveVoterId: string }[];
+};
+
 /** Columns selected for admin CSV (no image/base64 fields). */
 export type MahilaSammanCsvExportRow = {
   id: string;
@@ -369,6 +381,8 @@ export interface IStorage {
   createMappedVolunteer(volunteer: InsertMappedVolunteer): Promise<MappedVolunteer>;
   deleteMappedVolunteer(id: string): Promise<void>;
   deleteMappedVolunteersBatch(ids: string[]): Promise<void>;
+  matchMappedVolunteerBooths(): Promise<MappedVolunteerBoothSummary>;
+  getMappedVolunteerBoothSummary(): Promise<MappedVolunteerBoothSummary>;
 
   // Supporters
   getSupporters(): Promise<Supporter[]>;
@@ -1450,6 +1464,7 @@ export class DatabaseStorage implements IStorage {
         isVerified: mappedVolunteers.isVerified,
         selectedVillageId: mappedVolunteers.selectedVillageId,
         selectedVillageName: mappedVolunteers.selectedVillageName,
+        voterMappingBoothId: mappedVolunteers.voterMappingBoothId,
         createdAt: mappedVolunteers.createdAt,
         volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
         aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),
@@ -1585,6 +1600,7 @@ export class DatabaseStorage implements IStorage {
         isVerified: mappedVolunteers.isVerified,
         selectedVillageId: mappedVolunteers.selectedVillageId,
         selectedVillageName: mappedVolunteers.selectedVillageName,
+        voterMappingBoothId: mappedVolunteers.voterMappingBoothId,
         createdAt: mappedVolunteers.createdAt,
         volunteerPhoto: hasBlob(mappedVolunteers.volunteerPhoto),
         aadhaarPhoto: hasBlob(mappedVolunteers.aadhaarPhoto),
@@ -1704,6 +1720,93 @@ export class DatabaseStorage implements IStorage {
   async deleteMappedVolunteersBatch(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
     await db.delete(mappedVolunteers).where(inArray(mappedVolunteers.id, ids));
+  }
+
+  private effectiveVoterIdSql() {
+    return sql`TRIM(COALESCE(NULLIF(TRIM(${mappedVolunteers.voterId}), ''), NULLIF(TRIM(${mappedVolunteers.ocrVoterId}), '')))`;
+  }
+
+  async matchMappedVolunteerBooths(): Promise<MappedVolunteerBoothSummary> {
+    await db.execute(sql`ALTER TABLE mapped_volunteers ADD COLUMN IF NOT EXISTS voter_mapping_booth_id text`);
+
+    await db.execute(sql`
+      UPDATE mapped_volunteers mv
+      SET voter_mapping_booth_id = sub.booth_id
+      FROM (
+        SELECT DISTINCT ON (LOWER(TRIM(voter_id)))
+          LOWER(TRIM(voter_id)) AS vid_key,
+          booth_id
+        FROM voter_mapping_master
+        WHERE voter_id IS NOT NULL AND TRIM(voter_id) <> ''
+          AND booth_id IS NOT NULL AND TRIM(booth_id) <> ''
+        ORDER BY LOWER(TRIM(voter_id)), created_at
+      ) sub
+      WHERE LOWER(TRIM(COALESCE(NULLIF(TRIM(mv.voter_id), ''), NULLIF(TRIM(mv.ocr_voter_id), '')))) = sub.vid_key
+    `);
+
+    await db.execute(sql`
+      UPDATE mapped_volunteers
+      SET voter_mapping_booth_id = NULL
+      WHERE TRIM(COALESCE(voter_id, '')) = ''
+        AND TRIM(COALESCE(ocr_voter_id, '')) = ''
+    `);
+
+    return this.getMappedVolunteerBoothSummary();
+  }
+
+  async getMappedVolunteerBoothSummary(): Promise<MappedVolunteerBoothSummary> {
+    const effectiveId = this.effectiveVoterIdSql();
+
+    const [totals] = await db
+      .select({
+        totalVolunteers: sql<number>`count(*)::int`,
+        missingVoterId: sql<number>`count(*) filter (where trim(coalesce(${mappedVolunteers.voterId}, '')) = '')::int`,
+        missingOcrVoterId: sql<number>`count(*) filter (where trim(coalesce(${mappedVolunteers.ocrVoterId}, '')) = '')::int`,
+        missingBothIds: sql<number>`count(*) filter (where trim(coalesce(${mappedVolunteers.voterId}, '')) = '' and trim(coalesce(${mappedVolunteers.ocrVoterId}, '')) = '')::int`,
+        hasEffectiveVoterId: sql<number>`count(*) filter (where ${effectiveId} <> '')::int`,
+        matchedWithBooth: sql<number>`count(*) filter (where ${mappedVolunteers.voterMappingBoothId} is not null and trim(${mappedVolunteers.voterMappingBoothId}) <> '')::int`,
+        unmatchedNoBooth: sql<number>`count(*) filter (where ${effectiveId} <> '' and (${mappedVolunteers.voterMappingBoothId} is null or trim(${mappedVolunteers.voterMappingBoothId}) = ''))::int`,
+      })
+      .from(mappedVolunteers);
+
+    const boothCounts = await db
+      .select({
+        boothId: mappedVolunteers.voterMappingBoothId,
+        volunteerCount: sql<number>`count(*)::int`,
+      })
+      .from(mappedVolunteers)
+      .where(sql`${mappedVolunteers.voterMappingBoothId} is not null and trim(${mappedVolunteers.voterMappingBoothId}) <> ''`)
+      .groupBy(mappedVolunteers.voterMappingBoothId)
+      .orderBy(sql`count(*) desc`, mappedVolunteers.voterMappingBoothId);
+
+    const unmatchedSamples = await db
+      .select({
+        id: mappedVolunteers.id,
+        name: mappedVolunteers.name,
+        effectiveVoterId: sql<string>`${effectiveId}`,
+      })
+      .from(mappedVolunteers)
+      .where(sql`${effectiveId} <> '' and (${mappedVolunteers.voterMappingBoothId} is null or trim(${mappedVolunteers.voterMappingBoothId}) = '')`)
+      .orderBy(mappedVolunteers.name)
+      .limit(50);
+
+    return {
+      totalVolunteers: totals?.totalVolunteers ?? 0,
+      missingVoterId: totals?.missingVoterId ?? 0,
+      missingOcrVoterId: totals?.missingOcrVoterId ?? 0,
+      missingBothIds: totals?.missingBothIds ?? 0,
+      hasEffectiveVoterId: totals?.hasEffectiveVoterId ?? 0,
+      matchedWithBooth: totals?.matchedWithBooth ?? 0,
+      unmatchedNoBooth: totals?.unmatchedNoBooth ?? 0,
+      boothCounts: boothCounts
+        .filter((r) => r.boothId)
+        .map((r) => ({ boothId: String(r.boothId), volunteerCount: r.volunteerCount })),
+      unmatchedSamples: unmatchedSamples.map((r) => ({
+        id: r.id,
+        name: r.name,
+        effectiveVoterId: r.effectiveVoterId,
+      })),
+    };
   }
 
   // Supporters

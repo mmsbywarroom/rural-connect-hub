@@ -2260,6 +2260,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/mapped-volunteers/booth-summary", async (_req, res) => {
+    try {
+      const summary = await storage.getMappedVolunteerBoothSummary();
+      res.json(summary);
+    } catch (error) {
+      console.error("[mapped-volunteers] Booth summary failed:", error);
+      res.status(500).json({ error: "Failed to fetch booth summary" });
+    }
+  });
+
+  app.post("/api/admin/mapped-volunteers/match-booths", async (_req, res) => {
+    try {
+      const summary = await storage.matchMappedVolunteerBooths();
+      res.json(summary);
+    } catch (error) {
+      console.error("[mapped-volunteers] Booth match failed:", error);
+      res.status(500).json({ error: "Failed to match booth IDs" });
+    }
+  });
+
   app.get("/api/mapped-volunteers/user/:userId", async (req, res) => {
     try {
       const { villageId } = req.query;

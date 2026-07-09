@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Download, Database, FileText, ImageIcon, X, Pencil, Trash2, Ban, ShieldCheck, MoreHorizontal } from "lucide-react";
+import { Download, Database, FileText, ImageIcon, X, Pencil, Trash2, Ban, ShieldCheck, MoreHorizontal, RefreshCw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -18,6 +18,18 @@ import type { TaskConfig, MappedVolunteer, Supporter } from "@shared/schema";
 
 type MappedVolunteerWithName = MappedVolunteer & { addedByName?: string };
 type SupporterWithName = Supporter & { addedByName?: string };
+
+type MappedVolunteerBoothSummary = {
+  totalVolunteers: number;
+  missingVoterId: number;
+  missingOcrVoterId: number;
+  missingBothIds: number;
+  hasEffectiveVoterId: number;
+  matchedWithBooth: number;
+  unmatchedNoBooth: number;
+  boothCounts: { boothId: string; volunteerCount: number }[];
+  unmatchedSamples: { id: string; name: string; effectiveVoterId: string }[];
+};
 
 function downloadCSV(csvContent: string, filename: string) {
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -404,6 +416,33 @@ export default function DataExportPage() {
   const mappedVolunteers = mappedVolunteersPage?.items ?? [];
   const mappedVolunteersTotal = mappedVolunteersPage?.total ?? 0;
 
+  const { data: boothSummary } = useQuery<MappedVolunteerBoothSummary>({
+    queryKey: ["/api/admin/mapped-volunteers/booth-summary"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/mapped-volunteers/booth-summary", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch booth summary");
+      return res.json();
+    },
+  });
+
+  const matchBoothsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/mapped-volunteers/match-booths");
+      return res.json() as Promise<MappedVolunteerBoothSummary>;
+    },
+    onSuccess: (summary) => {
+      queryClient.setQueryData(["/api/admin/mapped-volunteers/booth-summary"], summary);
+      queryClient.invalidateQueries({ queryKey: ["/api/mapped-volunteers"] });
+      toast({
+        title: "Booth IDs updated",
+        description: `${summary.matchedWithBooth} volunteers matched across ${summary.boothCounts.length} booths`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to match booth IDs", variant: "destructive" });
+    },
+  });
+
   const { data: supportersPage, isLoading: supportersLoading } = useQuery<Paginated<SupporterWithName>>({
     queryKey: ["/api/supporters", supportersPageIndex],
     queryFn: async () => {
@@ -496,7 +535,7 @@ export default function DataExportPage() {
     try {
       const all = await fetchAllPaginated<MappedVolunteerWithName>("/api/mapped-volunteers");
       if (!all.length) return;
-    const headerRow = ["Name", "Mobile", "Category", "Voter ID", "Verified", "Added By", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Aadhaar Photo Front", "Aadhaar Photo Back", "Voter Card Front", "Voter Card Back", "Village/Unit", "Created Date"]
+    const headerRow = ["Name", "Mobile", "Category", "Voter ID", "Booth ID", "Verified", "Added By", "OCR Name", "OCR Aadhaar", "OCR Voter ID", "OCR DOB", "OCR Gender", "OCR Address", "Aadhaar Photo Front", "Aadhaar Photo Back", "Voter Card Front", "Voter Card Back", "Village/Unit", "Created Date"]
       .map(escapeCSVField)
       .join(",");
     const dataRows = all.map((v) => {
@@ -505,6 +544,7 @@ export default function DataExportPage() {
         v.mobileNumber,
         v.category ?? "",
         v.voterId ?? "",
+        v.voterMappingBoothId ?? "",
         v.isVerified ? "Yes" : "No",
         v.addedByName ?? v.addedByUserId ?? "",
         v.ocrName ?? "",
@@ -798,6 +838,15 @@ export default function DataExportPage() {
                     )}
                     <Button
                       variant="outline"
+                      onClick={() => matchBoothsMutation.mutate()}
+                      disabled={matchBoothsMutation.isPending}
+                      data-testid="button-match-booths"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${matchBoothsMutation.isPending ? "animate-spin" : ""}`} />
+                      Match Booth IDs
+                    </Button>
+                    <Button
+                      variant="outline"
                       onClick={handleExportVolunteers}
                       disabled={!mappedVolunteersTotal}
                       data-testid="button-export-volunteers"
@@ -808,10 +857,49 @@ export default function DataExportPage() {
                   </div>
                 </div>
                 {mappedVolunteersTotal > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs text-muted-foreground">
                     <div>
                       <p className="font-semibold text-slate-700 text-xs">Total volunteers</p>
-                      <p className="text-sm text-slate-900">{mappedVolunteersTotal.toLocaleString()}</p>
+                      <p className="text-sm text-slate-900">{boothSummary?.totalVolunteers?.toLocaleString() ?? mappedVolunteersTotal.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Booth matched</p>
+                      <p className="text-sm text-green-700">{boothSummary?.matchedWithBooth?.toLocaleString() ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Missing Voter ID</p>
+                      <p className="text-sm text-amber-700">{boothSummary?.missingVoterId?.toLocaleString() ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Missing OCR Voter ID</p>
+                      <p className="text-sm text-amber-700">{boothSummary?.missingOcrVoterId?.toLocaleString() ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Both IDs missing</p>
+                      <p className="text-sm text-red-700">{boothSummary?.missingBothIds?.toLocaleString() ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">No booth match</p>
+                      <p className="text-sm text-red-700">{boothSummary?.unmatchedNoBooth?.toLocaleString() ?? "-"}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-700 text-xs">Distinct booths</p>
+                      <p className="text-sm text-slate-900">{boothSummary?.boothCounts?.length?.toLocaleString() ?? "-"}</p>
+                    </div>
+                  </div>
+                )}
+                {boothSummary && boothSummary.boothCounts.length > 0 && (
+                  <div className="rounded-md border p-3 bg-slate-50">
+                    <p className="text-xs font-semibold text-slate-700 mb-2">Volunteers per booth (top 15)</p>
+                    <div className="flex flex-wrap gap-2">
+                      {boothSummary.boothCounts.slice(0, 15).map((b) => (
+                        <Badge key={b.boothId} variant="secondary" className="font-mono text-xs">
+                          Booth {b.boothId}: {b.volunteerCount}
+                        </Badge>
+                      ))}
+                      {boothSummary.boothCounts.length > 15 && (
+                        <span className="text-xs text-muted-foreground self-center">+{boothSummary.boothCounts.length - 15} more booths</span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -844,6 +932,7 @@ export default function DataExportPage() {
                         <TableHead>Mobile</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Voter ID</TableHead>
+                        <TableHead>Booth ID</TableHead>
                         <TableHead>Verified</TableHead>
                         <TableHead>Added By</TableHead>
                         <TableHead>OCR Name</TableHead>
@@ -889,6 +978,7 @@ export default function DataExportPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-mono text-xs">{vol.voterId ?? "-"}</TableCell>
+                          <TableCell className="font-mono text-xs">{vol.voterMappingBoothId ?? "-"}</TableCell>
                           <TableCell>{vol.isVerified ? "Yes" : "No"}</TableCell>
                           <TableCell>{(vol as MappedVolunteerWithName).addedByName ?? "-"}</TableCell>
                           <TableCell>{vol.ocrName ?? "-"}</TableCell>

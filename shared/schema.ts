@@ -275,6 +275,7 @@ export const mappedVolunteers = pgTable("mapped_volunteers", {
   isVerified: boolean("is_verified").default(false), // OTP verified for Active
   selectedVillageId: varchar("selected_village_id"),
   selectedVillageName: text("selected_village_name"),
+  voterMappingBoothId: text("voter_mapping_booth_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

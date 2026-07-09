@@ -26,6 +26,7 @@ export async function applySchemaPatches() {
       "ocr_address",
       "selected_village_id",
       "selected_village_name",
+      "voter_mapping_booth_id",
     ];
 
     for (const column of mappedVolunteerTextColumns) {
