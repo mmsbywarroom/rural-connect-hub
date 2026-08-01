@@ -268,18 +268,18 @@ export default function VolunteerPortal() {
           <MinisterImageWithFallback />
           <MinisterTextBlock />
         </AppPortraitCard>
-        <AppAuthCard className="px-4 py-5 space-y-3">
+        <AppAuthCard className="px-4 py-5 space-y-3 bg-white">
           <h1 className="text-xl font-semibold tracking-tight text-center text-[#0a274f]" data-testid="text-app-title">
             {t('patialaRural')}
           </h1>
           <Button
-            className="w-full h-12 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
+            className="w-full h-12 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
             onClick={() => setAuthState("login")}
             data-testid="button-login"
           >
             <LogIn className="mr-3 h-5 w-5" /> {t('login')}
           </Button>
-          <LanguageSwitcherInline className="mt-1" />
+          <LanguageSwitcherInline className="mt-1" tone="light" />
         </AppAuthCard>
       </AppAuthShell>
     );

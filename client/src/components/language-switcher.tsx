@@ -44,20 +44,35 @@ export function LanguageSwitcher({ variant = "ghost", className = "", showLabel 
   );
 }
 
-export function LanguageSwitcherInline({ className = "" }: { className?: string }) {
+export function LanguageSwitcherInline({
+  className = "",
+  tone = "light",
+}: {
+  className?: string;
+  /** light = on white card; dark = on navy background */
+  tone?: "light" | "dark";
+}) {
   const { language, setLanguage } = useTranslation();
 
+  const active =
+    tone === "dark"
+      ? "text-white font-semibold bg-white/20"
+      : "text-[#0d47a1] font-semibold bg-[#e8f0fe]";
+  const idle =
+    tone === "dark"
+      ? "text-white/80 hover:text-white hover:bg-white/10"
+      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100";
+  const divider = tone === "dark" ? "text-white/35" : "text-slate-300";
+
   return (
-    <div className={`flex items-center gap-1 ${className}`} data-testid="language-switcher-inline">
+    <div className={`flex items-center justify-center gap-1 ${className}`} data-testid="language-switcher-inline">
       {LANGUAGE_OPTIONS.map((opt, i) => (
         <span key={opt.value} className="flex items-center gap-1">
-          {i > 0 && <span className="text-muted-foreground/40">|</span>}
+          {i > 0 && <span className={divider}>|</span>}
           <button
             onClick={() => setLanguage(opt.value)}
-            className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
-              language === opt.value
-                ? "text-primary font-semibold bg-primary/10"
-                : "text-muted-foreground hover:text-foreground"
+            className={`text-xs px-2 py-1 rounded-md transition-colors ${
+              language === opt.value ? active : idle
             }`}
             data-testid={`lang-inline-${opt.value}`}
           >

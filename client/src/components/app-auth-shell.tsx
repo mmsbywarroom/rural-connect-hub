@@ -33,7 +33,7 @@ export function AppAuthShell({ children }: { children: ReactNode }) {
 
 export function AppAuthCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white/97 backdrop-blur-sm shadow-2xl shadow-black/30 ring-1 ring-black/5 overflow-hidden ${className}`}>
+    <div className={`rounded-2xl bg-white shadow-2xl shadow-black/30 ring-1 ring-black/10 overflow-hidden ${className}`}>
       {children}
     </div>
   );
@@ -41,7 +41,7 @@ export function AppAuthCard({ children, className = "" }: { children: ReactNode;
 
 export function AppPortraitCard({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-white/15 shrink-0">
+    <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-white/20 shrink-0 bg-white">
       {children}
     </div>
   );

@@ -132,7 +132,7 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
         <MinisterTextBlock compact />
       </AppPortraitCard>
 
-      <AppAuthCard>
+      <AppAuthCard className="bg-white">
         <div className="px-4 pt-4 pb-1 text-center">
           <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#e8f0fe] flex items-center justify-center">
             {inputIcon}
