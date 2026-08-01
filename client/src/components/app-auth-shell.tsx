@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 const NAVY_GRADIENT =
   "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)";
@@ -6,8 +6,71 @@ const NAVY_GRADIENT =
 const PLUS_PATTERN =
   "url(\"data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2393c5fd' fill-opacity='1'%3E%3Cpath d='M13 6h2v6h6v2h-6v6h-2v-6H7v-2h6z'/%3E%3C/g%3E%3C/svg%3E\")";
 
-/** Auth shell: navy + plus pattern, top-centered, keyboard-safe. */
+/** True when mobile keyboard (or similar chrome) has shrunk the visible viewport. */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let baseline = Math.max(window.innerHeight, window.visualViewport?.height ?? 0);
+    let focusedEditable = false;
+
+    const isEditable = (el: EventTarget | null) => {
+      if (!(el instanceof HTMLElement)) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+    };
+
+    const update = () => {
+      const vv = window.visualViewport?.height ?? window.innerHeight;
+      const ih = window.innerHeight;
+      const current = Math.min(vv, ih);
+      const shrunk = current < baseline - 120;
+      const touchLikely = window.matchMedia("(pointer: coarse)").matches;
+      const nextOpen = shrunk || (focusedEditable && touchLikely);
+      setOpen(nextOpen);
+      if (!shrunk && !focusedEditable && current > baseline) baseline = current;
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      if (isEditable(e.target)) {
+        focusedEditable = true;
+        update();
+      }
+    };
+    const onFocusOut = () => {
+      // Delay so focus moving between inputs doesn't flicker.
+      requestAnimationFrame(() => {
+        focusedEditable = isEditable(document.activeElement);
+        update();
+      });
+    };
+
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+
+  return open;
+}
+
+/**
+ * Auth shell: navy + plus pattern.
+ * Keyboard closed → cards vertically centered.
+ * Keyboard open → cards top-aligned so both stay visible.
+ */
 export function AppAuthShell({ children }: { children: ReactNode }) {
+  const keyboardOpen = useKeyboardOpen();
+
   return (
     <div
       className="app-auth-shell relative isolate h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#061a3a]"
@@ -27,7 +90,11 @@ export function AppAuthShell({ children }: { children: ReactNode }) {
         }}
       />
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-sm flex-col items-center justify-start gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))]">
+      <div
+        className={`relative z-10 mx-auto flex h-full w-full max-w-sm flex-col items-center gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))] ${
+          keyboardOpen ? "justify-start" : "justify-center"
+        }`}
+      >
         {children}
       </div>
     </div>

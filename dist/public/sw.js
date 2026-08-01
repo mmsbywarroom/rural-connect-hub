@@ -18,8 +18,8 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body: data.body || "",
-    icon: data.icon || "/favicon.png",
-    badge: data.badge || "/favicon.png",
+    icon: data.icon || "/icon-192.png",
+    badge: data.badge || "/icon-192.png",
     data: { url: data.url || "/app" },
     vibrate: [200, 100, 200],
     tag: "patiala-rural-notification",
@@ -42,7 +42,9 @@ self.addEventListener("notificationclick", (event) => {
           return client.focus();
         }
       }
-      return self.clients.openWindow(url);
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
     })
   );
 });
