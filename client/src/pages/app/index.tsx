@@ -290,7 +290,7 @@ export default function VolunteerPortal() {
             >
               <LogIn className="mr-3 h-5 w-5" /> {t('login')}
             </Button>
-            <LanguageSwitcher inline className="mt-2" />
+            <LanguageSwitcherInline className="mt-2" />
           </div>
         </div>
       </div>
