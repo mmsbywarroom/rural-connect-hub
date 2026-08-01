@@ -45,14 +45,12 @@ export function MinisterImageWithFallback({
     else setLoadState("fallback-text");
   };
 
-  // Image-1 look: tall portrait card, white plate, face always fully visible.
-  const frameClass = compact
-    ? "aspect-[3/4] max-h-[min(42dvh,300px)]"
-    : "aspect-[3/4] max-h-[min(48dvh,340px)]";
+  // Fill parent portrait card; parent max-height shrinks when keyboard opens.
+  const frameClass = "h-full w-full min-h-[120px]";
 
   if (loadState === "fallback-text") {
     return (
-      <div className={`w-full ${frameClass} relative bg-gradient-to-br from-[#0b3d91] via-[#1565c0] to-[#0d47a1] flex items-center justify-center`}>
+      <div className={`relative ${frameClass} bg-gradient-to-br from-[#0b3d91] via-[#1565c0] to-[#0d47a1] flex items-center justify-center`}>
         <div className="text-center p-4 text-white">
           <p className={`font-semibold tracking-tight ${compact ? "text-lg" : "text-2xl"}`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {c.ministerName}
@@ -71,8 +69,7 @@ export function MinisterImageWithFallback({
         : configuredUrl;
 
   return (
-    <div className={`w-full ${frameClass} relative overflow-hidden bg-white`}>
-      {/* soft blue wash at bottom like reference */}
+    <div className={`relative ${frameClass} overflow-hidden bg-white`}>
       <div
         className="absolute inset-x-0 bottom-0 h-1/2 pointer-events-none z-[1]"
         style={{
@@ -81,7 +78,7 @@ export function MinisterImageWithFallback({
       />
       <img
         key={loadState + imgSrc}
-        src={`${imgSrc}?v=2`}
+        src={`${imgSrc}?v=3`}
         alt={`${c.ministerName} - ${c.ministerTitle}`}
         className="absolute inset-0 z-0 h-full w-full object-contain object-center select-none"
         onError={handleError}
@@ -90,7 +87,7 @@ export function MinisterImageWithFallback({
         decoding="async"
       />
       {showOverlay && (
-        <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-3 pt-12 text-center text-white pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-2.5 pt-10 text-center text-white pointer-events-none">
           <p
             className={`font-semibold tracking-tight drop-shadow ${compact ? "text-sm" : "text-base"}`}
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
