@@ -9,7 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { Loader2, Mail, KeyRound, ArrowRight, ArrowLeft, Phone, Smartphone } from "lucide-react";
 import type { AppUser } from "@shared/schema";
 import { MinisterImageWithFallback, MinisterTextBlock } from "@/components/minister-image";
-import { AppAuthShell, AppAuthCard, AppPortraitCard } from "@/components/app-auth-shell";
+import { AppAuthShell, AppAuthCard, AppPortraitCard, AppPortraitMedia } from "@/components/app-auth-shell";
 
 interface AppLoginProps {
   onLogin: (user: AppUser) => void;
@@ -128,15 +128,17 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
 
   return (
     <AppAuthShell>
-      {/* 1st-screen look: portrait + name overlay + slogan strip */}
+      {/* Same as reference: portrait + name overlay + slogan, then white OTP card */}
       <AppPortraitCard>
-        <MinisterImageWithFallback compact showOverlay />
+        <AppPortraitMedia>
+          <MinisterImageWithFallback compact showOverlay />
+        </AppPortraitMedia>
         <MinisterTextBlock compact />
       </AppPortraitCard>
 
       <AppAuthCard className="bg-white">
         <div className="px-4 pt-4 pb-1 text-center">
-          <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#e8f0fe] flex items-center justify-center">
+          <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-white border border-[#c5d8f8] flex items-center justify-center shadow-sm">
             {step === "otp" && channel === "sms" ? (
               <Phone className="h-5 w-5 text-[#0d47a1]" />
             ) : (

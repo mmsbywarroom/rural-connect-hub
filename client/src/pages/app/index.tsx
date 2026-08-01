@@ -41,7 +41,7 @@ import { Loader2, LogIn, UserPlus, Mail, KeyRound, ArrowRight, ArrowLeft, MapPin
 import type { AppUser } from "@shared/schema";
 import { getProfileCompletion } from "@/lib/profile-completion";
 import { MinisterImageWithFallback, MinisterTextBlock } from "@/components/minister-image";
-import { AppAuthShell, AppAuthCard, AppPortraitCard } from "@/components/app-auth-shell";
+import { AppAuthShell, AppAuthCard, AppPortraitCard, AppPortraitMedia } from "@/components/app-auth-shell";
 
 function isIndianMobile(input: string): boolean {
   const cleaned = input.replace(/\D/g, "").replace(/^91/, "");
@@ -266,21 +266,23 @@ export default function VolunteerPortal() {
     return (
       <AppAuthShell>
         <AppPortraitCard>
-          <MinisterImageWithFallback showOverlay />
-          <MinisterTextBlock />
+          <AppPortraitMedia>
+            <MinisterImageWithFallback showOverlay />
+          </AppPortraitMedia>
+          <MinisterTextBlock compact />
         </AppPortraitCard>
-        <AppAuthCard className="px-4 py-5 space-y-3 bg-white">
+        <AppAuthCard className="px-4 py-4 space-y-2.5 bg-white">
           <h1 className="text-xl font-semibold tracking-tight text-center text-[#0a274f]" data-testid="text-app-title">
             {t('patialaRural')}
           </h1>
           <Button
-            className="w-full h-12 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
+            className="w-full h-11 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
             onClick={() => setAuthState("login")}
             data-testid="button-login"
           >
             <LogIn className="mr-3 h-5 w-5" /> {t('login')}
           </Button>
-          <LanguageSwitcherInline className="mt-1" tone="light" />
+          <LanguageSwitcherInline className="mt-0.5" tone="light" />
         </AppAuthCard>
       </AppAuthShell>
     );

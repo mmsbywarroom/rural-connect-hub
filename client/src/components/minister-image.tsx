@@ -110,7 +110,7 @@ export function MinisterTextBlock({ compact = false }: { compact?: boolean }) {
   });
   const c = config || DEFAULT_CONFIG;
   return (
-    <div className={`text-center bg-white border-t border-slate-100 ${compact ? "px-3 py-2" : "px-4 py-2.5"}`}>
+    <div className={`shrink-0 text-center bg-white border-t border-slate-100 ${compact ? "px-3 py-2" : "px-4 py-2.5"}`}>
       <p
         className={`text-slate-600 font-medium leading-snug ${compact ? "text-[10px]" : "text-xs"}`}
         style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: "0.02em" }}

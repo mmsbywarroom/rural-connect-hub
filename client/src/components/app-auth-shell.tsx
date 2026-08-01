@@ -1,38 +1,33 @@
 import { type ReactNode } from "react";
 
-/** Auth shell: navy + plus pattern, keyboard-safe (image + form stay visible). */
+const NAVY_GRADIENT =
+  "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)";
+
+const PLUS_PATTERN =
+  "url(\"data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2393c5fd' fill-opacity='1'%3E%3Cpath d='M13 6h2v6h6v2h-6v6h-2v-6H7v-2h6z'/%3E%3C/g%3E%3C/svg%3E\")";
+
+/** Auth shell: navy + plus pattern, top-centered, keyboard-safe. */
 export function AppAuthShell({ children }: { children: ReactNode }) {
   return (
     <div
-      className="app-auth-shell h-[100dvh] max-h-[100dvh] overflow-hidden"
+      className="app-auth-shell relative isolate h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#061a3a]"
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[#061a3a]" aria-hidden />
       <div
-        className="pointer-events-none fixed inset-0 -z-10"
+        className="pointer-events-none absolute inset-0"
         aria-hidden
-        style={{
-          background:
-            "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)",
-        }}
+        style={{ background: NAVY_GRADIENT }}
       />
-      {/* Plus pattern */}
       <div
-        className="pointer-events-none fixed inset-0 -z-10 opacity-[0.12]"
+        className="pointer-events-none absolute inset-0 opacity-[0.16]"
         aria-hidden
         style={{
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2393c5fd' fill-opacity='1'%3E%3Cpath d='M13 6h2v6h6v2h-6v6h-2v-6H7v-2h6z'/%3E%3C/g%3E%3C/svg%3E\")",
+          backgroundImage: PLUS_PATTERN,
           backgroundSize: "28px 28px",
         }}
       />
-      {/*
-        Keyboard-safe column:
-        - 100dvh shrinks when mobile keyboard opens
-        - no vertical centering (avoids pushing portrait off-screen)
-        - portrait can shrink; form stays pinned in view
-      */}
-      <div className="mx-auto flex h-full w-full max-w-sm flex-col justify-start gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-3 pt-3 sm:pt-4">
+
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-sm flex-col items-center justify-start gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))]">
         {children}
       </div>
     </div>
@@ -42,17 +37,22 @@ export function AppAuthShell({ children }: { children: ReactNode }) {
 export function AppAuthCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`shrink-0 rounded-2xl bg-white shadow-xl shadow-black/25 ring-1 ring-white/20 overflow-hidden ${className}`}
+      className={`w-full shrink-0 rounded-2xl bg-white shadow-xl shadow-black/25 ring-1 ring-white/20 overflow-hidden ${className}`}
     >
       {children}
     </div>
   );
 }
 
+/** Portrait + optional slogan strip (flex so slogan never gets clipped). */
 export function AppPortraitCard({ children }: { children: ReactNode }) {
   return (
-    <div className="h-[min(34dvh,260px)] min-h-[140px] shrink-0 rounded-2xl overflow-hidden bg-white shadow-xl shadow-black/25 ring-1 ring-white/25">
+    <div className="w-full flex flex-col h-[min(38dvh,280px)] min-h-[160px] max-h-[300px] shrink rounded-2xl overflow-hidden bg-white shadow-xl shadow-black/25 ring-1 ring-white/25">
       {children}
     </div>
   );
+}
+
+export function AppPortraitMedia({ children }: { children: ReactNode }) {
+  return <div className="relative min-h-0 flex-1 w-full">{children}</div>;
 }

@@ -372,4 +372,6 @@
 
 .app-auth-shell {
   -webkit-overflow-scrolling: touch;
+  background-color: #061a3a;
+  color-scheme: dark;
 }
