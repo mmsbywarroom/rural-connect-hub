@@ -23,7 +23,6 @@ export function MinisterImageWithFallback({
 }: {
   compact?: boolean;
   fullImage?: boolean;
-  /** Name/title over photo (1st-screen look). Default on. */
   showOverlay?: boolean;
 }) {
   const [loadState, setLoadState] = useState<"primary" | "local" | "fallback-text">("primary");
@@ -46,16 +45,14 @@ export function MinisterImageWithFallback({
     else setLoadState("fallback-text");
   };
 
-  const frameStyle = compact
-    ? { height: "min(38dvh, 260px)", minHeight: 160 }
-    : { height: "min(44dvh, 300px)", minHeight: 190 };
+  // Image-1 look: tall portrait card, white plate, face always fully visible.
+  const frameClass = compact
+    ? "aspect-[3/4] max-h-[min(42dvh,300px)]"
+    : "aspect-[3/4] max-h-[min(48dvh,340px)]";
 
   if (loadState === "fallback-text") {
     return (
-      <div
-        className="w-full relative bg-gradient-to-br from-[#0b3d91] via-[#1565c0] to-[#0d47a1] flex items-center justify-center"
-        style={frameStyle}
-      >
+      <div className={`w-full ${frameClass} relative bg-gradient-to-br from-[#0b3d91] via-[#1565c0] to-[#0d47a1] flex items-center justify-center`}>
         <div className="text-center p-4 text-white">
           <p className={`font-semibold tracking-tight ${compact ? "text-lg" : "text-2xl"}`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {c.ministerName}
@@ -74,36 +71,33 @@ export function MinisterImageWithFallback({
         : configuredUrl;
 
   return (
-    <div
-      className="w-full relative bg-gradient-to-b from-[#0a2f6e] via-[#1256b0] to-[#0d47a1] flex items-center justify-center overflow-hidden"
-      style={frameStyle}
-    >
+    <div className={`w-full ${frameClass} relative overflow-hidden bg-white`}>
+      {/* soft blue wash at bottom like reference */}
       <div
-        className="absolute inset-0 opacity-40 pointer-events-none"
+        className="absolute inset-x-0 bottom-0 h-1/2 pointer-events-none z-[1]"
         style={{
-          background:
-            "radial-gradient(ellipse 70% 80% at 50% 35%, rgba(255,255,255,0.2) 0%, transparent 65%)",
+          background: "linear-gradient(to top, #0a2f6e 0%, #1256b0aa 35%, transparent 100%)",
         }}
       />
       <img
         key={loadState + imgSrc}
-        src={imgSrc}
+        src={`${imgSrc}?v=2`}
         alt={`${c.ministerName} - ${c.ministerTitle}`}
-        className="relative z-[1] max-h-full max-w-full object-contain select-none"
+        className="absolute inset-0 z-0 h-full w-full object-contain object-center select-none"
         onError={handleError}
         referrerPolicy="no-referrer"
         loading="eager"
         decoding="async"
       />
       {showOverlay && (
-        <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-2.5 pt-10 text-center text-white bg-gradient-to-t from-[#0a2f6e] via-[#0a2f6e]/75 to-transparent pointer-events-none">
+        <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-3 pt-12 text-center text-white pointer-events-none">
           <p
-            className={`font-semibold tracking-tight drop-shadow-sm ${compact ? "text-sm" : "text-base"}`}
+            className={`font-semibold tracking-tight drop-shadow ${compact ? "text-sm" : "text-base"}`}
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
             {c.ministerName}
           </p>
-          <p className={`text-white/90 ${compact ? "text-[10px]" : "text-xs"}`}>{c.ministerTitle}</p>
+          <p className={`text-white/95 ${compact ? "text-[10px]" : "text-xs"}`}>{c.ministerTitle}</p>
         </div>
       )}
     </div>

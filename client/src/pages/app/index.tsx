@@ -249,13 +249,14 @@ export default function VolunteerPortal() {
 
   if (authState === "loading") {
     return (
-      <div className="min-h-screen app-header flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Loader2 className="h-10 w-10 animate-spin" />
-          </div>
-          <h1 className="text-xl font-semibold">{t('patialaRural')}</h1>
-          <p className="text-white/70 text-sm mt-1">{t('loading')}</p>
+      <div className="fixed inset-0 z-50 bg-[#0a274f] flex items-center justify-center">
+        <img
+          src="/splash-minister.jpg"
+          alt={t('patialaRural')}
+          className="w-full h-full object-contain object-center"
+        />
+        <div className="absolute bottom-10 left-0 right-0 flex justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-white/80" />
         </div>
       </div>
     );

@@ -9,3 +9,11 @@ if ("serviceWorker" in navigator) {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+// Hide HTML splash once React has painted
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const hide = (window as Window & { __hideAppSplash?: () => void }).__hideAppSplash;
+    hide?.();
+  });
+});
