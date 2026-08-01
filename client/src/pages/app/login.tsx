@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useTranslation } from "@/lib/i18n";
@@ -57,6 +58,7 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
       setChannel(data.channel || (data.smsSent ? "sms" : "email"));
       setMaskedTarget(data.maskedMobile || data.maskedEmail || identifier);
       setStep("otp");
+      setOtp("");
       const desc = data.channel === "sms" || data.smsSent
         ? "Check your phone for the OTP code"
         : "Check your email for the OTP code";
@@ -108,8 +110,8 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
     sendOtpMutation.mutate(trimmed);
   };
 
-  const handleVerifyOtp = () => {
-    const cleanOtp = otp.replace(/\D/g, '').trim();
+  const handleVerifyOtp = (otpCode = otp) => {
+    const cleanOtp = otpCode.replace(/\D/g, "").trim();
     if (!/^\d{4}$/.test(cleanOtp)) {
       toast({ title: t('invalid'), description: t('invalidOtp'), variant: "destructive" });
       return;
@@ -126,16 +128,20 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
 
   return (
     <AppAuthShell>
-      {/* Full portrait — object-contain, not cropped */}
+      {/* 1st-screen look: portrait + name overlay + slogan strip */}
       <AppPortraitCard>
-        <MinisterImageWithFallback compact />
+        <MinisterImageWithFallback compact showOverlay />
         <MinisterTextBlock compact />
       </AppPortraitCard>
 
       <AppAuthCard className="bg-white">
         <div className="px-4 pt-4 pb-1 text-center">
           <div className="mx-auto mb-2 w-10 h-10 rounded-full bg-[#e8f0fe] flex items-center justify-center">
-            {inputIcon}
+            {step === "otp" && channel === "sms" ? (
+              <Phone className="h-5 w-5 text-[#0d47a1]" />
+            ) : (
+              inputIcon
+            )}
           </div>
           <h1 className="text-xl font-semibold tracking-tight text-[#0a274f]">
             {t('patialaRural')}
@@ -156,7 +162,7 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
                   placeholder="Enter email or mobile number"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="h-11 text-base rounded-xl border-slate-200 focus-visible:ring-[#1565c0]"
+                  className="h-11 text-base rounded-xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:ring-[#1565c0]"
                   data-testid="input-email-or-mobile"
                   autoFocus
                 />
@@ -169,7 +175,7 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
                 )}
               </div>
               <Button
-                className="w-full h-11 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
+                className="w-full h-11 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
                 onClick={handleSendOtp}
                 disabled={sendOtpMutation.isPending || !isValidInput}
                 data-testid="button-send-otp"
@@ -216,24 +222,39 @@ export default function AppLogin({ onLogin, onNeedRegistration, onBack }: AppLog
               </div>
 
               <div>
-                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1 block">
+                <label className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2 block text-center">
                   {t('enterOtp')}
                 </label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete="one-time-code"
-                  placeholder={t('enter4DigitOtp')}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  className="h-11 text-xl text-center tracking-[0.5em] rounded-xl border-slate-200 focus-visible:ring-[#1565c0]"
-                  data-testid="input-otp"
-                />
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={4}
+                    value={otp}
+                    onChange={(value) => {
+                      const next = value.replace(/\D/g, "").slice(0, 4);
+                      setOtp(next);
+                      if (next.length === 4) {
+                        handleVerifyOtp(next);
+                      }
+                    }}
+                    containerClassName="gap-3"
+                    data-testid="input-otp"
+                  >
+                    <InputOTPGroup className="gap-3">
+                      {[0, 1, 2, 3].map((i) => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className="h-12 w-12 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 first:rounded-xl first:border-l last:rounded-xl shadow-sm"
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
               </div>
+
               <Button
-                className="w-full h-11 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
-                onClick={handleVerifyOtp}
+                className="w-full h-11 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
+                onClick={() => handleVerifyOtp()}
                 disabled={verifyOtpMutation.isPending || otp.length !== 4}
                 data-testid="button-verify-otp"
               >

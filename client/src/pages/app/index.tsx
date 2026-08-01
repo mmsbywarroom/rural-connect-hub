@@ -265,7 +265,7 @@ export default function VolunteerPortal() {
     return (
       <AppAuthShell>
         <AppPortraitCard>
-          <MinisterImageWithFallback />
+          <MinisterImageWithFallback showOverlay />
           <MinisterTextBlock />
         </AppPortraitCard>
         <AppAuthCard className="px-4 py-5 space-y-3 bg-white">

@@ -19,9 +19,11 @@ const LOCAL_MINISTER_IMAGE = "/minister.jpg";
 
 export function MinisterImageWithFallback({
   compact = false,
+  showOverlay = true,
 }: {
   compact?: boolean;
   fullImage?: boolean;
+  /** Name/title over photo (1st-screen look). Default on. */
   showOverlay?: boolean;
 }) {
   const [loadState, setLoadState] = useState<"primary" | "local" | "fallback-text">("primary");
@@ -44,10 +46,9 @@ export function MinisterImageWithFallback({
     else setLoadState("fallback-text");
   };
 
-  // Tall enough for full body+face; image always fully visible (never cropped).
   const frameStyle = compact
-    ? { height: "min(40dvh, 280px)", minHeight: 168 }
-    : { height: "min(46dvh, 320px)", minHeight: 200 };
+    ? { height: "min(38dvh, 260px)", minHeight: 160 }
+    : { height: "min(44dvh, 300px)", minHeight: 190 };
 
   if (loadState === "fallback-text") {
     return (
@@ -59,7 +60,7 @@ export function MinisterImageWithFallback({
           <p className={`font-semibold tracking-tight ${compact ? "text-lg" : "text-2xl"}`} style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {c.ministerName}
           </p>
-          <p className={`text-white/80 mt-1 ${compact ? "text-[11px]" : "text-sm"}`}>{c.ministerTitle}</p>
+          <p className={`text-white/85 mt-1 ${compact ? "text-[11px]" : "text-sm"}`}>{c.ministerTitle}</p>
         </div>
       </div>
     );
@@ -81,7 +82,7 @@ export function MinisterImageWithFallback({
         className="absolute inset-0 opacity-40 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse 70% 80% at 50% 40%, rgba(255,255,255,0.22) 0%, transparent 65%)",
+            "radial-gradient(ellipse 70% 80% at 50% 35%, rgba(255,255,255,0.2) 0%, transparent 65%)",
         }}
       />
       <img
@@ -94,10 +95,22 @@ export function MinisterImageWithFallback({
         loading="eager"
         decoding="async"
       />
+      {showOverlay && (
+        <div className="absolute inset-x-0 bottom-0 z-[2] px-3 pb-2.5 pt-10 text-center text-white bg-gradient-to-t from-[#0a2f6e] via-[#0a2f6e]/75 to-transparent pointer-events-none">
+          <p
+            className={`font-semibold tracking-tight drop-shadow-sm ${compact ? "text-sm" : "text-base"}`}
+            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+          >
+            {c.ministerName}
+          </p>
+          <p className={`text-white/90 ${compact ? "text-[10px]" : "text-xs"}`}>{c.ministerTitle}</p>
+        </div>
+      )}
     </div>
   );
 }
 
+/** Slogan strip under portrait (name lives on photo overlay). */
 export function MinisterTextBlock({ compact = false }: { compact?: boolean }) {
   const { data: config } = useQuery<LoginPageConfig>({
     queryKey: ["/api/login-page-config"],
@@ -108,15 +121,8 @@ export function MinisterTextBlock({ compact = false }: { compact?: boolean }) {
   return (
     <div className={`text-center bg-white border-t border-slate-100 ${compact ? "px-3 py-2" : "px-4 py-2.5"}`}>
       <p
-        className={`font-semibold text-slate-900 ${compact ? "text-sm" : "text-base"}`}
-        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-      >
-        {c.ministerName}
-      </p>
-      <p className={`text-slate-600 ${compact ? "text-[10px]" : "text-xs"}`}>{c.ministerTitle}</p>
-      <p
-        className={`text-slate-500 font-medium leading-snug ${compact ? "text-[9px] mt-1" : "text-[10px] mt-1.5"}`}
-        style={{ letterSpacing: "0.02em" }}
+        className={`text-slate-600 font-medium leading-snug ${compact ? "text-[10px]" : "text-xs"}`}
+        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: "0.02em" }}
       >
         {c.slogan}
       </p>
