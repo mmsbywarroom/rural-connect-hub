@@ -195,11 +195,19 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle?: string })
   return (
     <div className="mb-3.5">
       <div className="flex items-center gap-2.5">
-        <span className="h-4 w-1 rounded-full bg-[#1565c0]" aria-hidden />
-        <h2 className="text-[11px] font-semibold text-slate-500 tracking-[0.14em] uppercase">{title}</h2>
+        <span className="h-5 w-1.5 rounded-full bg-[#1565c0]" aria-hidden />
+        <h2 className="text-base font-bold text-black tracking-tight">{title}</h2>
       </div>
-      {subtitle ? <p className="mt-1 ml-3.5 text-[11px] text-slate-400">{subtitle}</p> : null}
+      {subtitle ? <p className="mt-1 ml-4 text-xs text-slate-500">{subtitle}</p> : null}
     </div>
+  );
+}
+
+function GridSectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="text-base font-bold text-black tracking-tight mb-2.5 ml-0.5">
+      {children}
+    </h3>
   );
 }
 
@@ -600,6 +608,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const { data: categories } = useQuery<TaskCategory[]>({
     queryKey: ["/api/app/task-categories"],
+    staleTime: 60_000,
   });
 
   const ALL_FIXED_SLUGS = ["nasha-viruddh-yuddh", "road-report", "harr-sirr-te-chatt", "sukh-dukh-saanjha-karo", "sunwai", "outdoor-ad", "gov-school", "appointment", "event-venue", "tirth-yatra", "mahila-samman-rashi", "voter-registration", "bla"];
@@ -608,10 +617,12 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   const { data: tasks, isLoading } = useQuery<TaskConfig[]>({
     queryKey: ["/api/app/tasks"],
+    staleTime: 60_000,
   });
 
   const { data: leaderboardData } = useQuery<LeaderboardData>({
     queryKey: ["/api/app/leaderboard"],
+    staleTime: 30_000,
   });
 
   const { data: activeSurveys } = useQuery<SurveyWithQuestions[]>({
@@ -621,10 +632,12 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
       if (!res.ok) throw new Error("Failed to fetch surveys");
       return res.json();
     },
+    staleTime: 30_000,
   });
 
   const { data: surveyLeaderboard } = useQuery<LeaderboardEntry[]>({
     queryKey: ["/api/app/survey-leaderboard"],
+    staleTime: 30_000,
   });
 
   const surveyTop3 = (surveyLeaderboard || []).filter(e => e.count > 0).slice(0, 3);
@@ -935,9 +948,9 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
           {!isMahilaSakhi && categories && categories.length > 0 && (
             <>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2 ml-0.5">
+              <GridSectionLabel>
                 {language === "hi" ? "श्रेणियाँ" : language === "pa" ? "ਸ਼੍ਰੇਣੀਆਂ" : "Categories"}
-              </p>
+              </GridSectionLabel>
               <div className="grid grid-cols-3 gap-2.5 mb-4">
                 <CategoryGridTile
                   selected={selectedCategoryId === null}
@@ -964,23 +977,20 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 })}
               </div>
 
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2 ml-0.5">
+              <GridSectionLabel>
                 {language === "hi" ? "कार्य" : language === "pa" ? "ਕੰਮ" : "Tasks"}
-              </p>
+              </GridSectionLabel>
               <div className="grid grid-cols-3 gap-2.5">
                 {selectedCategoryId === null
-                  ? renderTaskGrid(
-                      filterCategoryFixedSlugs([
-                        ...new Set([
-                          ...uncategorizedFixedSlugs,
-                          ...(categories.flatMap((c) => c.fixedTaskSlugs ?? [])),
-                        ]),
-                      ]),
-                      filterCategoryTasks(tasks ?? []),
+                  ? // Unmapped only — tasks not assigned to any category
+                    renderTaskGrid(
+                      filterCategoryFixedSlugs(uncategorizedFixedSlugs),
+                      filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
                     )
                   : (() => {
                       const cat = categories.find((c) => c.id === selectedCategoryId);
                       if (!cat) return null;
+                      // Only tasks mapped to this category
                       return renderTaskGrid(
                         filterCategoryFixedSlugs(cat.fixedTaskSlugs ?? []),
                         filterCategoryTasks(tasks?.filter((t) => (t as any).categoryId === cat.id) ?? []),

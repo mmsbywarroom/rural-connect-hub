@@ -11,6 +11,7 @@ import { transliterateBatch } from "./transliterate";
 import { sendOtpEmail, isEmailConfigured } from "./email";
 import { sendOtpSms, sendCustomSms, isSmsConfigured, isIndianMobile, normalizeMobile, maskMobile } from "./sms";
 import { db } from "./db";
+import { cacheGet, cacheSet } from "./cache";
 import { parseListParams } from "./pagination";
 import bcrypt from "bcryptjs";
 import { sql, count, eq, desc, gte, lte, and, or, inArray, ilike } from "drizzle-orm";
@@ -2673,7 +2674,10 @@ export async function registerRoutes(
   // Enabled tasks for mobile app
   app.get("/api/app/task-categories", async (req, res) => {
     try {
+      const cached = cacheGet<any[]>("app:task-categories");
+      if (cached) return res.json(cached);
       const categories = await storage.getTaskCategories(true);
+      cacheSet("app:task-categories", categories, 60_000);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch task categories" });
@@ -2682,8 +2686,11 @@ export async function registerRoutes(
 
   app.get("/api/app/tasks", async (req, res) => {
     try {
+      const cached = cacheGet<any[]>("app:tasks");
+      if (cached) return res.json(cached);
       const configs = await storage.getTaskConfigs();
       const enabled = configs.filter((c) => c.isEnabled);
+      cacheSet("app:tasks", enabled, 60_000);
       res.json(enabled);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch tasks" });
@@ -2692,72 +2699,104 @@ export async function registerRoutes(
 
   app.get("/api/app/leaderboard", async (req, res) => {
     try {
-      const volCounts = await db
-        .select({
-          userId: mappedVolunteers.addedByUserId,
-          count: count().as("count"),
-        })
-        .from(mappedVolunteers)
-        .groupBy(mappedVolunteers.addedByUserId);
+      const cached = cacheGet<{
+        volunteerMapping: any[];
+        supporterMapping: any[];
+        hstc: any[];
+        sdsk: any[];
+      }>("app:leaderboard");
+      if (cached) return res.json(cached);
 
-      const supCounts = await db
-        .select({
-          userId: supporters.addedByUserId,
-          count: count().as("count"),
-        })
-        .from(supporters)
-        .groupBy(supporters.addedByUserId);
-
-      const hstcCounts = await db
-        .select({
-          userId: hstcSubmissions.appUserId,
-          count: count().as("count"),
-        })
-        .from(hstcSubmissions)
-        .groupBy(hstcSubmissions.appUserId);
-
-      const sdskCounts = await db
-        .select({
-          userId: sdskSubmissions.appUserId,
-          count: count().as("count"),
-        })
-        .from(sdskSubmissions)
-        .groupBy(sdskSubmissions.appUserId);
-
-      const allUsers = await db
-        .select({
-          id: appUsers.id,
-          name: appUsers.name,
-          hasPhoto: sql<boolean>`CASE WHEN ${appUsers.selfPhoto} IS NOT NULL AND ${appUsers.selfPhoto} != '' THEN true ELSE false END`.as("has_photo"),
-        })
-        .from(appUsers);
+      // Parallel count aggregations (indexed by user id after schema patches)
+      const [volCounts, supCounts, hstcCounts, sdskCounts] = await Promise.all([
+        db
+          .select({
+            userId: mappedVolunteers.addedByUserId,
+            count: count().as("count"),
+          })
+          .from(mappedVolunteers)
+          .groupBy(mappedVolunteers.addedByUserId),
+        db
+          .select({
+            userId: supporters.addedByUserId,
+            count: count().as("count"),
+          })
+          .from(supporters)
+          .groupBy(supporters.addedByUserId),
+        db
+          .select({
+            userId: hstcSubmissions.appUserId,
+            count: count().as("count"),
+          })
+          .from(hstcSubmissions)
+          .groupBy(hstcSubmissions.appUserId),
+        db
+          .select({
+            userId: sdskSubmissions.appUserId,
+            count: count().as("count"),
+          })
+          .from(sdskSubmissions)
+          .groupBy(sdskSubmissions.appUserId),
+      ]);
 
       const volMap: Record<string, number> = {};
-      volCounts.forEach((r) => { volMap[r.userId] = r.count; });
+      volCounts.forEach((r) => { volMap[r.userId] = Number(r.count); });
       const supMap: Record<string, number> = {};
-      supCounts.forEach((r) => { supMap[r.userId] = r.count; });
+      supCounts.forEach((r) => { supMap[r.userId] = Number(r.count); });
       const hstcMap: Record<string, number> = {};
-      hstcCounts.forEach((r) => { hstcMap[r.userId] = r.count; });
+      hstcCounts.forEach((r) => { hstcMap[r.userId] = Number(r.count); });
       const sdskMap: Record<string, number> = {};
-      sdskCounts.forEach((r) => { sdskMap[r.userId] = r.count; });
+      sdskCounts.forEach((r) => { sdskMap[r.userId] = Number(r.count); });
+
+      // Only fetch users who actually have activity — avoids scanning 3k+ rows + photo TOAST.
+      const activeUserIds = [
+        ...new Set([
+          ...Object.keys(volMap),
+          ...Object.keys(supMap),
+          ...Object.keys(hstcMap),
+          ...Object.keys(sdskMap),
+        ]),
+      ];
+
+      const userMeta = new Map<string, { name: string; hasPhoto: boolean }>();
+      if (activeUserIds.length > 0) {
+        const users = await db
+          .select({
+            id: appUsers.id,
+            name: appUsers.name,
+            // IS NOT NULL avoids detoasting large base64 photo blobs
+            hasPhoto: sql<boolean>`(${appUsers.selfPhoto} IS NOT NULL)`.as("has_photo"),
+          })
+          .from(appUsers)
+          .where(inArray(appUsers.id, activeUserIds));
+        users.forEach((u) => {
+          userMeta.set(u.id, { name: u.name || "Unknown", hasPhoto: !!u.hasPhoto });
+        });
+      }
 
       const buildBoard = (countMap: Record<string, number>) => {
-        return allUsers
-          .map((u) => ({
-            userId: u.id,
-            name: u.name || "Unknown",
-            hasPhoto: u.hasPhoto,
-            count: countMap[u.id] || 0,
-          }))
+        return Object.entries(countMap)
+          .map(([userId, c]) => {
+            const meta = userMeta.get(userId);
+            return {
+              userId,
+              name: meta?.name || "Unknown",
+              hasPhoto: meta?.hasPhoto || false,
+              count: c,
+            };
+          })
+          .filter((e) => e.count > 0)
           .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
       };
 
-      res.json({
+      const payload = {
         volunteerMapping: buildBoard(volMap),
         supporterMapping: buildBoard(supMap),
         hstc: buildBoard(hstcMap),
         sdsk: buildBoard(sdskMap),
-      });
+      };
+      cacheSet("app:leaderboard", payload, 30_000);
+      res.json(payload);
     } catch (error) {
       console.error("Leaderboard error:", error);
       res.status(500).json({ error: "Failed to fetch leaderboard" });
@@ -7479,16 +7518,39 @@ export async function registerRoutes(
     try {
       const userId = typeof req.query.userId === "string" ? req.query.userId : null;
       const all = await storage.getSurveys();
-      const active = all.filter(s => s.isActive);
-      const result = [];
-      for (const s of active) {
-        if (userId) {
-          const existing = await storage.getSurveyResponseByUser(s.id, userId);
-          if (existing) continue;
-        }
-        const questions = await storage.getSurveyQuestions(s.id);
-        result.push({ ...s, questions });
+      const active = all.filter((s) => s.isActive);
+      if (active.length === 0) return res.json([]);
+
+      const surveyIds = active.map((s) => s.id);
+
+      // Batch questions + completed responses (avoid N+1 per survey)
+      const [allQuestions, completed] = await Promise.all([
+        db.select().from(surveyQuestions).where(inArray(surveyQuestions.surveyId, surveyIds)),
+        userId
+          ? db
+              .select({ surveyId: surveyResponses.surveyId })
+              .from(surveyResponses)
+              .where(and(eq(surveyResponses.appUserId, userId), inArray(surveyResponses.surveyId, surveyIds)))
+          : Promise.resolve([] as { surveyId: string }[]),
+      ]);
+
+      const completedSet = new Set(completed.map((r) => r.surveyId));
+      const questionsBySurvey = new Map<string, typeof allQuestions>();
+      for (const q of allQuestions) {
+        const list = questionsBySurvey.get(q.surveyId) || [];
+        list.push(q);
+        questionsBySurvey.set(q.surveyId, list);
       }
+
+      const result = active
+        .filter((s) => !completedSet.has(s.id))
+        .map((s) => ({
+          ...s,
+          questions: (questionsBySurvey.get(s.id) || []).sort(
+            (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+          ),
+        }));
+
       res.json(result);
     } catch (e) { res.status(500).json({ error: "Failed" }); }
   });
@@ -7496,6 +7558,9 @@ export async function registerRoutes(
   // App: survey leaderboard - count of survey responses per user
   app.get("/api/app/survey-leaderboard", async (_req, res) => {
     try {
+      const cached = cacheGet<any[]>("app:survey-leaderboard");
+      if (cached) return res.json(cached);
+
       const surveyResps = await db
         .select({
           userId: surveyResponses.appUserId,
@@ -7504,22 +7569,31 @@ export async function registerRoutes(
         .from(surveyResponses)
         .groupBy(surveyResponses.appUserId);
 
-      const userIds = surveyResps.map(r => r.userId);
-      const userMap = new Map<string, any>();
+      const userIds = surveyResps.map((r) => r.userId);
+      const userMap = new Map<string, { name: string; hasPhoto: boolean }>();
       if (userIds.length > 0) {
-        const users = await db.select().from(appUsers).where(inArray(appUsers.id, userIds));
-        users.forEach(u => userMap.set(u.id, u));
+        const users = await db
+          .select({
+            id: appUsers.id,
+            name: appUsers.name,
+            hasPhoto: sql<boolean>`(${appUsers.selfPhoto} IS NOT NULL)`.as("has_photo"),
+          })
+          .from(appUsers)
+          .where(inArray(appUsers.id, userIds));
+        users.forEach((u) => userMap.set(u.id, { name: u.name || "Unknown", hasPhoto: !!u.hasPhoto }));
       }
 
       const entries = surveyResps
-        .map(r => ({
+        .map((r) => ({
           userId: r.userId,
           name: userMap.get(r.userId)?.name || "Unknown",
-          hasPhoto: !!(userMap.get(r.userId)?.selfPhoto),
+          hasPhoto: !!(userMap.get(r.userId)?.hasPhoto),
           count: Number(r.count),
         }))
+        .filter((e) => e.count > 0)
         .sort((a, b) => b.count - a.count);
 
+      cacheSet("app:survey-leaderboard", entries, 30_000);
       res.json(entries);
     } catch (e) { res.status(500).json({ error: "Failed to fetch survey leaderboard" }); }
   });
