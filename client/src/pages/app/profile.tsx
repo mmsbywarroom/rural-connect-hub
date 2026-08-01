@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -282,133 +281,206 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
   } as AppUser;
 
   const completion = getProfileCompletion(currentUser);
+  const roleLabel =
+    selectedRole === "party_post_holder"
+      ? t("partyPostHolder")
+      : selectedRole === "mahila_sakhi"
+      ? (language === "hi" ? "महिला सखी" : language === "pa" ? "ਮਹਿਲਾ ਸਖੀ" : "Mahila Sakhi")
+      : t("volunteer");
+  const isComplete = completion.percentage === 100;
 
   return (
     <div className="min-h-screen app-page">
-      <header className="bg-blue-600 text-white px-4 py-3 shadow-lg sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-white" onClick={onBack} data-testid="button-profile-back">
+      <header className="app-header text-white sticky top-0 z-50">
+        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 h-9 w-9 rounded-xl shrink-0"
+            onClick={onBack}
+            data-testid="button-profile-back"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="font-semibold text-lg leading-tight flex items-center gap-1" data-testid="text-profile-title">
-              {t('myProfile')}
-              {user.isApproved && <BadgeCheck className="h-4.5 w-4.5 text-orange-400 flex-shrink-0" data-testid="badge-profile-verified" />}
+          <div className="flex-1 min-w-0">
+            <h1 className="font-semibold text-[15px] leading-tight flex items-center gap-1.5" data-testid="text-profile-title">
+              {t("myProfile")}
+              {user.isApproved && (
+                <BadgeCheck className="h-4 w-4 text-amber-300 shrink-0" data-testid="badge-profile-verified" />
+              )}
             </h1>
-            <p className="text-white/70 text-xs">{completion.filledCount} {t('of')} {completion.totalCount} {t('fieldsCompleted')}</p>
+            <p className="text-white/70 text-[11px] mt-0.5">
+              {completion.filledCount} {t("of")} {completion.totalCount} {t("fieldsCompleted")}
+            </p>
           </div>
           <Button
             variant="ghost"
-            className="text-white gap-1.5"
+            className="text-white hover:bg-white/10 gap-1.5 h-9 px-3 rounded-xl"
             onClick={handleSave}
             disabled={saveMutation.isPending}
             data-testid="button-save-profile"
           >
             {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {t('save')}
+            <span className="text-sm font-medium">{t("save")}</span>
           </Button>
         </div>
       </header>
 
-      <div className="px-4 py-4 space-y-4 max-w-lg mx-auto pb-24">
+      <div className="px-4 py-5 space-y-4 max-w-lg mx-auto pb-28">
+        {/* Identity hero */}
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-4 flex items-center gap-3.5">
+          <div className="relative shrink-0">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-[#0a274f] to-[#1565c0] ring-2 ring-white shadow-md">
+              {selfPhoto ? (
+                <img src={selfPhoto} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white text-xl font-semibold">
+                  {(name || user.name || "?").charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            {isComplete && (
+              <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center">
+                <Check className="h-3 w-3 text-white" />
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900 truncate tracking-tight">{name || user.name}</p>
+            <span className="inline-flex mt-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[#eef4ff] text-[#0d47a1]">
+              {roleLabel}
+            </span>
+            {user.mappedAreaName && (
+              <p className="text-[11px] text-slate-500 mt-1.5 truncate">{user.mappedAreaName}</p>
+            )}
+          </div>
+          <div className="text-right shrink-0">
+            <p
+              className={`text-xl font-bold tabular-nums leading-none ${isComplete ? "text-emerald-600" : "text-[#0d47a1]"}`}
+              data-testid="text-profile-percentage"
+            >
+              {completion.percentage}%
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1 font-medium">complete</p>
+          </div>
+        </div>
+
+        {/* Completion status */}
         <div
-          className={`rounded-md p-4 ${completion.percentage === 100 ? 'bg-green-50 border border-green-200' : 'profile-banner-gradient text-white'}`}
+          className={`rounded-2xl p-4 border shadow-sm ${
+            isComplete
+              ? "bg-gradient-to-br from-emerald-50 to-white border-emerald-100"
+              : "bg-gradient-to-br from-[#0a274f] via-[#0d47a1] to-[#1565c0] border-transparent text-white"
+          }`}
           data-testid="profile-progress-section"
         >
           <div className="flex items-center gap-3 mb-3">
-            {completion.percentage === 100 ? (
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                <Trophy className="h-5 w-5 text-green-600" />
-              </div>
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
-                <Sparkles className="h-5 w-5 text-amber-200 animate-twinkle" />
-              </div>
-            )}
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <span className={`font-semibold text-sm ${completion.percentage === 100 ? 'text-green-800' : 'text-white'}`}>
-                  {completion.percentage === 100 ? t('profileComplete') : t('completeYourProfile')}
-                </span>
-                <span className={`text-lg font-bold ${completion.percentage === 100 ? 'text-green-600' : 'text-amber-300'}`} data-testid="text-profile-percentage">
-                  {completion.percentage}%
-                </span>
-              </div>
-              <p className={`text-xs mt-0.5 ${completion.percentage === 100 ? 'text-green-600' : 'text-white/70'}`}>
-                {completion.filledCount} {t('of')} {completion.totalCount} {t('fieldsCompleted')}
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                isComplete ? "bg-emerald-100" : "bg-white/15"
+              }`}
+            >
+              {isComplete ? (
+                <Trophy className="h-5 w-5 text-emerald-600" />
+              ) : (
+                <Sparkles className="h-5 w-5 text-amber-200" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`font-semibold text-sm ${isComplete ? "text-emerald-900" : "text-white"}`}>
+                {isComplete ? t("profileComplete") : t("completeYourProfile")}
+              </p>
+              <p className={`text-xs mt-0.5 ${isComplete ? "text-emerald-600" : "text-white/70"}`}>
+                {completion.filledCount} {t("of")} {completion.totalCount} {t("fieldsCompleted")}
               </p>
             </div>
           </div>
-          <div className={`h-2.5 rounded-full overflow-hidden ${completion.percentage === 100 ? 'bg-green-200' : 'bg-white/20'}`} data-testid="progress-bar-track">
+          <div
+            className={`h-2 rounded-full overflow-hidden ${isComplete ? "bg-emerald-100" : "bg-white/20"}`}
+            data-testid="progress-bar-track"
+          >
             <div
               className="h-full rounded-full transition-all duration-700 ease-out"
               style={{
                 width: `${completion.percentage}%`,
-                background: completion.percentage === 100
-                  ? 'linear-gradient(90deg, #22c55e, #16a34a)'
-                  : 'linear-gradient(90deg, #fbbf24, #f59e0b)',
+                background: isComplete
+                  ? "linear-gradient(90deg, #22c55e, #16a34a)"
+                  : "linear-gradient(90deg, #fbbf24, #f59e0b)",
               }}
               data-testid="progress-bar-fill"
             />
           </div>
           {completion.missingFields.length > 0 && (
-            <div className="flex items-start gap-2 text-xs text-white/80 mt-2.5">
-              <CircleAlert className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-amber-300" />
-              <span>{t('missing')}: {completion.missingFields.map((f) => f.label).join(", ")}</span>
+            <div className={`flex items-start gap-2 text-xs mt-2.5 ${isComplete ? "text-emerald-700" : "text-white/80"}`}>
+              <CircleAlert className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${isComplete ? "text-emerald-500" : "text-amber-300"}`} />
+              <span>
+                {t("missing")}: {completion.missingFields.map((f) => f.label).join(", ")}
+              </span>
             </div>
           )}
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('personalInformation')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('fullName')} *</label>
+        {/* Personal Information */}
+        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-4 pt-4 pb-2 flex items-center gap-2.5">
+            <span className="h-5 w-1.5 rounded-full bg-[#1565c0]" aria-hidden />
+            <h2 className="text-base font-bold text-black tracking-tight">{t("personalInformation")}</h2>
+          </div>
+          <div className="px-4 pb-4 space-y-4">
+            <FieldBlock label={`${t("fullName")} *`}>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={t('enterFullName')}
+                placeholder={t("enterFullName")}
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 focus-visible:bg-white"
                 data-testid="input-profile-name"
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('email')}</label>
+            </FieldBlock>
+            <FieldBlock label={t("email")}>
               <Input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={t('enterEmail') || "Enter email"}
+                placeholder={t("enterEmail") || "Enter email"}
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 focus-visible:bg-white"
                 data-testid="input-profile-email"
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('mobileNumber')}</label>
-              <Input value={user.mobileNumber || ""} disabled className="bg-slate-50 text-slate-500" data-testid="input-profile-mobile" />
-              <p className="text-xs text-slate-400 mt-1">{t('mobileCannotChange') || "Mobile number cannot be changed (used for login)"}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('villageWard')}</label>
+            </FieldBlock>
+            <FieldBlock label={t("mobileNumber")}>
+              <Input
+                value={user.mobileNumber || ""}
+                disabled
+                className="h-11 rounded-xl bg-slate-100 text-slate-500 border-slate-200"
+                data-testid="input-profile-mobile"
+              />
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                {t("mobileCannotChange") || "Mobile number cannot be changed (used for login)"}
+              </p>
+            </FieldBlock>
+            <FieldBlock label={t("villageWard")}>
               <div className="space-y-2">
                 <Input
                   value={profileVillageSearch}
                   onChange={(e) => setProfileVillageSearch(e.target.value)}
-                  placeholder={t('searchVillage') || "Search village/ward..."}
-                  className="h-10"
+                  placeholder={t("searchVillage") || "Search village/ward..."}
+                  className="h-11 rounded-xl border-slate-200 bg-slate-50/50"
                   data-testid="input-profile-village-search"
                 />
                 <Select value={selectedVillageId} onValueChange={(v) => setSelectedVillageId(v)}>
-                  <SelectTrigger data-testid="select-profile-village">
-                    <SelectValue placeholder={t('selectVillage') || "Select Village/Ward"} />
+                  <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-slate-50/50" data-testid="select-profile-village">
+                    <SelectValue placeholder={t("selectVillage") || "Select Village/Ward"} />
                   </SelectTrigger>
                   <SelectContent>
                     {(villagesData || [])
-                      .filter(v => v.isActive)
-                      .filter(v => {
+                      .filter((v) => v.isActive)
+                      .filter((v) => {
                         if (!profileVillageSearch.trim()) return true;
                         const s = profileVillageSearch.toLowerCase();
-                        return v.name.toLowerCase().includes(s) || v.nameHi?.toLowerCase().includes(s) || v.namePa?.toLowerCase().includes(s);
+                        return (
+                          v.name.toLowerCase().includes(s) ||
+                          v.nameHi?.toLowerCase().includes(s) ||
+                          v.namePa?.toLowerCase().includes(s)
+                        );
                       })
                       .map((v) => (
                         <SelectItem key={v.id} value={String(v.id)}>
@@ -418,9 +490,9 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </FieldBlock>
             <PhotoField
-              label={t('selfPhoto')}
+              label={t("selfPhoto")}
               photo={selfPhoto}
               inputRef={selfPhotoRef}
               galleryRef={selfGalleryRef}
@@ -431,35 +503,37 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
               processing={false}
               t={t}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('idDocuments')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('voterIdNumber')}</label>
+        {/* ID Documents */}
+        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-4 pt-4 pb-2 flex items-center gap-2.5">
+            <span className="h-5 w-1.5 rounded-full bg-[#1565c0]" aria-hidden />
+            <h2 className="text-base font-bold text-black tracking-tight">{t("idDocuments")}</h2>
+          </div>
+          <div className="px-4 pb-4 space-y-4">
+            <FieldBlock label={t("voterIdNumber")}>
               <Input
                 value={voterId}
                 onChange={(e) => setVoterId(e.target.value)}
-                placeholder={t('enterVoterId')}
+                placeholder={t("enterVoterId")}
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 focus-visible:bg-white"
                 data-testid="input-profile-voter-id"
               />
-            </div>
+            </FieldBlock>
             <VoterDetailsCard voterId={voterId} />
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('aadhaarNumber')}</label>
+            <FieldBlock label={t("aadhaarNumber")}>
               <Input
                 value={aadhaarNumber}
                 onChange={(e) => setAadhaarNumber(e.target.value.replace(/\D/g, "").slice(0, 12))}
-                placeholder={t('enterAadhaar')}
+                placeholder={t("enterAadhaar")}
+                className="h-11 rounded-xl border-slate-200 bg-slate-50/50 focus-visible:bg-white"
                 data-testid="input-profile-aadhaar"
               />
-            </div>
+            </FieldBlock>
             <PhotoField
-              label={t('aadhaarFront')}
+              label={t("aadhaarFront")}
               photo={aadhaarPhoto}
               inputRef={aadhaarPhotoRef}
               galleryRef={aadhaarGalleryRef}
@@ -471,7 +545,7 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
               t={t}
             />
             <PhotoField
-              label={t('aadhaarBack')}
+              label={t("aadhaarBack")}
               photo={aadhaarPhotoBack}
               inputRef={aadhaarPhotoBackRef}
               galleryRef={aadhaarBackGalleryRef}
@@ -483,7 +557,7 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
               t={t}
             />
             <PhotoField
-              label={t('voterCardFront')}
+              label={t("voterCardFront")}
               photo={voterCardPhoto}
               inputRef={voterPhotoRef}
               galleryRef={voterGalleryRef}
@@ -495,7 +569,7 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
               t={t}
             />
             <PhotoField
-              label={t('voterCardBack')}
+              label={t("voterCardBack")}
               photo={voterCardPhotoBack}
               inputRef={voterPhotoBackRef}
               galleryRef={voterBackGalleryRef}
@@ -506,54 +580,66 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
               processing={false}
               t={t}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('roleAndAssignment')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('role')}</label>
+        {/* Role */}
+        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-4 pt-4 pb-2 flex items-center gap-2.5">
+            <span className="h-5 w-1.5 rounded-full bg-[#1565c0]" aria-hidden />
+            <h2 className="text-base font-bold text-black tracking-tight">{t("roleAndAssignment")}</h2>
+          </div>
+          <div className="px-4 pb-4 space-y-4">
+            <FieldBlock label={t("role")}>
               <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v)}>
-                <SelectTrigger data-testid="select-profile-role">
-                  <SelectValue placeholder={t('selectRole') || "Select Role"} />
+                <SelectTrigger className="h-11 rounded-xl border-slate-200 bg-slate-50/50" data-testid="select-profile-role">
+                  <SelectValue placeholder={t("selectRole") || "Select Role"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="volunteer">{t('volunteer')}</SelectItem>
-                  <SelectItem value="party_post_holder">{t('partyPostHolder')}</SelectItem>
+                  <SelectItem value="volunteer">{t("volunteer")}</SelectItem>
+                  <SelectItem value="party_post_holder">{t("partyPostHolder")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FieldBlock>
 
             {selectedRole === "party_post_holder" && (
               <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-600 block">{t('roleAssignment')}</label>
+                <p className="text-sm font-semibold text-slate-800">{t("roleAssignment")}</p>
                 {profileRoles.map((ra, index) => {
-                  const filteredVillages = (villagesData || []).filter(v => {
+                  const filteredVillages = (villagesData || []).filter((v) => {
                     if (!v.isActive) return false;
                     if (!villageSearch.trim()) return true;
                     const s = villageSearch.toLowerCase();
-                    return v.name.toLowerCase().includes(s) || v.nameHi?.toLowerCase().includes(s) || v.namePa?.toLowerCase().includes(s);
+                    return (
+                      v.name.toLowerCase().includes(s) ||
+                      v.nameHi?.toLowerCase().includes(s) ||
+                      v.namePa?.toLowerCase().includes(s)
+                    );
                   });
 
                   return (
-                    <div key={index} className="border rounded-lg p-3 space-y-3 bg-slate-50" data-testid={`profile-role-card-${index}`}>
+                    <div
+                      key={index}
+                      className="rounded-2xl border border-slate-200/80 p-3.5 space-y-3 bg-slate-50/80"
+                      data-testid={`profile-role-card-${index}`}
+                    >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-blue-700" data-testid={`text-profile-role-label-${index}`}>
-                          {index === 0 ? t('primaryRole') : `${t('additionalRole')} ${index}`}
+                        <span
+                          className="text-sm font-semibold text-[#0d47a1]"
+                          data-testid={`text-profile-role-label-${index}`}
+                        >
+                          {index === 0 ? t("primaryRole") : `${t("additionalRole")} ${index}`}
                         </span>
                         {index > 0 && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-red-500"
+                            className="text-red-500 h-8 rounded-lg"
                             onClick={() => removeProfileRole(index)}
                             data-testid={`button-remove-profile-role-${index}`}
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-1" />
-                            {t('removeRole')}
+                            {t("removeRole")}
                           </Button>
                         )}
                       </div>
@@ -561,128 +647,139 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          className={`flex items-center justify-center gap-1.5 p-2 rounded-md border-2 text-xs font-medium transition-colors ${
-                            ra.cardType === "party" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"
+                          className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 text-xs font-semibold transition-colors ${
+                            ra.cardType === "party"
+                              ? "border-[#1565c0] bg-[#eef4ff] text-[#0d47a1]"
+                              : "border-slate-200 bg-white text-slate-500"
                           }`}
                           onClick={() => handleProfileRoleChange(index, "cardType", "party")}
                           data-testid={`button-profile-card-type-party-${index}`}
                         >
                           <Users className="h-4 w-4" />
-                          {t('partyPostHolder')}
+                          {t("partyPostHolder")}
                         </button>
                         <button
                           type="button"
-                          className={`flex items-center justify-center gap-1.5 p-2 rounded-md border-2 text-xs font-medium transition-colors ${
-                            ra.cardType === "govt" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-500"
+                          className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border-2 text-xs font-semibold transition-colors ${
+                            ra.cardType === "govt"
+                              ? "border-[#1565c0] bg-[#eef4ff] text-[#0d47a1]"
+                              : "border-slate-200 bg-white text-slate-500"
                           }`}
                           onClick={() => handleProfileRoleChange(index, "cardType", "govt")}
                           data-testid={`button-profile-card-type-govt-${index}`}
                         >
                           <Building2 className="h-4 w-4" />
-                          {t('govtPostHolder')}
+                          {t("govtPostHolder")}
                         </button>
                       </div>
 
                       {ra.cardType === "party" && (
                         <>
-                          <div>
-                            <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('wing')}</label>
+                          <FieldBlock label={t("wing")}>
                             <Select value={ra.wing} onValueChange={(v) => handleProfileRoleChange(index, "wing", v)}>
-                              <SelectTrigger data-testid={`select-profile-wing-${index}`}>
-                                <SelectValue placeholder={t('selectWing')} />
+                              <SelectTrigger className="h-11 rounded-xl bg-white" data-testid={`select-profile-wing-${index}`}>
+                                <SelectValue placeholder={t("selectWing")} />
                               </SelectTrigger>
                               <SelectContent>
-                                {wingsData?.filter(w => w.isActive).map((w) => (
-                                  <SelectItem key={w.id} value={w.name}>{getLocalizedText(language, w.name, w.nameHi, w.namePa)}</SelectItem>
+                                {wingsData?.filter((w) => w.isActive).map((w) => (
+                                  <SelectItem key={w.id} value={w.name}>
+                                    {getLocalizedText(language, w.name, w.nameHi, w.namePa)}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
+                          </FieldBlock>
                           {ra.wing === "Other" && (
-                            <div>
-                              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('otherWingName')}</label>
+                            <FieldBlock label={t("otherWingName")}>
                               <Input
                                 value={ra.otherWingName}
                                 onChange={(e) => handleProfileRoleChange(index, "otherWingName", e.target.value)}
-                                placeholder={t('specifyWingName')}
+                                placeholder={t("specifyWingName")}
+                                className="h-11 rounded-xl bg-white"
                                 data-testid={`input-profile-other-wing-${index}`}
                               />
-                            </div>
+                            </FieldBlock>
                           )}
-                          {index === 0 && govWingsData && govWingsData.filter(gw => gw.isActive).length > 0 && (
-                            <div>
-                              <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('punjabGovWing')}</label>
-                              <Select value={govWing || "__none__"} onValueChange={(v) => setGovWing(v === "__none__" ? "" : v)}>
-                                <SelectTrigger data-testid="select-profile-gov-wing">
-                                  <SelectValue placeholder={t('selectGovWing')} />
+                          {index === 0 && govWingsData && govWingsData.filter((gw) => gw.isActive).length > 0 && (
+                            <FieldBlock label={t("punjabGovWing")}>
+                              <Select
+                                value={govWing || "__none__"}
+                                onValueChange={(v) => setGovWing(v === "__none__" ? "" : v)}
+                              >
+                                <SelectTrigger className="h-11 rounded-xl bg-white" data-testid="select-profile-gov-wing">
+                                  <SelectValue placeholder={t("selectGovWing")} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="__none__">{t('none')}</SelectItem>
-                                  {govWingsData.filter(gw => gw.isActive).map((gw) => (
-                                    <SelectItem key={gw.id} value={gw.name}>{getLocalizedText(language, gw.name, gw.nameHi, gw.namePa)}</SelectItem>
+                                  <SelectItem value="__none__">{t("none")}</SelectItem>
+                                  {govWingsData.filter((gw) => gw.isActive).map((gw) => (
+                                    <SelectItem key={gw.id} value={gw.name}>
+                                      {getLocalizedText(language, gw.name, gw.nameHi, gw.namePa)}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
-                            </div>
+                            </FieldBlock>
                           )}
-                          <div>
-                            <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('level')}</label>
+                          <FieldBlock label={t("level")}>
                             <Select value={ra.level} onValueChange={(v) => handleProfileRoleChange(index, "level", v)}>
-                              <SelectTrigger data-testid={`select-profile-level-${index}`}>
-                                <SelectValue placeholder={t('selectLevel')} />
+                              <SelectTrigger className="h-11 rounded-xl bg-white" data-testid={`select-profile-level-${index}`}>
+                                <SelectValue placeholder={t("selectLevel")} />
                               </SelectTrigger>
                               <SelectContent>
                                 {hierarchy?.levels.map((l) => (
-                                  <SelectItem key={l} value={l}>{translateDynamic(l, language)}</SelectItem>
+                                  <SelectItem key={l} value={l}>
+                                    {translateDynamic(l, language)}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('position')}</label>
+                          </FieldBlock>
+                          <FieldBlock label={t("position")}>
                             <Input
                               value={ra.position}
                               onChange={(e) => handleProfileRoleChange(index, "position", e.target.value)}
-                              placeholder={t('enterPosition')}
+                              placeholder={t("enterPosition")}
+                              className="h-11 rounded-xl bg-white"
                               data-testid={`input-profile-position-${index}`}
                             />
-                          </div>
+                          </FieldBlock>
                         </>
                       )}
 
                       {ra.cardType === "govt" && (
                         <>
-                          <div>
-                            <label className="text-sm font-medium text-slate-600 mb-1.5 block">{t('govtPosition')}</label>
+                          <FieldBlock label={t("govtPosition")}>
                             <Select
                               value={ra.govPositionId || ""}
                               onValueChange={(v) => handleProfileRoleChange(index, "govPositionId", v)}
                             >
-                              <SelectTrigger data-testid={`select-profile-govt-position-${index}`}>
-                                <SelectValue placeholder={t('selectGovtPosition')} />
+                              <SelectTrigger
+                                className="h-11 rounded-xl bg-white"
+                                data-testid={`select-profile-govt-position-${index}`}
+                              >
+                                <SelectValue placeholder={t("selectGovtPosition")} />
                               </SelectTrigger>
                               <SelectContent>
-                                {govPositionsData?.filter(gp => gp.isActive).map((gp) => (
+                                {govPositionsData?.filter((gp) => gp.isActive).map((gp) => (
                                   <SelectItem key={gp.id} value={String(gp.id)}>
                                     {getLocalizedText(language, gp.name, gp.nameHi, gp.namePa)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium text-slate-600 mb-1.5 block">
-                              {t('jurisdictionUnits')} ({ra.jurisdictionVillageIds.length} {t('unitsSelected')})
-                            </label>
-                            <div className="border rounded-md">
-                              <div className="p-2 border-b">
+                          </FieldBlock>
+                          <FieldBlock
+                            label={`${t("jurisdictionUnits")} (${ra.jurisdictionVillageIds.length} ${t("unitsSelected")})`}
+                          >
+                            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                              <div className="p-2.5 border-b border-slate-100">
                                 <div className="relative">
                                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                   <Input
                                     value={villageSearch}
                                     onChange={(e) => setVillageSearch(e.target.value)}
-                                    placeholder={t('selectJurisdictionUnits')}
-                                    className="pl-8 h-8 text-sm"
+                                    placeholder={t("selectJurisdictionUnits")}
+                                    className="pl-8 h-9 text-sm rounded-lg"
                                     data-testid={`input-profile-village-search-${index}`}
                                   />
                                 </div>
@@ -690,38 +787,53 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleProfileRoleChange(index, "jurisdictionVillageIds", filteredVillages.map(v => String(v.id)))}
+                                    className="rounded-lg h-8"
+                                    onClick={() =>
+                                      handleProfileRoleChange(
+                                        index,
+                                        "jurisdictionVillageIds",
+                                        filteredVillages.map((v) => String(v.id)),
+                                      )
+                                    }
                                     data-testid={`button-select-all-villages-${index}`}
                                   >
-                                    {t('selectAll')}
+                                    {t("selectAll")}
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="rounded-lg h-8"
                                     onClick={() => handleProfileRoleChange(index, "jurisdictionVillageIds", [])}
                                     data-testid={`button-clear-all-villages-${index}`}
                                   >
-                                    {t('clearAll')}
+                                    {t("clearAll")}
                                   </Button>
                                 </div>
                               </div>
-                              <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+                              <div className="max-h-48 overflow-y-auto p-2 space-y-0.5">
                                 {filteredVillages.map((v) => {
                                   const vid = String(v.id);
                                   const checked = ra.jurisdictionVillageIds.includes(vid);
                                   return (
                                     <label
                                       key={v.id}
-                                      className="flex items-center gap-2 p-1.5 rounded hover:bg-slate-50 cursor-pointer text-sm"
+                                      className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-sm"
                                       data-testid={`label-village-${v.id}`}
                                     >
                                       <Checkbox
                                         checked={checked}
                                         onCheckedChange={(c) => {
                                           if (c) {
-                                            handleProfileRoleChange(index, "jurisdictionVillageIds", [...ra.jurisdictionVillageIds, vid]);
+                                            handleProfileRoleChange(index, "jurisdictionVillageIds", [
+                                              ...ra.jurisdictionVillageIds,
+                                              vid,
+                                            ]);
                                           } else {
-                                            handleProfileRoleChange(index, "jurisdictionVillageIds", ra.jurisdictionVillageIds.filter((id: string) => id !== vid));
+                                            handleProfileRoleChange(
+                                              index,
+                                              "jurisdictionVillageIds",
+                                              ra.jurisdictionVillageIds.filter((id: string) => id !== vid),
+                                            );
                                           }
                                         }}
                                         data-testid={`checkbox-village-${v.id}`}
@@ -731,11 +843,11 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
                                   );
                                 })}
                                 {filteredVillages.length === 0 && (
-                                  <p className="text-sm text-slate-400 text-center py-2">{t('noResults')}</p>
+                                  <p className="text-sm text-slate-400 text-center py-2">{t("noResults")}</p>
                                 )}
                               </div>
                             </div>
-                          </div>
+                          </FieldBlock>
                         </>
                       )}
                     </div>
@@ -743,21 +855,23 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
                 })}
                 <Button
                   variant="outline"
-                  className="w-full border-dashed border-blue-300 text-blue-600"
+                  className="w-full border-dashed border-[#93c5fd] text-[#0d47a1] rounded-xl h-11 hover:bg-[#eef4ff]"
                   onClick={addProfileRole}
                   data-testid="button-add-profile-role"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  {t('addAnotherRole')}
+                  {t("addAnotherRole")}
                 </Button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
+      </div>
 
-        <div className="sticky bottom-0 bg-slate-50 pt-2 pb-4 -mx-4 px-4">
+      <div className="fixed bottom-0 inset-x-0 z-40">
+        <div className="max-w-lg mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 bg-gradient-to-t from-[#f4f7fb] via-[#f4f7fb]/95 to-transparent">
           <Button
-            className="w-full h-12 text-base"
+            className="w-full h-12 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] text-white shadow-lg shadow-blue-900/20"
             onClick={handleSave}
             disabled={saveMutation.isPending}
             data-testid="button-save-profile-bottom"
@@ -767,10 +881,21 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
             ) : (
               <Save className="h-5 w-5 mr-2" />
             )}
-            {t('saveProfile')}
+            {t("saveProfile")}
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FieldBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
@@ -800,53 +925,59 @@ function PhotoField({
 }) {
   return (
     <div>
-      <label className="text-sm font-medium text-slate-600 mb-1.5 block">{label}</label>
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5 block">
+        {label}
+      </label>
       {photo ? (
-        <div className="relative rounded-lg overflow-hidden border border-slate-200">
-          <img src={photo} alt={label} className="w-full h-32 object-cover" data-testid={`img-${testId}`} />
+        <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
+          <img src={photo} alt={label} className="w-full h-36 object-cover" data-testid={`img-${testId}`} />
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-1 right-1 bg-black/50 text-white h-7 w-7"
+            className="absolute top-2 right-2 bg-black/55 text-white h-8 w-8 rounded-full hover:bg-black/70"
             onClick={onClear}
             data-testid={`button-clear-${testId}`}
           >
             <X className="h-3.5 w-3.5" />
           </Button>
           {processing && (
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-              <div className="bg-white rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                {t('reading')}
+            <div className="absolute inset-0 bg-black/35 flex items-center justify-center">
+              <div className="bg-white rounded-xl px-3.5 py-2 flex items-center gap-2 text-sm shadow-lg">
+                <Loader2 className="h-4 w-4 animate-spin text-[#0d47a1]" />
+                {t("reading")}
               </div>
             </div>
           )}
-          <div className="absolute bottom-1 left-1">
-            <div className="bg-green-500 rounded-full p-0.5">
+          <div className="absolute bottom-2 left-2">
+            <div className="bg-emerald-500 rounded-full p-1 shadow-sm ring-2 ring-white/80">
               <Check className="h-3 w-3 text-white" />
             </div>
           </div>
         </div>
       ) : (
-        <div className="w-full h-24 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center gap-6">
+        <div className="w-full h-28 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/80 flex items-center justify-center gap-8">
           <button
             type="button"
-            className="flex flex-col items-center gap-1 text-slate-400 hover:text-blue-500 transition-colors p-2"
+            className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#1565c0] transition-colors p-2"
             onClick={() => inputRef.current?.click()}
             data-testid={`button-camera-${testId}`}
           >
-            <Camera className="h-5 w-5" />
-            <span className="text-xs">{t('camera')}</span>
+            <span className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+              <Camera className="h-5 w-5" />
+            </span>
+            <span className="text-[11px] font-medium">{t("camera")}</span>
           </button>
-          <div className="w-px h-10 bg-slate-300" />
+          <div className="w-px h-12 bg-slate-200" />
           <button
             type="button"
-            className="flex flex-col items-center gap-1 text-slate-400 hover:text-blue-500 transition-colors p-2"
+            className="flex flex-col items-center gap-1.5 text-slate-400 hover:text-[#1565c0] transition-colors p-2"
             onClick={() => galleryRef.current?.click()}
             data-testid={`button-gallery-${testId}`}
           >
-            <Upload className="h-5 w-5" />
-            <span className="text-xs">{t('gallery')}</span>
+            <span className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+              <Upload className="h-5 w-5" />
+            </span>
+            <span className="text-[11px] font-medium">{t("gallery")}</span>
           </button>
         </div>
       )}
