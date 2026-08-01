@@ -262,29 +262,36 @@ export default function VolunteerPortal() {
 
   if (authState === "welcome") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-sm space-y-4">
-          <div className="rounded-xl overflow-hidden shadow-xl border-2 border-white/20 bg-white">
-            <div className="w-full min-h-[220px]">
-              <MinisterImageWithFallback fullImage />
-            </div>
+      <div
+        className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden"
+        style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+      >
+        <div className="absolute inset-0 bg-[#061a3a]" />
+        <div
+          className="absolute inset-0 opacity-90"
+          style={{
+            background:
+              "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)",
+          }}
+        />
+        <div className="relative w-full max-w-sm space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-white/15">
+            <MinisterImageWithFallback />
             <MinisterTextBlock />
           </div>
-          <Card className="shadow-xl">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-xl" data-testid="text-app-title">{t('patialaRural')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                className="w-full h-14 text-base"
-                onClick={() => setAuthState("login")}
-                data-testid="button-login"
-              >
-                <LogIn className="mr-3 h-5 w-5" /> {t('login')}
-              </Button>
-              <LanguageSwitcherInline className="mt-3" />
-            </CardContent>
-          </Card>
+          <div className="rounded-2xl bg-white/97 backdrop-blur-sm shadow-2xl shadow-black/30 ring-1 ring-black/5 px-6 py-6 space-y-3">
+            <h1 className="text-2xl font-semibold tracking-tight text-center text-[#0a274f]" data-testid="text-app-title">
+              {t('patialaRural')}
+            </h1>
+            <Button
+              className="w-full h-14 text-base rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]"
+              onClick={() => setAuthState("login")}
+              data-testid="button-login"
+            >
+              <LogIn className="mr-3 h-5 w-5" /> {t('login')}
+            </Button>
+            <LanguageSwitcher inline className="mt-2" />
+          </div>
         </div>
       </div>
     );

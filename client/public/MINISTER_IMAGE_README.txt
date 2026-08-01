@@ -1,7 +1,5 @@
-To display Dr. Balbir Singh's photo on the login page:
+To display Dr. Balbir Singh's photo on the login / welcome screens:
 
-1. Export your image as JPG or PNG (the Google Drive link was for a PSD file, which browsers cannot display).
-
-2. Save the image as "minister.jpg" in this folder (client/public/).
-
-3. The app will automatically load it. If the file is missing, it will try Google Drive, then show a styled fallback with the minister's name.
+1. Place the portrait as "minister.jpg" in this folder (client/public/).
+2. The app loads /minister.jpg edge-to-edge (object-cover) — no side letterboxing.
+3. Admin Login Page Settings can still set a custom imageUrl; Drive thumbnail URLs are ignored in favor of the bundled file.
