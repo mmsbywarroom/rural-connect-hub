@@ -1,10 +1,18 @@
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 
 const NAVY_GRADIENT =
   "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)";
 
 const PLUS_PATTERN =
   "url(\"data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2393c5fd' fill-opacity='1'%3E%3Cpath d='M13 6h2v6h6v2h-6v6h-2v-6H7v-2h6z'/%3E%3C/g%3E%3C/svg%3E\")";
+
+const AuthShellContext = createContext({ keyboardOpen: false });
 
 /** True when mobile keyboard (or similar chrome) has shrunk the visible viewport. */
 function useKeyboardOpen() {
@@ -38,7 +46,6 @@ function useKeyboardOpen() {
       }
     };
     const onFocusOut = () => {
-      // Delay so focus moving between inputs doesn't flicker.
       requestAnimationFrame(() => {
         focusedEditable = isEditable(document.activeElement);
         update();
@@ -65,39 +72,43 @@ function useKeyboardOpen() {
 
 /**
  * Auth shell: navy + plus pattern.
- * Keyboard closed → cards vertically centered.
- * Keyboard open → cards top-aligned so both stay visible.
+ * Keyboard closed → centered stack, tall portrait toward browser top.
+ * Keyboard open → top-aligned compact cards (both stay visible).
  */
 export function AppAuthShell({ children }: { children: ReactNode }) {
   const keyboardOpen = useKeyboardOpen();
 
   return (
-    <div
-      className="app-auth-shell relative isolate h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#061a3a]"
-      style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-    >
+    <AuthShellContext.Provider value={{ keyboardOpen }}>
       <div
-        className="pointer-events-none absolute inset-0"
-        aria-hidden
-        style={{ background: NAVY_GRADIENT }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.16]"
-        aria-hidden
-        style={{
-          backgroundImage: PLUS_PATTERN,
-          backgroundSize: "28px 28px",
-        }}
-      />
-
-      <div
-        className={`relative z-10 mx-auto flex h-full w-full max-w-sm flex-col items-center gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.35rem,env(safe-area-inset-top))] ${
-          keyboardOpen ? "justify-start" : "justify-center"
-        }`}
+        className="app-auth-shell relative isolate h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#061a3a]"
+        style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
       >
-        {children}
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden
+          style={{ background: NAVY_GRADIENT }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.16]"
+          aria-hidden
+          style={{
+            backgroundImage: PLUS_PATTERN,
+            backgroundSize: "28px 28px",
+          }}
+        />
+
+        <div
+          className={`relative z-10 mx-auto flex h-full w-full max-w-sm flex-col items-center gap-2.5 overflow-y-auto overscroll-y-contain px-3 ${
+            keyboardOpen
+              ? "justify-start pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]"
+              : "justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))]"
+          }`}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </AuthShellContext.Provider>
   );
 }
 
@@ -111,10 +122,22 @@ export function AppAuthCard({ children, className = "" }: { children: ReactNode;
   );
 }
 
-/** Portrait + optional slogan strip (flex so slogan never gets clipped). */
+/**
+ * Portrait card:
+ * - Keyboard closed: tall (stretches toward browser chrome) while stack stays centered
+ * - Keyboard open: compact so image + form both remain visible
+ */
 export function AppPortraitCard({ children }: { children: ReactNode }) {
+  const { keyboardOpen } = useContext(AuthShellContext);
+
   return (
-    <div className="w-full flex flex-col h-[min(38dvh,280px)] min-h-[160px] max-h-[300px] shrink rounded-2xl overflow-hidden bg-white shadow-xl shadow-black/25 ring-1 ring-white/25">
+    <div
+      className={
+        keyboardOpen
+          ? "w-full flex flex-col h-[min(26dvh,190px)] min-h-[110px] max-h-[200px] shrink rounded-2xl overflow-hidden bg-white shadow-xl shadow-black/25 ring-1 ring-white/25"
+          : "w-full flex flex-col h-[min(58dvh,520px)] min-h-[320px] max-h-[560px] shrink-0 rounded-2xl overflow-hidden bg-white shadow-xl shadow-black/25 ring-1 ring-white/25"
+      }
+    >
       {children}
     </div>
   );
