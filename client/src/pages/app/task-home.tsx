@@ -3,8 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, FolderTree, LayoutGrid, MessageCircle, Vote, ExternalLink } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { LogOut, Building2, Users, UserPlus, ChevronRight, ClipboardList, MapPin, FileText, Camera, BarChart3, Sparkles, Home, Trophy, BadgeCheck, Crown, Medal, Heart, ClipboardCheck, MessageSquare, Image as ImageIcon, GraduationCap, CalendarCheck, ShieldAlert, Route as RouteIcon, LayoutGrid, MessageCircle, Vote, ExternalLink } from "lucide-react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getProfileCompletion } from "@/lib/profile-completion";
@@ -191,78 +191,69 @@ function CircularProgress({ percentage, size = 44 }: { percentage: number; size?
   );
 }
 
-function SectionTitle({ title }: { title: string }) {
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="flex items-center gap-2.5 mb-3">
-      <span className="h-4 w-1 rounded-full bg-[#1565c0]" aria-hidden />
-      <h2 className="text-[11px] font-semibold text-slate-500 tracking-[0.14em] uppercase">{title}</h2>
+    <div className="mb-3.5">
+      <div className="flex items-center gap-2.5">
+        <span className="h-4 w-1 rounded-full bg-[#1565c0]" aria-hidden />
+        <h2 className="text-[11px] font-semibold text-slate-500 tracking-[0.14em] uppercase">{title}</h2>
+      </div>
+      {subtitle ? <p className="mt-1 ml-3.5 text-[11px] text-slate-400">{subtitle}</p> : null}
     </div>
   );
 }
 
-function DashboardTaskCard({
+/** Compact 3-per-row task / action tile */
+function TaskGridTile({
   href,
   title,
-  description,
   icon,
-  iconWrapClassName,
   iconGradient,
-  hoverBorderClassName = "hover:border-blue-200",
-  chevronClassName = "text-blue-500",
-  chevronBgClassName = "bg-blue-50 group-hover:bg-blue-100",
+  iconStyle,
   testId,
   featured = false,
 }: {
   href: string;
   title: string;
-  description: string;
   icon: ReactNode;
-  iconWrapClassName?: string;
   iconGradient?: string;
-  hoverBorderClassName?: string;
-  chevronClassName?: string;
-  chevronBgClassName?: string;
+  iconStyle?: CSSProperties;
   testId?: string;
   featured?: boolean;
 }) {
   return (
-    <Link href={href}>
-      <Card
-        className={`app-task-card group cursor-pointer ${
-          featured ? "border-blue-200 ring-1 ring-blue-100" : `border-slate-100 ${hoverBorderClassName}`
+    <Link href={href} className="block h-full">
+      <div
+        className={`group h-full rounded-2xl bg-white border p-3 flex flex-col items-center text-center shadow-sm transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:shadow-md ${
+          featured
+            ? "border-blue-200 ring-1 ring-blue-100 shadow-blue-900/5"
+            : "border-slate-100/90 hover:border-slate-200"
         }`}
         data-testid={testId}
       >
-        <CardContent className="p-4 flex items-center gap-3.5">
-          <div
-            className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
-              iconGradient ? `bg-gradient-to-br ${iconGradient} text-white` : iconWrapClassName
-            }`}
-          >
-            {icon}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
-            <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{description}</p>
-          </div>
-          <div className="shrink-0">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${chevronBgClassName}`}>
-              <ChevronRight className={`h-4 w-4 ${chevronClassName}`} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-sm ${
+            iconGradient ? `bg-gradient-to-br ${iconGradient}` : ""
+          }`}
+          style={iconStyle}
+        >
+          {icon}
+        </div>
+        <h3 className="mt-2.5 text-[11px] font-semibold text-slate-800 leading-snug line-clamp-2 tracking-tight">
+          {title}
+        </h3>
+      </div>
     </Link>
   );
 }
 
-function CategoryPickerItem({
+/** Category filter tile (3-per-row) */
+function CategoryGridTile({
   selected,
   onClick,
   icon,
   iconGradient,
   title,
-  subtitle,
   testId,
 }: {
   selected: boolean;
@@ -270,33 +261,43 @@ function CategoryPickerItem({
   icon: ReactNode;
   iconGradient: string;
   title: string;
-  subtitle: string;
   testId?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-xl border-2 transition-all duration-200 ${
-        selected ? "border-blue-500 bg-blue-50 shadow-md" : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
+      className={`h-full rounded-2xl border p-3 flex flex-col items-center text-center transition-all duration-200 active:scale-[0.97] ${
+        selected
+          ? "border-[#1565c0] bg-[#eef4ff] shadow-md shadow-blue-900/10 ring-1 ring-[#1565c0]/25"
+          : "border-slate-100/90 bg-white shadow-sm hover:border-slate-200 hover:shadow-md hover:-translate-y-0.5"
       }`}
       data-testid={testId}
     >
-      <div className="p-4 flex items-center gap-3.5">
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br ${iconGradient} text-white`}>
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
-          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{subtitle}</p>
-        </div>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${selected ? "bg-blue-100" : "bg-slate-100"}`}>
-          <ChevronRight className={`h-4 w-4 ${selected ? "text-blue-500" : "text-slate-500"}`} />
-        </div>
+      <div
+        className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-sm bg-gradient-to-br ${iconGradient}`}
+      >
+        {icon}
       </div>
+      <h3
+        className={`mt-2 text-[11px] font-semibold leading-snug line-clamp-2 tracking-tight ${
+          selected ? "text-[#0a274f]" : "text-slate-800"
+        }`}
+      >
+        {title}
+      </h3>
     </button>
   );
 }
+
+const CATEGORY_VISUALS: { icon: ReactNode; iconGradient: string }[] = [
+  { icon: <Building2 className="h-5 w-5" />, iconGradient: "from-blue-500 to-indigo-600" },
+  { icon: <Heart className="h-5 w-5" />, iconGradient: "from-rose-500 to-pink-600" },
+  { icon: <ShieldAlert className="h-5 w-5" />, iconGradient: "from-amber-500 to-orange-600" },
+  { icon: <GraduationCap className="h-5 w-5" />, iconGradient: "from-emerald-500 to-teal-600" },
+  { icon: <Users className="h-5 w-5" />, iconGradient: "from-violet-500 to-purple-600" },
+  { icon: <MapPin className="h-5 w-5" />, iconGradient: "from-cyan-500 to-sky-600" },
+];
 
 type FixedTaskMeta = {
   href: string;
@@ -497,15 +498,11 @@ function FixedTaskCard({ slug, language, featured = false }: { slug: string; lan
   const meta = FIXED_TASK_META[slug];
   if (!meta) return null;
   return (
-    <DashboardTaskCard
+    <TaskGridTile
       href={meta.href}
       title={meta.title[language]}
-      description={meta.description[language]}
       icon={meta.icon}
       iconGradient={meta.iconGradient}
-      hoverBorderClassName={meta.hoverBorderClassName}
-      chevronClassName={meta.chevronClassName}
-      chevronBgClassName={meta.chevronBgClassName}
       testId={meta.testId}
       featured={featured}
     />
@@ -537,11 +534,13 @@ function LeaderboardMiniCard({
 }) {
   return (
     <Link href={href}>
-      <Card className={`cursor-pointer border-0 text-white hover:shadow-lg transition-shadow h-full bg-gradient-to-br ${cardGradient}`} data-testid={testId}>
+      <Card className={`cursor-pointer border-0 text-white overflow-hidden hover:shadow-xl hover:shadow-slate-900/10 transition-all duration-200 h-full bg-gradient-to-br ${cardGradient} active:scale-[0.98]`} data-testid={testId}>
         <CardContent className="p-3.5">
           <div className="flex items-center gap-2 mb-2.5">
-            {icon}
-            <h3 className="font-semibold text-sm text-white">{title}</h3>
+            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0 backdrop-blur-sm">
+              {icon}
+            </div>
+            <h3 className="font-semibold text-sm text-white tracking-tight">{title}</h3>
           </div>
           {entries.length > 0 ? (
             <div className="space-y-1.5">
@@ -643,8 +642,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
     return taskList.filter((t) => t.name !== "Volunteer Mapping");
   }
 
-  /** Fixed slugs + dynamic tasks list – pinned tasks (VM, outdoor, BLA, MSR) shown separately on dashboard. */
-  function renderTaskList(fixedSlugs: string[], taskList: TaskConfig[]) {
+  /** Fixed slugs + dynamic tasks as a 3-column grid */
+  function renderTaskGrid(fixedSlugs: string[], taskList: TaskConfig[]) {
     const fixedSlugsFiltered = fixedSlugs.filter(
       (slug) => !DASHBOARD_TOP_SLUGS.has(slug) && !DASHBOARD_BOTTOM_SLUGS.has(slug),
     );
@@ -658,40 +657,28 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
         ))}
         {isLoading && (
           <>
-            <Skeleton className="h-[68px] w-full rounded-lg" />
-            <Skeleton className="h-[68px] w-full rounded-lg" />
+            <Skeleton className="h-[108px] w-full rounded-2xl" />
+            <Skeleton className="h-[108px] w-full rounded-2xl" />
+            <Skeleton className="h-[108px] w-full rounded-2xl" />
           </>
         )}
         {dynamicTasks.map((task) => {
           const IconComponent = iconMap[task.icon || "ClipboardList"] || ClipboardList;
           const color = task.color || "#3b82f6";
           return (
-            <Link key={task.id} href={getTaskRoute(task)}>
-              <Card className="app-task-card group cursor-pointer" data-testid={`task-card-${task.id}`}>
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-                    style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}
-                  >
-                    <IconComponent className="h-5 w-5 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, task)}</h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, task)}</p>
-                  </div>
-                  <div className="shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                      <ChevronRight className="h-4 w-4 text-blue-500" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
+            <TaskGridTile
+              key={task.id}
+              href={getTaskRoute(task)}
+              title={getTaskName(language, task)}
+              icon={<IconComponent className="h-5 w-5" />}
+              iconStyle={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}
+              testId={`task-card-${task.id}`}
+            />
           );
         })}
         {!isLoading && !hasFixed && !hasDynamic && (
-          <div className="text-center py-10 text-slate-400">
-            <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+          <div className="col-span-3 text-center py-8 text-slate-400">
+            <ClipboardList className="h-9 w-9 mx-auto mb-2 text-slate-300" />
             <p className="text-sm">
               {language === "hi" ? "इस श्रेणी में कोई कार्य नहीं" : language === "pa" ? "ਇਸ ਸ਼੍ਰੇਣੀ ਵਿੱਚ ਕੋਈ ਕੰਮ ਨਹੀਂ" : "No tasks in this category"}
             </p>
@@ -715,11 +702,14 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
 
   return (
     <div className="min-h-screen app-page">
-      <header className="app-header text-white">
-        <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
+      <header className="app-header text-white relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 opacity-20" aria-hidden style={{
+          backgroundImage: "radial-gradient(ellipse 80% 60% at 100% 0%, #93c5fd 0%, transparent 55%)",
+        }} />
+        <div className="relative max-w-lg mx-auto px-4 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={onProfile} className="flex items-center gap-3 min-w-0 text-left">
-              <Avatar className="w-11 h-11 border border-white/20 shrink-0">
+              <Avatar className="w-12 h-12 border-2 border-white/25 shrink-0 shadow-lg shadow-black/20">
                 {user.selfPhoto ? (
                   <AvatarImage src={user.selfPhoto} className="object-cover" />
                 ) : (
@@ -729,18 +719,18 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
                 )}
               </Avatar>
               <div className="min-w-0">
-                <h1 className="font-semibold text-base leading-tight truncate flex items-center gap-1" data-testid="text-user-name">
+                <h1 className="font-semibold text-[15px] leading-tight truncate flex items-center gap-1.5" data-testid="text-user-name">
                   {user.name}
                   {user.isApproved && (
-                    <BadgeCheck className="h-4 w-4 text-amber-400 shrink-0" data-testid="badge-verified-tick" />
+                    <BadgeCheck className="h-4 w-4 text-amber-300 shrink-0" data-testid="badge-verified-tick" />
                   )}
                 </h1>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/90" data-testid="text-user-role">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/95 font-medium tracking-wide" data-testid="text-user-role">
                     {roleLabel}
                   </span>
                   {user.mappedAreaName && (
-                    <span className="text-xs text-slate-300 truncate" data-testid="text-user-area">
+                    <span className="text-[11px] text-white/70 truncate" data-testid="text-user-area">
                       {user.mappedAreaName}
                     </span>
                   )}
@@ -776,8 +766,10 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             className="mt-4 block"
             data-testid="link-msrp-punjab-vmap"
           >
-            <div className="flex items-center gap-2 rounded-lg bg-white text-slate-800 px-3 py-2.5 text-sm font-medium shadow-sm hover:bg-slate-50 transition-colors">
-              <MapPin className="h-4 w-4 shrink-0 text-blue-600" />
+            <div className="flex items-center gap-2.5 rounded-xl bg-white text-slate-800 px-3.5 py-2.5 text-sm font-medium shadow-lg shadow-black/15 hover:bg-slate-50 transition-colors">
+              <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <MapPin className="h-4 w-4" />
+              </span>
               <span className="flex-1 truncate">
                 {language === "hi" ? "मतदाता मैपिंग" : language === "pa" ? "ਵੋਟਰ ਮੈਪਿੰਗ" : "Voter Mapping"}
               </span>
@@ -818,16 +810,16 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <SectionTitle
               title={language === "hi" ? "सर्वेक्षण" : language === "pa" ? "ਸਰਵੇਖਣ" : "Pending Surveys"}
             />
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {activeSurveys.map((survey) => (
                 <Link key={survey.id} href={`/survey/${survey.id}`}>
-                  <Card className="app-task-card group cursor-pointer border-emerald-100 hover:border-emerald-300" data-testid={`survey-card-${survey.id}`}>
-                    <CardContent className="p-4 flex items-center gap-3.5">
-                      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
+                  <Card className="group cursor-pointer border-emerald-100/80 bg-white shadow-sm hover:border-emerald-300 hover:shadow-md transition-all duration-200 rounded-2xl" data-testid={`survey-card-${survey.id}`}>
+                    <CardContent className="p-3.5 flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
                         <ClipboardCheck className="h-5 w-5 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm text-slate-900 leading-tight">
+                        <h3 className="font-semibold text-sm text-slate-900 leading-tight tracking-tight">
                           {getLocalizedText(language, survey.title, survey.titleHi || undefined, survey.titlePa || undefined)}
                         </h3>
                         {survey.description && (
@@ -880,167 +872,132 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
         )}
 
         <section>
-          <SectionTitle title={t("availableTasks")} />
+          <SectionTitle
+            title={t("availableTasks")}
+            subtitle={
+              language === "hi"
+                ? "श्रेणी चुनें, फिर कार्य पर टैप करें"
+                : language === "pa"
+                ? "ਸ਼੍ਰੇਣੀ ਚੁਣੋ, ਫਿਰ ਕੰਮ ਤੇ ਟੈਪ ਕਰੋ"
+                : "Pick a category, then tap a task"
+            }
+          />
 
-          <div className="space-y-2">
-          {volunteerMappingTask && (() => {
-            const VmIcon = iconMap[volunteerMappingTask.icon || "Users"] || Users;
-            const vmColor = volunteerMappingTask.color || "#3b82f6";
-            return (
-              <Link href="/task/volunteer-mapping">
-                <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 border-2 border-blue-100" data-testid="task-card-volunteer-mapping-priority">
-                  <CardContent className="p-4 flex items-center gap-3.5">
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
-                      style={{ background: `linear-gradient(135deg, ${vmColor}, ${vmColor}dd)` }}
-                    >
-                      <VmIcon className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm text-slate-800">{getTaskName(language, volunteerMappingTask)}</h3>
-                      <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{getTaskDesc(language, volunteerMappingTask)}</p>
-                    </div>
-                    <div className="shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                        <ChevronRight className="h-4 w-4 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })()}
-
-          <FixedTaskCard slug="outdoor-ad" language={language} featured />
+          {/* Priority / pinned actions */}
+          <div className="grid grid-cols-3 gap-2.5 mb-4">
+            {volunteerMappingTask && (() => {
+              const VmIcon = iconMap[volunteerMappingTask.icon || "Users"] || Users;
+              const vmColor = volunteerMappingTask.color || "#3b82f6";
+              return (
+                <TaskGridTile
+                  href="/task/volunteer-mapping"
+                  title={getTaskName(language, volunteerMappingTask)}
+                  icon={<VmIcon className="h-5 w-5" />}
+                  iconStyle={{ background: `linear-gradient(135deg, ${vmColor}, ${vmColor}dd)` }}
+                  testId="task-card-volunteer-mapping-priority"
+                  featured
+                />
+              );
+            })()}
+            <FixedTaskCard slug="outdoor-ad" language={language} featured />
+            <TaskGridTile
+              href="/task/bla"
+              title={getFixedTaskLabel("bla", language)}
+              icon={<Vote className="h-5 w-5" />}
+              iconGradient="from-indigo-600 to-violet-600"
+              testId="task-card-bla-priority"
+              featured
+            />
+            {isMahilaSakhi ? (
+              <TaskGridTile
+                href="/task/mahila-samman-punjab-gov"
+                title={
+                  language === "hi"
+                    ? "महिला सम्मान राशि"
+                    : language === "pa"
+                    ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ"
+                    : "Mahila Samman Rashi"
+                }
+                icon={<Users className="h-5 w-5" />}
+                iconGradient="from-purple-600 to-pink-600"
+                testId="task-card-mahila-samman-punjab"
+              />
+            ) : (
+              <TaskGridTile
+                href="/task/mahila-samman-rashi"
+                title={language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
+                icon={<Users className="h-5 w-5" />}
+                iconGradient="from-purple-600 to-pink-600"
+                testId="task-card-mahila-samman"
+              />
+            )}
+          </div>
 
           {!isMahilaSakhi && categories && categories.length > 0 && (
             <>
-              <div className="space-y-2">
-                <CategoryPickerItem
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2 ml-0.5">
+                {language === "hi" ? "श्रेणियाँ" : language === "pa" ? "ਸ਼੍ਰੇਣੀਆਂ" : "Categories"}
+              </p>
+              <div className="grid grid-cols-3 gap-2.5 mb-4">
+                <CategoryGridTile
                   selected={selectedCategoryId === null}
                   onClick={() => setSelectedCategoryId(null)}
                   icon={<LayoutGrid className="h-5 w-5" />}
-                  iconGradient="from-slate-500 to-slate-600"
+                  iconGradient="from-slate-500 to-slate-700"
                   title={language === "hi" ? "सभी" : language === "pa" ? "ਸਭ" : "All"}
-                  subtitle={language === "hi" ? "सभी कार्य देखें" : language === "pa" ? "ਸਭ ਕੰਮ ਵੇਖੋ" : "View all tasks"}
+                  testId="category-all"
                 />
-                {selectedCategoryId === null && (
-                  <div className="space-y-2">
-                    {renderTaskList(
-                      filterCategoryFixedSlugs(uncategorizedFixedSlugs),
-                      filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
-                    )}
-                  </div>
-                )}
+                {categories.map((cat, idx) => {
+                  const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
+                  const visual = CATEGORY_VISUALS[idx % CATEGORY_VISUALS.length];
+                  return (
+                    <CategoryGridTile
+                      key={cat.id}
+                      selected={selectedCategoryId === cat.id}
+                      onClick={() => setSelectedCategoryId(cat.id)}
+                      icon={visual.icon}
+                      iconGradient={visual.iconGradient}
+                      title={label}
+                      testId={`category-${cat.id}`}
+                    />
+                  );
+                })}
               </div>
 
-              {categories.map((cat) => {
-                const label = getLocalizedText(language, cat.name, cat.nameHi || undefined, cat.namePa || undefined);
-                const isSelected = selectedCategoryId === cat.id;
-                const catSlugs = filterCategoryFixedSlugs(cat.fixedTaskSlugs ?? []);
-                const catTasks = filterCategoryTasks(tasks?.filter((t) => (t as any).categoryId === cat.id) ?? []);
-                const fixedNames = catSlugs.map((slug) => getFixedTaskLabel(slug, language));
-                const dynamicNames = catTasks.map((t) => getTaskName(language, t));
-                const allNames = [...fixedNames, ...dynamicNames].filter(Boolean);
-                const hintText =
-                  allNames.length > 0
-                    ? allNames.join(", ")
-                    : language === "hi"
-                    ? "इस श्रेणी के कार्य"
-                    : language === "pa"
-                    ? "ਇਸ ਸ਼੍ਰੇਣੀ ਦੇ ਕੰਮ"
-                    : "Tasks in this category";
-                return (
-                  <div key={cat.id} className="space-y-2">
-                    <CategoryPickerItem
-                      selected={isSelected}
-                      onClick={() => setSelectedCategoryId(cat.id)}
-                      icon={<FolderTree className="h-5 w-5" />}
-                      iconGradient="from-blue-500 to-indigo-600"
-                      title={label}
-                      subtitle={hintText}
-                    />
-                    {isSelected && (
-                      <div className="space-y-2">
-                        {renderTaskList(catSlugs, catTasks)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2 ml-0.5">
+                {language === "hi" ? "कार्य" : language === "pa" ? "ਕੰਮ" : "Tasks"}
+              </p>
+              <div className="grid grid-cols-3 gap-2.5">
+                {selectedCategoryId === null
+                  ? renderTaskGrid(
+                      filterCategoryFixedSlugs([
+                        ...new Set([
+                          ...uncategorizedFixedSlugs,
+                          ...(categories.flatMap((c) => c.fixedTaskSlugs ?? [])),
+                        ]),
+                      ]),
+                      filterCategoryTasks(tasks ?? []),
+                    )
+                  : (() => {
+                      const cat = categories.find((c) => c.id === selectedCategoryId);
+                      if (!cat) return null;
+                      return renderTaskGrid(
+                        filterCategoryFixedSlugs(cat.fixedTaskSlugs ?? []),
+                        filterCategoryTasks(tasks?.filter((t) => (t as any).categoryId === cat.id) ?? []),
+                      );
+                    })()}
+              </div>
             </>
           )}
 
-          {(!categories || categories.length === 0) && !isMahilaSakhi &&
-            renderTaskList(
-              filterCategoryFixedSlugs(uncategorizedFixedSlugs),
-              filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
-            )}
-
-          <DashboardTaskCard
-            href="/task/bla"
-            title={getFixedTaskLabel("bla", language)}
-            description={
-              language === "hi"
-                ? "बूथ चुनें, BLA चुनें, OTP और दस्तावेज़ से पंजीकरण"
-                : language === "pa"
-                ? "ਬੂਥ ਚੁਣੋ, BLA ਚੁਣੋ, OTP ਨਾਲ ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਦਸਤਾਵੇਜ਼ ਅਪਲੋਡ ਕਰੋ"
-                : "Select booth & BLA, verify mobile, upload documents"
-            }
-            icon={<Vote className="h-5 w-5" />}
-            iconGradient="from-indigo-600 to-violet-600"
-            hoverBorderClassName="hover:border-indigo-200"
-            chevronClassName="text-indigo-600"
-            chevronBgClassName="bg-indigo-50 group-hover:bg-indigo-100"
-            testId="task-card-bla-priority"
-          />
-
-          {isMahilaSakhi && (
-            <DashboardTaskCard
-              href="/task/mahila-samman-punjab-gov"
-              title={
-                language === "hi"
-                  ? "महिला सम्मान राशि (पंजाब सरकार)"
-                  : language === "pa"
-                  ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ (ਪੰਜਾਬ ਸਰਕਾਰ)"
-                  : "Mahila Samman Rashi through Punjab Gov"
-              }
-              description={
-                language === "hi"
-                  ? "हर महिला को ₹1,000/महीना; SC/ST को ₹1,500/महीना"
-                  : language === "pa"
-                  ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                  : "Every woman ₹1,000/month; SC/ST ₹1,500/month"
-              }
-              icon={<Users className="h-5 w-5" />}
-              iconGradient="from-purple-600 to-pink-600"
-              hoverBorderClassName="hover:border-purple-200"
-              chevronClassName="text-purple-600"
-              chevronBgClassName="bg-purple-50 group-hover:bg-purple-100"
-              testId="task-card-mahila-samman-punjab"
-            />
+          {(!categories || categories.length === 0) && !isMahilaSakhi && (
+            <div className="grid grid-cols-3 gap-2.5">
+              {renderTaskGrid(
+                filterCategoryFixedSlugs(uncategorizedFixedSlugs),
+                filterCategoryTasks(tasks?.filter((t) => !(t as any).categoryId) ?? []),
+              )}
+            </div>
           )}
-
-          {!isMahilaSakhi && (
-            <DashboardTaskCard
-              href="/task/mahila-samman-rashi"
-              title={language === "hi" ? "महिला सम्मान राशि" : language === "pa" ? "ਮਹਿਲਾ ਸਨਮਾਨ ਰਾਸ਼ੀ" : "Mahila Samman Rashi"}
-              description={
-                language === "hi"
-                  ? "हर महिला को ₹1,000/महीना; SC/ST महिलाओं को ₹1,500/महीना"
-                  : language === "pa"
-                  ? "ਹਰ ਔਰਤ ਨੂੰ ₹1,000/ਮਹੀਨਾ; SC/ST ਔਰਤਾਂ ਨੂੰ ₹1,500/ਮਹੀਨਾ"
-                  : "₹1,000/month for every woman; ₹1,500 for SC/ST women"
-              }
-              icon={<Users className="h-5 w-5" />}
-              iconGradient="from-purple-600 to-pink-600"
-              hoverBorderClassName="hover:border-purple-200"
-              chevronClassName="text-purple-600"
-              chevronBgClassName="bg-purple-50 group-hover:bg-purple-100"
-              testId="task-card-mahila-samman"
-            />
-          )}
-          </div>
         </section>
       </div>
       </div>
