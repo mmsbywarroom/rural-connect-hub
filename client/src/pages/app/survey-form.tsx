@@ -97,7 +97,7 @@ export default function SurveyForm({ user, surveyId, onBack }: SurveyFormProps) 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen app-page flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     );
@@ -105,7 +105,7 @@ export default function SurveyForm({ user, surveyId, onBack }: SurveyFormProps) 
 
   if (!survey) {
     return (
-      <div className="min-h-screen bg-slate-50 p-4">
+      <div className="min-h-screen app-page p-4">
         <Button variant="ghost" onClick={onBack} data-testid="button-back">
           <ArrowLeft className="h-4 w-4 mr-2" />
           {language === "hi" ? "वापस" : language === "pa" ? "ਵਾਪਸ" : "Back"}
@@ -117,7 +117,7 @@ export default function SurveyForm({ user, surveyId, onBack }: SurveyFormProps) 
 
   if (alreadyResponded || submitted) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-emerald-600 text-white px-4 py-4 shadow-lg">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="text-white" onClick={onBack} data-testid="button-back-header">
@@ -147,7 +147,7 @@ export default function SurveyForm({ user, surveyId, onBack }: SurveyFormProps) 
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen app-page">
       <header className="bg-emerald-600 text-white px-4 py-4 shadow-lg">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={onBack} data-testid="button-back-header">

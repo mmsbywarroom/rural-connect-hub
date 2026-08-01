@@ -482,7 +482,7 @@ export default function TaskTirthYatra({ user }: Props) {
 
   if (step === "description") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setLocation("/app")}>
             <ArrowLeft className="h-5 w-5" />
@@ -572,7 +572,7 @@ export default function TaskTirthYatra({ user }: Props) {
 
   if (step === "select_unit") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setStep("description")}>
             <ArrowLeft className="h-5 w-5" />
@@ -607,7 +607,7 @@ export default function TaskTirthYatra({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen app-page flex flex-col">
       <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setStep("select_unit")}>
           <ArrowLeft className="h-5 w-5" />

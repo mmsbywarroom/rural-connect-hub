@@ -103,7 +103,7 @@ export default function SurveyLeaderboard({ user, onBack }: SurveyLeaderboardPro
   const title = language === "hi" ? "सर्वे लीडरबोर्ड" : language === "pa" ? "ਸਰਵੇ ਲੀਡਰਬੋਰਡ" : "Survey Leaderboard";
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen app-page">
       <header className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-4 py-4 shadow-lg">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onBack} data-testid="button-survey-leaderboard-back">

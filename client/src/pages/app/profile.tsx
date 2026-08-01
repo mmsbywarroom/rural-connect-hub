@@ -284,7 +284,7 @@ export default function ProfilePage({ user, onBack, onUpdate }: ProfileProps) {
   const completion = getProfileCompletion(currentUser);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen app-page">
       <header className="bg-blue-600 text-white px-4 py-3 shadow-lg sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={onBack} data-testid="button-profile-back">

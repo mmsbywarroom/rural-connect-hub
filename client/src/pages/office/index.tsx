@@ -173,7 +173,7 @@ export default function OfficePage({ manager, onLogout }: OfficePageProps) {
   const timeFilterLabels: Record<TimeFilter, string> = { today: t('today'), "7days": t('days7'), "30days": t('days30') };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen app-page flex flex-col">
       {/* Header */}
       <header className="bg-[#0f172a] text-white">
         <div className="px-4 py-2 flex items-center justify-between">

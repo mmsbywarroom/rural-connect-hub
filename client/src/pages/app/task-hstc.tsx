@@ -776,7 +776,7 @@ export default function TaskHstc({ user }: Props) {
 
   if (step === "verify_mobile") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-orange-600 text-white px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={() => { setStep("select_unit"); setOtpSent(false); setOtpCode(""); }} data-testid="button-hstc-otp-back">
             <ArrowLeft className="h-5 w-5" />
@@ -847,7 +847,7 @@ export default function TaskHstc({ user }: Props) {
 
   if (step === "select_unit") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-orange-600 text-white px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={() => setStep("description")} data-testid="button-hstc-unit-back">
             <ArrowLeft className="h-5 w-5" />
@@ -876,7 +876,7 @@ export default function TaskHstc({ user }: Props) {
 
   if (step === "description") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-orange-600 text-white px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={() => setLocation("/")} data-testid="button-hstc-back">
             <ArrowLeft className="h-5 w-5" />
@@ -921,7 +921,7 @@ export default function TaskHstc({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen app-page">
       <header className="bg-orange-600 text-white px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" className="text-white" onClick={() => { setStep(editingId ? "description" : "select_unit"); if (editingId) { setEditingId(null); resetForm(); } }} data-testid="button-hstc-form-back">
           <ArrowLeft className="h-5 w-5" />

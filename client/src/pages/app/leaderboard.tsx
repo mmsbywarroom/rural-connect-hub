@@ -146,8 +146,8 @@ export default function Leaderboard({ user, onBack }: LeaderboardProps) {
   const title = language === "hi" ? "लीडरबोर्ड" : language === "pa" ? "ਲੀਡਰਬੋਰਡ" : "Leaderboard";
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-4 shadow-lg">
+    <div className="min-h-screen app-page">
+      <header className="app-header text-white px-4 py-4 shadow-lg">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={onBack} data-testid="button-leaderboard-back">
             <ArrowLeft className="h-5 w-5" />

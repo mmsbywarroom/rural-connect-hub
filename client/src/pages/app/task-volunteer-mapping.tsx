@@ -271,7 +271,7 @@ export default function TaskVolunteerMapping({ user }: VolunteerMappingProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen app-page flex flex-col">
       <header className="bg-blue-600 text-white px-4 py-3 flex items-center gap-3">
         <Link href="/"><ArrowLeft className="h-5 w-5 cursor-pointer" data-testid="button-back" /></Link>
         <div>

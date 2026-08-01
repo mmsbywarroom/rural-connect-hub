@@ -758,10 +758,10 @@ export default function AppRegister({ email, mobile, selectedVillageId, selected
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm shadow-xl">
+    <div className="min-h-screen app-page flex items-center justify-center p-4">
+      <Card className="w-full max-w-sm shadow-xl rounded-2xl border-slate-200/80">
         <CardHeader className="text-center pb-2">
-          <CardTitle className="text-xl">{t('registration')}</CardTitle>
+          <CardTitle className="text-xl text-[#0a274f]">{t('registration')}</CardTitle>
           <CardDescription>
             {email}
             {selectedVillageName && <span className="block text-xs mt-0.5">{t('unit')}: {selectedVillageName}</span>}

@@ -430,7 +430,7 @@ export default function TaskVoterRegistration({ user }: Props) {
     });
 
     return (
-      <div className="min-h-screen bg-slate-50 pb-24">
+      <div className="min-h-screen app-page pb-24">
         <div className="sticky top-0 z-10 bg-white border-b shadow-sm px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
             <ArrowLeft className="h-5 w-5" />
@@ -565,7 +565,7 @@ export default function TaskVoterRegistration({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen app-page pb-24">
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
           <ArrowLeft className="h-5 w-5" />

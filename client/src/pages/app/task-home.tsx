@@ -192,7 +192,12 @@ function CircularProgress({ percentage, size = 44 }: { percentage: number; size?
 }
 
 function SectionTitle({ title }: { title: string }) {
-  return <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>;
+  return (
+    <div className="flex items-center gap-2.5 mb-3">
+      <span className="h-4 w-1 rounded-full bg-[#1565c0]" aria-hidden />
+      <h2 className="text-[11px] font-semibold text-slate-500 tracking-[0.14em] uppercase">{title}</h2>
+    </div>
+  );
 }
 
 function DashboardTaskCard({
@@ -223,7 +228,7 @@ function DashboardTaskCard({
   return (
     <Link href={href}>
       <Card
-        className={`group cursor-pointer border bg-white shadow-sm hover:shadow-md transition-all duration-200 ${
+        className={`app-task-card group cursor-pointer ${
           featured ? "border-blue-200 ring-1 ring-blue-100" : `border-slate-100 ${hoverBorderClassName}`
         }`}
         data-testid={testId}
@@ -662,7 +667,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
           const color = task.color || "#3b82f6";
           return (
             <Link key={task.id} href={getTaskRoute(task)}>
-              <Card className="group cursor-pointer bg-white border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200" data-testid={`task-card-${task.id}`}>
+              <Card className="app-task-card group cursor-pointer" data-testid={`task-card-${task.id}`}>
                 <CardContent className="p-4 flex items-center gap-3.5">
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-sm"
@@ -709,8 +714,8 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
   })();
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-md">
+    <div className="min-h-screen app-page">
+      <header className="app-header text-white">
         <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={onProfile} className="flex items-center gap-3 min-w-0 text-left">
@@ -816,7 +821,7 @@ export default function TaskHome({ user, onLogout, onProfile }: TaskHomeProps) {
             <div className="space-y-2">
               {activeSurveys.map((survey) => (
                 <Link key={survey.id} href={`/survey/${survey.id}`}>
-                  <Card className="group cursor-pointer border-emerald-100 bg-white hover:border-emerald-300 hover:shadow-md transition-all duration-200" data-testid={`survey-card-${survey.id}`}>
+                  <Card className="app-task-card group cursor-pointer border-emerald-100 hover:border-emerald-300" data-testid={`survey-card-${survey.id}`}>
                     <CardContent className="p-4 flex items-center gap-3.5">
                       <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
                         <ClipboardCheck className="h-5 w-5 text-white" />

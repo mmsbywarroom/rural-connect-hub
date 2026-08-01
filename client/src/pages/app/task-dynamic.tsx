@@ -201,7 +201,7 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen app-page flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
       </div>
     );
@@ -209,7 +209,7 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
 
   if (!config) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 p-4">
+      <div className="min-h-screen app-page flex flex-col items-center justify-center gap-4 p-4">
         <p className="text-slate-600">Task not found</p>
         <Button onClick={() => setLocation("/")} data-testid="button-home">
           <Home className="mr-2 h-4 w-4" /> {t('goToHome')}
@@ -220,7 +220,7 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
 
   if (showUnitSelector) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="text-white px-4 py-3 flex items-center gap-3" style={{ backgroundColor: taskColor }}>
           <button onClick={() => setLocation("/")} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -245,7 +245,7 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="text-white px-4 py-3 flex items-center gap-3" style={{ backgroundColor: taskColor }}>
           <button onClick={() => setLocation("/")} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -458,7 +458,7 @@ export default function TaskDynamicForm({ user, taskId }: TaskDynamicFormProps) 
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen app-page flex flex-col">
       <header className="text-white px-4 py-3 flex items-center gap-3" style={{ backgroundColor: taskColor }}>
         <button onClick={() => setLocation("/")} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />

@@ -41,6 +41,7 @@ import { Loader2, LogIn, UserPlus, Mail, KeyRound, ArrowRight, ArrowLeft, MapPin
 import type { AppUser } from "@shared/schema";
 import { getProfileCompletion } from "@/lib/profile-completion";
 import { MinisterImageWithFallback, MinisterTextBlock } from "@/components/minister-image";
+import { AppAuthShell, AppAuthCard, AppPortraitCard } from "@/components/app-auth-shell";
 
 function isIndianMobile(input: string): boolean {
   const cleaned = input.replace(/\D/g, "").replace(/^91/, "");
@@ -248,7 +249,7 @@ export default function VolunteerPortal() {
 
   if (authState === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex items-center justify-center">
+      <div className="min-h-screen app-header flex items-center justify-center">
         <div className="text-center text-white">
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Loader2 className="h-10 w-10 animate-spin" />
@@ -262,38 +263,25 @@ export default function VolunteerPortal() {
 
   if (authState === "welcome") {
     return (
-      <div
-        className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden"
-        style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
-      >
-        <div className="absolute inset-0 bg-[#061a3a]" />
-        <div
-          className="absolute inset-0 opacity-90"
-          style={{
-            background:
-              "radial-gradient(ellipse 120% 80% at 50% -10%, #1565c0 0%, transparent 55%), radial-gradient(ellipse 80% 60% at 100% 100%, #0b3d91 0%, transparent 50%), linear-gradient(165deg, #0a274f 0%, #061a3a 45%, #082448 100%)",
-          }}
-        />
-        <div className="relative w-full max-w-sm space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
-          <div className="rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-white/15">
-            <MinisterImageWithFallback />
-            <MinisterTextBlock />
-          </div>
-          <div className="rounded-2xl bg-white/97 backdrop-blur-sm shadow-2xl shadow-black/30 ring-1 ring-black/5 px-6 py-6 space-y-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-center text-[#0a274f]" data-testid="text-app-title">
-              {t('patialaRural')}
-            </h1>
-            <Button
-              className="w-full h-14 text-base rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-lg shadow-blue-900/20 transition-all active:scale-[0.98]"
-              onClick={() => setAuthState("login")}
-              data-testid="button-login"
-            >
-              <LogIn className="mr-3 h-5 w-5" /> {t('login')}
-            </Button>
-            <LanguageSwitcherInline className="mt-2" />
-          </div>
-        </div>
-      </div>
+      <AppAuthShell>
+        <AppPortraitCard>
+          <MinisterImageWithFallback />
+          <MinisterTextBlock />
+        </AppPortraitCard>
+        <AppAuthCard className="px-4 py-5 space-y-3">
+          <h1 className="text-xl font-semibold tracking-tight text-center text-[#0a274f]" data-testid="text-app-title">
+            {t('patialaRural')}
+          </h1>
+          <Button
+            className="w-full h-12 text-sm rounded-xl bg-[#0d47a1] hover:bg-[#1565c0] shadow-md shadow-blue-900/20 transition-all active:scale-[0.98]"
+            onClick={() => setAuthState("login")}
+            data-testid="button-login"
+          >
+            <LogIn className="mr-3 h-5 w-5" /> {t('login')}
+          </Button>
+          <LanguageSwitcherInline className="mt-1" />
+        </AppAuthCard>
+      </AppAuthShell>
     );
   }
 
@@ -320,8 +308,8 @@ export default function VolunteerPortal() {
     };
 
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-xl">
+      <div className="min-h-screen app-page flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-xl rounded-2xl border-slate-200/80">
           <CardContent className="pt-6 pb-4 space-y-3">
             <div className="space-y-1" data-testid="progress-bar-village">
               <div className="flex items-center justify-between">
@@ -374,8 +362,8 @@ export default function VolunteerPortal() {
     const regIcon = regInputType === "mobile" ? <Smartphone className="h-6 w-6 text-blue-600" /> : <Mail className="h-6 w-6 text-blue-600" />;
     const regChannelIcon = regChannel === "sms" ? <Phone className="h-4 w-4 text-blue-600" /> : <Mail className="h-4 w-4 text-blue-600" />;
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-600 to-blue-800 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-xl">
+      <div className="min-h-screen app-page flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm shadow-xl rounded-2xl border-slate-200/80">
           <CardHeader className="text-center pb-2">
             <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
               {regIcon}

@@ -295,7 +295,7 @@ export default function TaskNvy({ user }: Props) {
 
   if (step === "select_unit") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-red-700 text-white px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost"
@@ -330,7 +330,7 @@ export default function TaskNvy({ user }: Props) {
 
   if (step === "description") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-red-700 text-white px-4 py-3 flex items-center gap-3">
           <Button
             variant="ghost"
@@ -373,7 +373,7 @@ export default function TaskNvy({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen app-page">
       <header className="bg-red-700 text-white px-4 py-3 flex items-center gap-3">
         <Button
           variant="ghost"

@@ -400,7 +400,7 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
 
   if (step === "description") {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen app-page">
         <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setLocation("/app")}>
             <ArrowLeft className="h-5 w-5" />
@@ -423,7 +423,7 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
 
   if (step === "log") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={goPrev}>
             <ArrowLeft className="h-5 w-5" />
@@ -531,7 +531,7 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
 
   if (step === "unit") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={goPrev}>
             <ArrowLeft className="h-5 w-5" />
@@ -555,7 +555,7 @@ export default function TaskMahilaSammanPunjabGov({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-24">
+    <div className="min-h-screen app-page flex flex-col pb-24">
       <header className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 flex items-center gap-3 shadow-md">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={goPrev}>
           <ArrowLeft className="h-5 w-5" />

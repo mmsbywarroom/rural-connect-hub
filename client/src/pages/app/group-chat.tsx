@@ -467,7 +467,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
 
   if (groupLoading || !group) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen app-page flex items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
       </div>
     );
@@ -482,7 +482,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
   };
 
   return (
-    <div className="h-dvh bg-slate-50 flex flex-col overflow-hidden relative">
+    <div className="h-dvh app-page flex flex-col overflow-hidden relative">
       {pendingCallType && !inCall && (
         <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-6">
           <Loader2 className="h-12 w-12 animate-spin text-white mb-4" />
@@ -669,7 +669,7 @@ export default function GroupChat({ user, onBack }: GroupChatProps) {
           )}
         </DialogContent>
       </Dialog>
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-3 shadow-md sticky top-0 z-10 flex items-center gap-3">
+      <header className="app-header text-white px-4 py-3 shadow-md sticky top-0 z-10 flex items-center gap-3">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={onBack}>
           <ArrowLeft className="h-5 w-5" />
         </Button>

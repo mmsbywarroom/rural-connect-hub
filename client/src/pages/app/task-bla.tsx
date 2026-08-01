@@ -639,7 +639,7 @@ export default function TaskBla({ user }: Props) {
 
   if (step === "booth") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={() => setLocation("/app")}>
             <ArrowLeft className="h-5 w-5" />
@@ -674,7 +674,7 @@ export default function TaskBla({ user }: Props) {
 
   if (step === "select_bla") {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen app-page flex flex-col">
         <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-white" onClick={handleBack}>
             <ArrowLeft className="h-5 w-5" />
@@ -813,7 +813,7 @@ export default function TaskBla({ user }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen app-page pb-24">
       <header className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3 sticky top-0 z-10">
         <Button variant="ghost" size="icon" className="text-white" onClick={handleBack}>
           <ArrowLeft className="h-5 w-5" />
