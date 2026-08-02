@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel, SidebarGroupContent, SidebarTrigger, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, MapPin, AlertTriangle, Building, Building2, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon, MessageCircle } from "lucide-react";
+import { Users, MapPin, AlertTriangle, Building, Building2, Flag, Briefcase, GraduationCap, Settings, ChevronRight, ClipboardList, Upload, Database, BarChart3, FileBarChart, UserCheck, Vote, UserCog, Landmark, Home, Shield, LogIn, LogOut, Loader2, Eye, EyeOff, Heart, ClipboardCheck, Cake, Megaphone, CalendarCheck, ShieldAlert, Route, FolderTree, ImageIcon, MessageCircle, Search, LayoutDashboard } from "lucide-react";
 
 import VolunteersPage from "./volunteers";
 import VillagesPage from "./villages";
@@ -63,6 +62,10 @@ interface AdminUser {
 }
 
 const allMenuItems = [
+  { id: "analytics", label: "Dashboard", icon: LayoutDashboard, path: "/admin/analytics", group: "Overview" },
+  { id: "task-reports", label: "Task Reports", icon: FileBarChart, path: "/admin/task-reports", group: "Overview" },
+  { id: "user-reports", label: "User Reports", icon: UserCheck, path: "/admin/user-reports", group: "Overview" },
+  { id: "user-tree", label: "User Tree", icon: FolderTree, path: "/admin/user-tree", group: "Overview" },
   { id: "user-management", label: "User Management", icon: UserCog, path: "/admin/user-management", group: "Management" },
   { id: "role-management", label: "Role Management", icon: Shield, path: "/admin/role-management", group: "Management" },
   { id: "volunteers", label: "Volunteers", icon: Users, path: "/admin/volunteers", group: "Management" },
@@ -71,25 +74,25 @@ const allMenuItems = [
   { id: "task-manager", label: "Task Manager", icon: ClipboardList, path: "/admin/task-manager", group: "Management" },
   { id: "task-categories", label: "Task Categories", icon: FolderTree, path: "/admin/task-categories", group: "Management" },
   { id: "group-chat", label: "Group Chat", icon: MessageCircle, path: "/admin/group-chat", group: "Management" },
-  { id: "hstc", label: "Harr Sirr te Chatt", icon: Home, path: "/admin/hstc", group: "Management" },
-  { id: "sdsk", label: "Sukh-Dukh Saanjha Karo", icon: Heart, path: "/admin/sdsk", group: "Management" },
   { id: "surveys", label: "Survey Manager", icon: ClipboardCheck, path: "/admin/surveys", group: "Management" },
   { id: "birthdays", label: "Birthday Manager", icon: Cake, path: "/admin/birthdays", group: "Management" },
-  { id: "sunwai", label: "Sunwai (Complaints)", icon: Megaphone, path: "/admin/sunwai", group: "Management" },
-  { id: "nvy", label: "Nasha Viruddh Yuddh", icon: ShieldAlert, path: "/admin/nvy", group: "Management" },
-  { id: "bla-upload", label: "BLA Upload CSV", icon: Upload, path: "/admin/bla-upload", group: "Management" },
-  { id: "bla", label: "Booth Level Agents (BLA)", icon: Users, path: "/admin/bla", group: "Management" },
-  { id: "bla-attendance", label: "BLA Attendance", icon: CalendarCheck, path: "/admin/bla-attendance", group: "Management" },
-  { id: "road", label: "Road Reports", icon: Route, path: "/admin/road", group: "Management" },
-  { id: "outdoor-ads", label: "Outdoor Ads", icon: Megaphone, path: "/admin/outdoor-ads", group: "Management" },
-  { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Management" },
-  { id: "appointments", label: "Appointments", icon: CalendarCheck, path: "/admin/appointments", group: "Management" },
-  { id: "event-venues", label: "Event Venues", icon: Building2, path: "/admin/event-venues", group: "Management" },
-  { id: "tirth-yatra", label: "Tirth Yatra", icon: Users, path: "/admin/tirth-yatra", group: "Management" },
-  { id: "mahila-samman", label: "Mahila Samman Rashi", icon: Users, path: "/admin/mahila-samman", group: "Management" },
-  { id: "mahila-samman-punjab", label: "Mahila Samman (Punjab Gov)", icon: Users, path: "/admin/mahila-samman-punjab", group: "Management" },
-  { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Management" },
   { id: "contacts-hub", label: "Contacts Hub", icon: Users, path: "/admin/contacts-hub", group: "Management" },
+  { id: "hstc", label: "Harr Sirr te Chatt", icon: Home, path: "/admin/hstc", group: "Field Work" },
+  { id: "sdsk", label: "Sukh-Dukh Saanjha Karo", icon: Heart, path: "/admin/sdsk", group: "Field Work" },
+  { id: "sunwai", label: "Sunwai (Complaints)", icon: Megaphone, path: "/admin/sunwai", group: "Field Work" },
+  { id: "nvy", label: "Nasha Viruddh Yuddh", icon: ShieldAlert, path: "/admin/nvy", group: "Field Work" },
+  { id: "bla-upload", label: "BLA Upload CSV", icon: Upload, path: "/admin/bla-upload", group: "Field Work" },
+  { id: "bla", label: "Booth Level Agents (BLA)", icon: Users, path: "/admin/bla", group: "Field Work" },
+  { id: "bla-attendance", label: "BLA Attendance", icon: CalendarCheck, path: "/admin/bla-attendance", group: "Field Work" },
+  { id: "road", label: "Road Reports", icon: Route, path: "/admin/road", group: "Field Work" },
+  { id: "outdoor-ads", label: "Outdoor Ads", icon: Megaphone, path: "/admin/outdoor-ads", group: "Field Work" },
+  { id: "gov-school", label: "Gov School Work", icon: GraduationCap, path: "/admin/gov-school", group: "Field Work" },
+  { id: "appointments", label: "Appointments", icon: CalendarCheck, path: "/admin/appointments", group: "Field Work" },
+  { id: "event-venues", label: "Event Venues", icon: Building2, path: "/admin/event-venues", group: "Field Work" },
+  { id: "tirth-yatra", label: "Tirth Yatra", icon: Users, path: "/admin/tirth-yatra", group: "Field Work" },
+  { id: "mahila-samman", label: "Mahila Samman Rashi", icon: Users, path: "/admin/mahila-samman", group: "Field Work" },
+  { id: "mahila-samman-punjab", label: "Mahila Samman (Punjab Gov)", icon: Users, path: "/admin/mahila-samman-punjab", group: "Field Work" },
+  { id: "voter-registration", label: "Voter Registration", icon: Vote, path: "/admin/voter-registration", group: "Field Work" },
   { id: "villages", label: "Villages", icon: MapPin, path: "/admin/villages", group: "Master Data" },
   { id: "issues", label: "Issues", icon: AlertTriangle, path: "/admin/issues", group: "Master Data" },
   { id: "departments", label: "Departments", icon: Briefcase, path: "/admin/departments", group: "Master Data" },
@@ -103,13 +106,9 @@ const allMenuItems = [
   { id: "csv-upload", label: "CSV Upload", icon: Upload, path: "/admin/csv-upload", group: "Tools" },
   { id: "data-export", label: "Data Export", icon: Database, path: "/admin/data-export", group: "Tools" },
   { id: "login-page-settings", label: "Login Page Settings", icon: ImageIcon, path: "/admin/login-page-settings", group: "Tools" },
-  { id: "analytics", label: "Dashboard", icon: BarChart3, path: "/admin/analytics", group: "Analytics" },
-  { id: "task-reports", label: "Task Reports", icon: FileBarChart, path: "/admin/task-reports", group: "Analytics" },
-  { id: "user-reports", label: "User Reports", icon: UserCheck, path: "/admin/user-reports", group: "Analytics" },
-  { id: "user-tree", label: "User Tree", icon: FolderTree, path: "/admin/user-tree", group: "Analytics" },
 ];
 
-const GROUPS = ["Management", "Master Data", "Tools", "Analytics"];
+const GROUPS = ["Overview", "Management", "Field Work", "Master Data", "Tools"];
 
 type AdminAuthStep = "login" | "setup_2fa" | "verify_2fa";
 
@@ -206,17 +205,17 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
       ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(twoFaOtpauthUrl)}`
       : "";
     return (
-      <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-xl">
+      <div className="admin-login flex items-center justify-center p-4">
+        <Card className="admin-login-card w-full max-w-md rounded-2xl shadow-xl">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-              <Settings className="h-8 w-8 text-orange-600" />
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0a274f] to-[#1565c0] flex items-center justify-center mb-3 shadow-lg shadow-blue-900/30">
+              <Shield className="h-7 w-7 text-white" />
             </div>
-            <CardTitle className="text-xl">Set up 2-Factor Authentication</CardTitle>
+            <CardTitle className="text-xl tracking-tight">Set up 2-Factor Authentication</CardTitle>
             <CardDescription>Protect your admin account from unauthorized access.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <ol className="list-decimal list-inside space-y-1 text-left">
+            <ol className="list-decimal list-inside space-y-1 text-left text-slate-600">
               <li>Install an authenticator app (Google Authenticator, Authy, etc.) on your mobile.</li>
               <li>Open the app and choose “Add account” → “Scan QR code” or “Enter setup key”.</li>
               <li>Scan the QR code below, or manually enter the secret key.</li>
@@ -225,13 +224,13 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
 
             {qrUrl && (
               <div className="flex justify-center mt-2">
-                <img src={qrUrl} alt="2FA QR Code" className="border rounded-md" />
+                <img src={qrUrl} alt="2FA QR Code" className="border rounded-xl shadow-sm" />
               </div>
             )}
 
             <div className="space-y-1">
-              <div className="text-xs font-medium text-left">Secret key (keep this safe):</div>
-              <div className="font-mono text-xs break-all bg-slate-100 rounded px-2 py-1 text-left">
+              <div className="text-xs font-medium text-left text-slate-600">Secret key (keep this safe):</div>
+              <div className="font-mono text-xs break-all bg-slate-100 rounded-lg px-2.5 py-2 text-left">
                 {twoFaSecret || "—"}
               </div>
             </div>
@@ -241,12 +240,12 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
               <Input
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="text-center tracking-[0.5em]"
+                className="text-center tracking-[0.5em] h-11"
                 placeholder="123456"
               />
             </div>
 
-            <Button className="w-full h-11" onClick={handleVerify2fa} disabled={loading}>
+            <Button className="w-full h-11 bg-[#0d47a1] hover:bg-[#0a274f]" onClick={handleVerify2fa} disabled={loading}>
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Enable 2FA & Continue"}
             </Button>
           </CardContent>
@@ -257,13 +256,13 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
 
   if (step === "verify_2fa") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm shadow-xl">
+      <div className="admin-login flex items-center justify-center p-4">
+        <Card className="admin-login-card w-full max-w-md rounded-2xl shadow-xl">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-              <Settings className="h-8 w-8 text-orange-600" />
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0a274f] to-[#1565c0] flex items-center justify-center mb-3 shadow-lg shadow-blue-900/30">
+              <Shield className="h-7 w-7 text-white" />
             </div>
-            <CardTitle className="text-xl">Enter 2-Factor Code</CardTitle>
+            <CardTitle className="text-xl tracking-tight">Enter 2-Factor Code</CardTitle>
             <CardDescription>Open your authenticator app and enter the 6-digit code.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
@@ -272,14 +271,14 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
               <Input
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="text-center tracking-[0.5em]"
+                className="text-center tracking-[0.5em] h-11"
                 placeholder="123456"
               />
             </div>
-            <Button className="w-full h-11" onClick={handleVerify2fa} disabled={loading}>
+            <Button className="w-full h-11 bg-[#0d47a1] hover:bg-[#0a274f]" onClick={handleVerify2fa} disabled={loading}>
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify & Login"}
             </Button>
-            <p className="text-xs text-orange-100 text-left">
+            <p className="text-xs text-slate-500 text-left">
               If you lose your authenticator app, contact the super admin to reset 2FA for your account.
             </p>
           </CardContent>
@@ -289,53 +288,60 @@ function AdminLogin({ onLogin }: { onLogin: (user: AdminUser, permissions: strin
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-500 to-orange-700 flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm shadow-xl">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mb-3">
-            <Settings className="h-8 w-8 text-orange-600" />
-          </div>
-          <CardTitle className="text-xl" data-testid="text-admin-login-title">Admin Panel</CardTitle>
-          <CardDescription>Patiala Rural - Login</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Username</label>
-            <Input
-              placeholder="Enter username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="h-11"
-              data-testid="input-admin-username"
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">Password</label>
-            <div className="relative">
+    <div className="admin-login flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <p className="text-white/70 text-xs font-semibold tracking-[0.2em] uppercase mb-2">Command Center</p>
+          <h1 className="text-white text-3xl font-bold tracking-tight">Admin Panel</h1>
+          <p className="text-blue-100/80 text-sm mt-1.5">Patiala Rural · Secure access</p>
+        </div>
+        <Card className="admin-login-card rounded-2xl shadow-xl">
+          <CardHeader className="text-center pb-2 pt-6">
+            <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0a274f] to-[#1565c0] flex items-center justify-center mb-3 shadow-lg shadow-blue-900/20">
+              <Settings className="h-7 w-7 text-white" />
+            </div>
+            <CardTitle className="text-xl tracking-tight" data-testid="text-admin-login-title">Sign in</CardTitle>
+            <CardDescription>Enter your admin credentials to continue</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-6">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block text-slate-700">Username</label>
               <Input
-                type={showPwd ? "text" : "password"}
-                placeholder="Enter password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 pr-10"
-                data-testid="input-admin-password"
+                placeholder="Enter username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="h-11"
+                data-testid="input-admin-username"
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                onClick={() => setShowPwd(!showPwd)}
-              >
-                {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-          </div>
-          <Button className="w-full h-11" onClick={handleLogin} disabled={loading} data-testid="button-admin-login">
-            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><LogIn className="h-4 w-4 mr-2" /> Login</>}
-          </Button>
-        </CardContent>
-      </Card>
+            <div>
+              <label className="text-sm font-medium mb-1.5 block text-slate-700">Password</label>
+              <div className="relative">
+                <Input
+                  type={showPwd ? "text" : "password"}
+                  placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 pr-10"
+                  data-testid="input-admin-password"
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  onClick={() => setShowPwd(!showPwd)}
+                >
+                  {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <Button className="w-full h-11 bg-[#0d47a1] hover:bg-[#0a274f] text-white" onClick={handleLogin} disabled={loading} data-testid="button-admin-login">
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><LogIn className="h-4 w-4 mr-2" /> Login</>}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -346,6 +352,7 @@ export default function AdminPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [assignedVillages, setAssignedVillages] = useState<string[]>([]);
   const [authLoading, setAuthLoading] = useState(true);
+  const [navSearch, setNavSearch] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("adminUser");
@@ -385,8 +392,8 @@ export default function AdminPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+      <div className="admin-login flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
       </div>
     );
   }
@@ -399,8 +406,16 @@ export default function AdminPage() {
   const hasPermission = (id: string) => isSuperAdmin || permissions.includes(id);
 
   const filteredMenuItems = allMenuItems.filter((item) => hasPermission(item.id));
+  const searchq = navSearch.trim().toLowerCase();
+  const visibleMenuItems = searchq
+    ? filteredMenuItems.filter((item) => item.label.toLowerCase().includes(searchq) || item.id.includes(searchq))
+    : filteredMenuItems;
 
-  const currentPath = location.replace("/admin", "") || "/user-management";
+  const currentPath = location.replace("/admin", "") || "/analytics";
+  const activeMenuItem = filteredMenuItems.find(
+    (m) => currentPath.includes(`/${m.id}`) || currentPath.endsWith(m.id) || currentPath.includes(m.path.replace("/admin", ""))
+  );
+  const activeLabel = activeMenuItem?.label || "Dashboard";
 
   const getActiveSection = () => {
     if (currentPath.includes("form-builder")) return "form-builder";
@@ -448,47 +463,59 @@ export default function AdminPage() {
     if (currentPath.includes("csv-upload")) return "csv-upload";
     if (currentPath.includes("data-export")) return "data-export";
     if (currentPath.includes("login-page-settings")) return "login-page-settings";
-    return filteredMenuItems[0]?.id || "user-management";
+    return filteredMenuItems[0]?.id || "analytics";
   };
 
   const activeSection = getActiveSection();
 
   const sidebarStyle = {
-    "--sidebar-width": "16rem",
+    "--sidebar-width": "17rem",
     "--sidebar-width-icon": "3rem",
   };
 
   return (
-    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <Sidebar>
-          <SidebarHeader className="p-4 border-b">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <Settings className="w-4 h-4 text-white" />
+    <SidebarProvider style={sidebarStyle as React.CSSProperties} className="admin-shell">
+      <div className="flex h-screen w-full admin-shell">
+        <Sidebar className="admin-sidebar border-r-0">
+          <SidebarHeader className="p-4 border-b border-white/10">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 bg-gradient-to-br from-[#1565c0] to-[#42a5f5] rounded-xl flex items-center justify-center shadow-md shadow-black/20">
+                <LayoutDashboard className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="font-semibold text-sm">Admin Panel</h2>
-                <p className="text-xs text-muted-foreground truncate">{adminUser.username}</p>
+                <h2 className="font-bold text-sm text-white tracking-tight">Admin Panel</h2>
+                <p className="text-[11px] text-blue-200/70 truncate">Patiala Rural</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={handleLogout} title="Logout" data-testid="button-admin-logout">
-                <LogOut className="h-4 w-4" />
-              </Button>
+            </div>
+            <div className="relative mt-3">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-blue-200/60" />
+              <Input
+                value={navSearch}
+                onChange={(e) => setNavSearch(e.target.value)}
+                placeholder="Search modules…"
+                className="h-9 pl-8 bg-white/10 border-white/10 text-white placeholder:text-blue-200/50 focus-visible:ring-[#42a5f5]/40"
+              />
             </div>
           </SidebarHeader>
 
-          <SidebarContent>
+          <SidebarContent className="px-1">
             {GROUPS.map((group) => {
-              const groupItems = filteredMenuItems.filter((item) => item.group === group);
+              const groupItems = visibleMenuItems.filter((item) => item.group === group);
               if (groupItems.length === 0) return null;
               return (
                 <SidebarGroup key={group}>
-                  <SidebarGroupLabel>{group}</SidebarGroupLabel>
+                  <SidebarGroupLabel className="text-blue-200/50 text-[10px] uppercase tracking-wider font-semibold">
+                    {group}
+                  </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
                       {groupItems.map((item) => (
                         <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton asChild isActive={activeSection === item.id}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={activeSection === item.id}
+                            className="text-blue-50/80 data-[active=true]:bg-white/15 data-[active=true]:text-white hover:bg-white/10 hover:text-white"
+                          >
                             <Link href={item.path}>
                               <item.icon className="h-4 w-4" />
                               <span>{item.label}</span>
@@ -501,20 +528,53 @@ export default function AdminPage() {
                 </SidebarGroup>
               );
             })}
+            {visibleMenuItems.length === 0 && (
+              <p className="px-4 py-6 text-xs text-blue-200/50 text-center">No modules match “{navSearch}”</p>
+            )}
           </SidebarContent>
+
+          <SidebarFooter className="border-t border-white/10 p-3">
+            <div className="flex items-center gap-2.5 rounded-xl bg-white/5 px-2.5 py-2">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-white">
+                {adminUser.username.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate">{adminUser.username}</p>
+                <p className="text-[10px] text-blue-200/60">{adminUser.role || "Admin"}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0 text-blue-100/70 hover:text-white hover:bg-white/10"
+                onClick={handleLogout}
+                title="Logout"
+                data-testid="button-admin-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </SidebarFooter>
         </Sidebar>
 
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center gap-4 p-4 border-b bg-background/95 backdrop-blur">
+          <header className="admin-topbar flex items-center gap-3 px-4 sm:px-5 py-3">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Admin</span>
-              <ChevronRight className="h-4 w-4" />
-              <span className="capitalize text-foreground">{activeSection.replace(/-/g, " ")}</span>
+            <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0">
+              <span className="hidden sm:inline">Admin</span>
+              <ChevronRight className="h-3.5 w-3.5 hidden sm:inline shrink-0" />
+              <span className="font-semibold text-slate-900 truncate">{activeLabel}</span>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex h-8 text-xs">
+                <Link href="/admin/analytics">
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                  Dashboard
+                </Link>
+              </Button>
             </div>
           </header>
 
-          <main className="flex-1 overflow-auto p-6 bg-muted/30">
+          <main className="flex-1 overflow-auto p-4 sm:p-6">
             {activeSection === "user-management" && <UserManagementPage />}
             {activeSection === "role-management" && <RoleManagementPage />}
             {activeSection === "volunteers" && <VolunteersPage />}

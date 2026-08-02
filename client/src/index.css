@@ -375,3 +375,44 @@
   background-color: #061a3a;
   color-scheme: dark;
 }
+
+/* ===== Admin visual system ===== */
+.admin-shell {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse 70% 40% at 100% 0%, rgba(21, 101, 192, 0.06), transparent 50%),
+    linear-gradient(180deg, #f1f5f9 0%, #e8eef5 100%);
+  color: #0f172a;
+  --sidebar: 213 72% 13%;
+  --sidebar-foreground: 210 40% 96%;
+  --sidebar-primary: 210 80% 56%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 213 55% 20%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 213 40% 20%;
+  --sidebar-ring: 210 80% 56%;
+}
+
+.admin-sidebar {
+  background: linear-gradient(180deg, #061a3a 0%, #0a274f 55%, #082448 100%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-topbar {
+  @apply sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75;
+}
+
+.admin-login {
+  min-height: 100dvh;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(21, 101, 192, 0.35), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(10, 39, 79, 0.9), transparent 50%),
+    linear-gradient(160deg, #061a3a 0%, #0a274f 45%, #082448 100%);
+}
+
+.admin-login-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}

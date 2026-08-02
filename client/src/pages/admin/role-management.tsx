@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Pencil, Trash2, Shield, ShieldCheck, Loader2 } from "lucide-react";
 import type { AdminRole } from "@shared/schema";
+import { AdminPageHeader, AdminEmptyState, AdminStatCard } from "@/components/admin/admin-ui";
 
 const ALL_PERMISSIONS = [
   { id: "user-management", label: "User Management", group: "Management", hasSubPerms: true },
@@ -321,71 +321,89 @@ export default function RoleManagementPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#0d47a1]" />
       </div>
     );
   }
 
+  const totalRoles = roles?.length || 0;
+  const fullAccessCount = roles?.filter((r) => (r.permissions?.length || 0) >= ALL_PERMISSIONS.length).length || 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-role-title">Role Management</h1>
-          <p className="text-muted-foreground">Create and manage admin roles with specific permissions</p>
-        </div>
-        <Button onClick={handleOpenCreate} data-testid="button-create-role">
-          <Plus className="h-4 w-4 mr-2" /> Create Role
-        </Button>
+      <AdminPageHeader
+        title="Role Management"
+        description="Create admin roles and control module access permissions"
+        icon={<Shield className="h-5 w-5" />}
+        actions={
+          <Button onClick={handleOpenCreate} className="bg-[#0d47a1] hover:bg-[#0a274f]" data-testid="button-create-role">
+            <Plus className="h-4 w-4 mr-2" /> Create Role
+          </Button>
+        }
+      />
+      <span className="sr-only" data-testid="text-role-title">Role Management</span>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <AdminStatCard label="Total Roles" value={totalRoles} icon={<Shield className="h-5 w-5" />} accent="blue" />
+        <AdminStatCard label="Full Access" value={fullAccessCount} icon={<ShieldCheck className="h-5 w-5" />} accent="emerald" />
+        <AdminStatCard label="Modules Controllable" value={ALL_PERMISSIONS.length} icon={<Shield className="h-5 w-5" />} accent="violet" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {roles?.map((role) => (
-          <Card key={role.id} data-testid={`card-role-${role.id}`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-blue-600" />
-                  <CardTitle className="text-base" data-testid={`text-role-name-${role.id}`}>{role.name}</CardTitle>
+          <div
+            key={role.id}
+            data-testid={`card-role-${role.id}`}
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0a274f] to-[#1565c0] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="h-5 w-5 text-white" />
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(role)} data-testid={`button-edit-role-${role.id}`}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => setDeletingRole(role)} data-testid={`button-delete-role-${role.id}`}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900 truncate" data-testid={`text-role-name-${role.id}`}>
+                    {role.name}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {role.permissions?.length || 0} permission{(role.permissions?.length || 0) !== 1 ? "s" : ""}
+                  </p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1">
-                {role.permissions?.length === ALL_PERMISSIONS.length ? (
-                  <Badge variant="default" className="bg-green-600">All Access</Badge>
-                ) : (
-                  role.permissions?.slice(0, 5).map((perm) => (
-                    <Badge key={perm} variant="secondary" className="text-xs">
-                      {ALL_PERMISSIONS.find((p) => p.id === perm)?.label || perm}
-                    </Badge>
-                  ))
-                )}
-                {(role.permissions?.length || 0) > 5 && (
-                  <Badge variant="outline" className="text-xs">+{role.permissions!.length - 5} more</Badge>
-                )}
+              <div className="flex gap-1 shrink-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(role)} data-testid={`button-edit-role-${role.id}`}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500" onClick={() => setDeletingRole(role)} data-testid={`button-delete-role-${role.id}`}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {role.permissions?.length || 0} permission{(role.permissions?.length || 0) !== 1 ? "s" : ""}
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {role.permissions?.length === ALL_PERMISSIONS.length ? (
+                <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600">All Access</Badge>
+              ) : (
+                role.permissions?.slice(0, 5).map((perm) => (
+                  <Badge key={perm} variant="secondary" className="text-xs font-normal">
+                    {ALL_PERMISSIONS.find((p) => p.id === perm)?.label || perm}
+                  </Badge>
+                ))
+              )}
+              {(role.permissions?.length || 0) > 5 && (
+                <Badge variant="outline" className="text-xs">+{role.permissions!.length - 5} more</Badge>
+              )}
+            </div>
+          </div>
         ))}
 
         {(!roles || roles.length === 0) && (
-          <Card className="col-span-full">
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <Shield className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>No roles created yet. Click "Create Role" to get started.</p>
-            </CardContent>
-          </Card>
+          <div className="col-span-full rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <AdminEmptyState
+              icon={<Shield className="h-6 w-6" />}
+              title="No roles created yet"
+              description='Click "Create Role" to define permissions for admin accounts.'
+            />
+          </div>
         )}
       </div>
 

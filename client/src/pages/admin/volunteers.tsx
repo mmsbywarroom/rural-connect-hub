@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +17,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Users, Phone, MapPin, Search, Calendar, Briefcase, Eye } from "lucide-react";
 import { FamilyMembers } from "@/components/family-members";
 import type { Volunteer, Village, Wing, Position, LeadershipFlag } from "@shared/schema";
+import { AdminPageHeader, AdminSurface, AdminEmptyState, AdminStatCard } from "@/components/admin/admin-ui";
 
 const volunteerFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -195,21 +195,18 @@ export default function VolunteersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-volunteers-title">
-            <Users className="h-6 w-6 text-primary" />
-            Volunteers
-          </h1>
-          <p className="text-muted-foreground">Manage volunteer records</p>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleAdd} data-testid="button-add-volunteer">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Volunteer
-            </Button>
-          </DialogTrigger>
+      <AdminPageHeader
+        title="Volunteers"
+        description="Manage volunteer directory, village mapping, and leadership flags"
+        icon={<Users className="h-5 w-5" />}
+        actions={
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleAdd} className="bg-[#0d47a1] hover:bg-[#0a274f]" data-testid="button-add-volunteer">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Volunteer
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingVolunteer ? "Edit Volunteer" : "Add New Volunteer"}</DialogTitle>
@@ -476,41 +473,46 @@ export default function VolunteersPage() {
             </Form>
           </DialogContent>
         </Dialog>
+        }
+      />
+      <span className="sr-only" data-testid="text-volunteers-title">Volunteers</span>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <AdminStatCard label="Total Volunteers" value={volunteers?.length || 0} icon={<Users className="h-5 w-5" />} accent="blue" />
+        <AdminStatCard label="Showing" value={filteredVolunteers?.length || 0} icon={<Search className="h-5 w-5" />} accent="emerald" hint={search ? "Filtered results" : "All records"} />
+        <AdminStatCard label="Villages Covered" value={new Set(volunteers?.map((v) => v.villageId).filter(Boolean)).size} icon={<MapPin className="h-5 w-5" />} accent="amber" />
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or mobile..."
-                className="pl-10"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="input-search-volunteers"
-              />
-            </div>
-            <Badge variant="secondary">{filteredVolunteers?.length || 0} volunteers</Badge>
+      <AdminSurface
+        title="Volunteer directory"
+        description="Search and manage volunteer profiles"
+        action={
+          <Badge variant="secondary" className="font-semibold">{filteredVolunteers?.length || 0} shown</Badge>
+        }
+      >
+          <div className="relative max-w-md mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or mobile..."
+              className="pl-10 h-10 bg-slate-50/80 border-slate-200"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              data-testid="input-search-volunteers"
+            />
           </div>
-        </CardHeader>
-        <CardContent>
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
               ))}
             </div>
           ) : filteredVolunteers?.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>No volunteers found</p>
-            </div>
+            <AdminEmptyState icon={<Users className="h-6 w-6" />} title="No volunteers found" description="Add a volunteer or clear your search." />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
                     <TableHead>Volunteer</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Village</TableHead>
@@ -592,8 +594,7 @@ export default function VolunteersPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </AdminSurface>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

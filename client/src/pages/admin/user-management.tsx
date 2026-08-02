@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -19,12 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Plus, Search, MoreHorizontal, Pencil, Trash2, Ban, ShieldCheck,
-  Users, UserCog, Eye, EyeOff, Download, Phone, Mail, Chrome, CheckCircle, BadgeCheck,
+  Users, UserCog, Eye, EyeOff, Download, Phone, CheckCircle, BadgeCheck, Clock, Briefcase,
 } from "lucide-react";
 import { getProfileCompletion } from "@/lib/profile-completion";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { AppUser, OfficeManager, Wing, Position, Village, GovWing, AdminRole } from "@shared/schema";
+import { AdminPageHeader, AdminStatCard, AdminSurface, AdminEmptyState } from "@/components/admin/admin-ui";
 
 function downloadCSV(csvContent: string, filename: string) {
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -387,93 +387,75 @@ export default function UserManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">User Management</h1>
-          <p className="text-muted-foreground text-sm">Manage all app users and admin accounts</p>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="User Management"
+        description="Manage app users, approvals, and admin accounts"
+        icon={<UserCog className="h-5 w-5" />}
+      />
+      <span className="sr-only" data-testid="text-page-title">User Management</span>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList data-testid="tabs-user-type">
-          <TabsTrigger value="app-users" data-testid="tab-app-users">
+        <TabsList
+          data-testid="tabs-user-type"
+          className="h-11 p-1 bg-white border border-slate-200/80 rounded-xl shadow-sm"
+        >
+          <TabsTrigger
+            value="app-users"
+            data-testid="tab-app-users"
+            className="rounded-lg data-[state=active]:bg-[#0d47a1] data-[state=active]:text-white px-4"
+          >
             <Users className="h-4 w-4 mr-1.5" />
             App Users
           </TabsTrigger>
-          <TabsTrigger value="admins" data-testid="tab-admins">
+          <TabsTrigger
+            value="admins"
+            data-testid="tab-admins"
+            className="rounded-lg data-[state=active]:bg-[#0d47a1] data-[state=active]:text-white px-4"
+          >
             <UserCog className="h-4 w-4 mr-1.5" />
             Admin Accounts
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="app-users" className="space-y-4 mt-4">
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold" data-testid="text-stat-total">{stats.total}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Approved</p>
-                <p className="text-2xl font-bold text-blue-600" data-testid="text-stat-approved">{stats.approved}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600" data-testid="text-stat-pending">{stats.pending}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold text-green-600" data-testid="text-stat-active">{stats.active}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Volunteers</p>
-                <p className="text-2xl font-bold" data-testid="text-stat-volunteers">{stats.volunteers}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground">Post Holders</p>
-                <p className="text-2xl font-bold" data-testid="text-stat-postholders">{stats.postHolders}</p>
-              </CardContent>
-            </Card>
+        <TabsContent value="app-users" className="space-y-4 mt-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <AdminStatCard label="Total" value={stats.total} icon={<Users className="h-5 w-5" />} accent="blue" valueTestId="text-stat-total" />
+            <AdminStatCard label="Approved" value={stats.approved} icon={<BadgeCheck className="h-5 w-5" />} accent="violet" valueTestId="text-stat-approved" />
+            <AdminStatCard label="Pending" value={stats.pending} icon={<Clock className="h-5 w-5" />} accent="amber" valueTestId="text-stat-pending" />
+            <AdminStatCard label="Active" value={stats.active} icon={<CheckCircle className="h-5 w-5" />} accent="emerald" valueTestId="text-stat-active" />
+            <AdminStatCard label="Volunteers" value={stats.volunteers} icon={<Users className="h-5 w-5" />} accent="slate" valueTestId="text-stat-volunteers" />
+            <AdminStatCard label="Post Holders" value={stats.postHolders} icon={<Briefcase className="h-5 w-5" />} accent="rose" valueTestId="text-stat-postholders" />
           </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
-              <CardTitle className="text-base">App Users</CardTitle>
+          <AdminSurface
+            title="App Users"
+            description="Search, filter, approve or block field users"
+            action={
               <div className="flex items-center gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={handleExportUsers} data-testid="button-export-users">
                   <Download className="h-4 w-4 mr-1.5" />
                   Export CSV
                 </Button>
-                <Button size="sm" onClick={() => { appUserForm.reset(); setCreateUserOpen(true); }} data-testid="button-create-user">
+                <Button size="sm" className="bg-[#0d47a1] hover:bg-[#0a274f]" onClick={() => { appUserForm.reset(); setCreateUserOpen(true); }} data-testid="button-create-user">
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add User
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 flex-wrap">
+            }
+          >
+              <div className="flex items-center gap-3 flex-wrap mb-4">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by name or mobile..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
+                    className="pl-9 h-10 bg-slate-50/80 border-slate-200"
                     data-testid="input-search-users"
                   />
                 </div>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-role-filter">
+                  <SelectTrigger className="w-[140px] h-10" data-testid="select-role-filter">
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -483,7 +465,7 @@ export default function UserManagementPage() {
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                  <SelectTrigger className="w-[140px] h-10" data-testid="select-status-filter">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -496,18 +478,20 @@ export default function UserManagementPage() {
 
               {usersLoading ? (
                 <div className="space-y-2">
-                  {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                  {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
                 </div>
               ) : !appUsers.length ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p data-testid="text-no-users">No users found</p>
-                </div>
+                <AdminEmptyState
+                  icon={<Users className="h-6 w-6" />}
+                  title="No users found"
+                  description="Try a different search or clear filters."
+                />
+                <span className="sr-only" data-testid="text-no-users">No users found</span>
               ) : (
-                <div className="border rounded-md overflow-auto">
+                <div className="border border-slate-200/80 rounded-xl overflow-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
                         <TableHead>Name</TableHead>
                         <TableHead>Mobile</TableHead>
                         <TableHead>Profile</TableHead>
@@ -655,36 +639,38 @@ export default function UserManagementPage() {
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+          </AdminSurface>
         </TabsContent>
 
-        <TabsContent value="admins" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
-              <CardTitle className="text-base">Admin Accounts (Office Managers)</CardTitle>
-              {isSuperAdmin && (
-                <Button size="sm" onClick={() => { adminForm.reset(); setCreateAdminOpen(true); }} data-testid="button-create-admin">
+        <TabsContent value="admins" className="space-y-4 mt-5">
+          <AdminSurface
+            title="Admin Accounts"
+            description="Office managers and panel access"
+            action={
+              isSuperAdmin ? (
+                <Button size="sm" className="bg-[#0d47a1] hover:bg-[#0a274f]" onClick={() => { adminForm.reset(); setCreateAdminOpen(true); }} data-testid="button-create-admin">
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add Admin
                 </Button>
-              )}
-            </CardHeader>
-            <CardContent>
+              ) : undefined
+            }
+          >
               {managersLoading ? (
                 <div className="space-y-2">
-                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                  {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
                 </div>
               ) : !managers?.length ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <UserCog className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p data-testid="text-no-admins">No admin accounts found</p>
-                </div>
+                <AdminEmptyState
+                  icon={<UserCog className="h-6 w-6" />}
+                  title="No admin accounts found"
+                  description="Super admin can create panel accounts here."
+                />
+                <span className="sr-only" data-testid="text-no-admins">No admin accounts found</span>
               ) : (
-                <div className="border rounded-md overflow-auto">
+                <div className="border border-slate-200/80 rounded-xl overflow-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
+                      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
                         <TableHead>Name</TableHead>
                         <TableHead>User ID</TableHead>
                         <TableHead>Role</TableHead>
@@ -768,8 +754,7 @@ export default function UserManagementPage() {
                   </Table>
                 </div>
               )}
-            </CardContent>
-          </Card>
+          </AdminSurface>
         </TabsContent>
       </Tabs>
 

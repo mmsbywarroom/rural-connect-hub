@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +26,6 @@ import {
   Users,
   UserCheck,
   ClipboardList,
-  CheckCircle,
   MapPin,
   Heart,
   Eye,
@@ -36,7 +34,18 @@ import {
   Activity,
   Trophy,
   Clock,
+  UserCog,
+  Vote,
+  Megaphone,
+  FileBarChart,
 } from "lucide-react";
+import {
+  AdminPageHeader,
+  AdminStatCard,
+  AdminSurface,
+  AdminEmptyState,
+  AdminQuickLink,
+} from "@/components/admin/admin-ui";
 
 interface AnalyticsOverview {
   summary: {
@@ -119,16 +128,14 @@ function exportToCSV(data: AnalyticsOverview) {
   URL.revokeObjectURL(url);
 }
 
-const summaryCards = [
-  { key: "totalSubmissions", label: "Total Submissions", icon: ClipboardList },
-  { key: "activeUsers", label: "Active Users", icon: UserCheck },
-  { key: "totalUsers", label: "Total Users", icon: Users },
-  { key: "totalTasks", label: "Total Tasks", icon: BarChart3 },
-  { key: "enabledTasks", label: "Enabled Tasks", icon: CheckCircle },
-  { key: "totalVillages", label: "Villages", icon: MapPin },
-  { key: "totalVolunteers", label: "Volunteers", icon: Heart },
-  { key: "totalVisitors", label: "Visitors", icon: Eye },
-] as const;
+const chartTooltipStyle = {
+  borderRadius: "12px",
+  border: "1px solid #e2e8f0",
+  backgroundColor: "#fff",
+  color: "#0f172a",
+  boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+  fontSize: "12px",
+};
 
 export default function AnalyticsDashboard() {
   const { data, isLoading } = useQuery<AnalyticsOverview>({
@@ -139,21 +146,17 @@ export default function AnalyticsDashboard() {
     return (
       <div className="space-y-6" data-testid="analytics-loading">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-12 w-72" />
           <Skeleton className="h-9 w-32" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 w-full" />
+            <Skeleton key={i} className="h-28 w-full rounded-2xl" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-80 w-full" />
-          <Skeleton className="h-80 w-full" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-80 w-full rounded-2xl" />
+          <Skeleton className="h-80 w-full rounded-2xl" />
         </div>
       </div>
     );
@@ -161,295 +164,310 @@ export default function AnalyticsDashboard() {
 
   if (!data) {
     return (
-      <div className="text-center py-12 text-muted-foreground" data-testid="analytics-empty">
-        <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>No analytics data available</p>
-      </div>
+      <AdminEmptyState
+        icon={<BarChart3 className="h-6 w-6" />}
+        title="No analytics data available"
+        description="Once field teams start submitting work, insights will appear here."
+      />
     );
   }
 
+  const s = data.summary;
+  const todayCount = data.dailyTrend.length
+    ? data.dailyTrend[data.dailyTrend.length - 1]?.count ?? 0
+    : 0;
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1
-            className="text-2xl font-bold flex items-center gap-2"
-            data-testid="text-analytics-title"
+      <AdminPageHeader
+        title="Operations Dashboard"
+        description="Live overview of users, submissions, and field activity"
+        icon={<BarChart3 className="h-5 w-5" />}
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => exportToCSV(data)}
+            data-testid="button-export-csv"
+            className="h-9"
           >
-            <BarChart3 className="h-6 w-6 text-primary" />
-            Analytics Dashboard
-          </h1>
-          <p className="text-muted-foreground">Platform overview and insights</p>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        }
+      />
+
+      {/* Hero strip */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#061a3a] via-[#0a274f] to-[#1565c0] p-5 sm:p-6 text-white shadow-lg">
+        <div className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.18), transparent 40%), radial-gradient(circle at 80% 0%, rgba(66,165,245,0.35), transparent 35%)",
+          }}
+        />
+        <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-200/80">Submissions</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums" data-testid="text-summary-totalSubmissions">
+              {s.totalSubmissions.toLocaleString()}
+            </p>
+            <p className="text-xs text-blue-100/70 mt-1">All-time field data</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-200/80">Active users</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums" data-testid="text-summary-activeUsers">
+              {s.activeUsers.toLocaleString()}
+            </p>
+            <p className="text-xs text-blue-100/70 mt-1">of {s.totalUsers.toLocaleString()} total</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-200/80">Live tasks</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums" data-testid="text-summary-enabledTasks">
+              {s.enabledTasks.toLocaleString()}
+            </p>
+            <p className="text-xs text-blue-100/70 mt-1">of {s.totalTasks} configured</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-200/80">Latest day</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums">{todayCount.toLocaleString()}</p>
+            <p className="text-xs text-blue-100/70 mt-1">Submissions recently</p>
+          </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => exportToCSV(data)}
-          data-testid="button-export-csv"
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <AdminStatCard
+          label="Total Users"
+          value={s.totalUsers}
+          icon={<Users className="h-5 w-5" />}
+          accent="blue"
+          testId="card-summary-totalUsers"
+        />
+        <AdminStatCard
+          label="Villages"
+          value={s.totalVillages}
+          icon={<MapPin className="h-5 w-5" />}
+          accent="emerald"
+          testId="card-summary-totalVillages"
+        />
+        <AdminStatCard
+          label="Volunteers"
+          value={s.totalVolunteers}
+          icon={<Heart className="h-5 w-5" />}
+          accent="rose"
+          testId="card-summary-totalVolunteers"
+        />
+        <AdminStatCard
+          label="Office Visitors"
+          value={s.totalVisitors}
+          icon={<Eye className="h-5 w-5" />}
+          accent="amber"
+          testId="card-summary-totalVisitors"
+        />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-bold text-slate-900 mb-3 tracking-tight">Quick actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <AdminQuickLink href="/admin/user-management" icon={<UserCog className="h-5 w-5" />} title="User Management" subtitle="Accounts & roles" />
+          <AdminQuickLink href="/admin/task-reports" icon={<FileBarChart className="h-5 w-5" />} title="Task Reports" subtitle="Submission reports" />
+          <AdminQuickLink href="/admin/voter-database" icon={<Vote className="h-5 w-5" />} title="Voter Database" subtitle="Search & export" />
+          <AdminQuickLink href="/admin/outdoor-ads" icon={<Megaphone className="h-5 w-5" />} title="Outdoor Ads" subtitle="Field ad submissions" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AdminSurface
+          title="Daily submissions"
+          description="Trend over recent days"
+          action={<TrendingUp className="h-4 w-4 text-slate-400" />}
+          testId="card-daily-trend"
         >
-          <Download className="h-4 w-4 mr-2" />
-          Export CSV
-        </Button>
-      </div>
+          {data.dailyTrend.length === 0 ? (
+            <AdminEmptyState icon={<TrendingUp className="h-5 w-5" />} title="No trend data yet" />
+          ) : (
+            <div className="h-64" data-testid="chart-daily-trend">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.dailyTrend}>
+                  <defs>
+                    <linearGradient id="adminTrendStroke" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#0a274f" />
+                      <stop offset="100%" stopColor="#1565c0" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDate}
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: "#64748b" }}
+                  />
+                  <YAxis
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                    tick={{ fill: "#64748b" }}
+                  />
+                  <Tooltip labelFormatter={formatDate} contentStyle={chartTooltipStyle} />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="url(#adminTrendStroke)"
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#1565c0" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </AdminSurface>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
-          const value = data.summary[card.key];
-          return (
-            <Card key={card.key} data-testid={`card-summary-${card.key}`}>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {card.label}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="text-2xl font-bold"
-                  data-testid={`text-summary-${card.key}`}
-                >
-                  {value.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card data-testid="card-daily-trend">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Daily Submissions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.dailyTrend.length === 0 ? (
-              <div
-                className="text-center py-12 text-muted-foreground"
-                data-testid="text-no-trend-data"
-              >
-                No trend data available
-              </div>
-            ) : (
-              <div className="h-64" data-testid="chart-daily-trend">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.dailyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      labelFormatter={formatDate}
-                      contentStyle={{
-                        borderRadius: "6px",
-                        border: "1px solid hsl(var(--border))",
-                        backgroundColor: "hsl(var(--card))",
-                        color: "hsl(var(--card-foreground))",
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="card-task-breakdown">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Task Breakdown
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.taskBreakdown.length === 0 ? (
-              <div
-                className="text-center py-12 text-muted-foreground"
-                data-testid="text-no-task-data"
-              >
-                No task data available
-              </div>
-            ) : (
-              <div className="h-64" data-testid="chart-task-breakdown">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.taskBreakdown} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis
-                      type="number"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      allowDecimals={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="taskName"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      width={120}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: "6px",
-                        border: "1px solid hsl(var(--border))",
-                        backgroundColor: "hsl(var(--card))",
-                        color: "hsl(var(--card-foreground))",
-                      }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="hsl(var(--chart-1))"
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <AdminSurface
+          title="Task breakdown"
+          description="Submissions by task type"
+          action={<Activity className="h-4 w-4 text-slate-400" />}
+          testId="card-task-breakdown"
+        >
+          {data.taskBreakdown.length === 0 ? (
+            <AdminEmptyState icon={<Activity className="h-5 w-5" />} title="No task data yet" />
+          ) : (
+            <div className="h-64" data-testid="chart-task-breakdown">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.taskBreakdown} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis
+                    type="number"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                    tick={{ fill: "#64748b" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="taskName"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    width={110}
+                    tick={{ fill: "#64748b" }}
+                  />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                  <Bar dataKey="count" fill="#1565c0" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </AdminSurface>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card data-testid="card-top-users">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              Top Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.topUsers.length === 0 ? (
-              <div
-                className="text-center py-12 text-muted-foreground"
-                data-testid="text-no-top-users"
-              >
-                No user data available
-              </div>
-            ) : (
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="text-right">Submissions</TableHead>
-                      <TableHead className="text-right">Last Active</TableHead>
+        <AdminSurface
+          title="Top contributors"
+          description="Highest submission counts"
+          action={<Trophy className="h-4 w-4 text-amber-500" />}
+          testId="card-top-users"
+        >
+          {data.topUsers.length === 0 ? (
+            <AdminEmptyState icon={<UserCheck className="h-5 w-5" />} title="No user data yet" />
+          ) : (
+            <div className="overflow-auto -mx-1">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Subs</TableHead>
+                    <TableHead className="text-right">Last Active</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.topUsers.map((user, index) => (
+                    <TableRow key={user.userId} data-testid={`row-top-user-${user.userId}`}>
+                      <TableCell>
+                        <Badge
+                          className={
+                            index === 0
+                              ? "bg-amber-500 hover:bg-amber-500"
+                              : index === 1
+                                ? "bg-slate-400 hover:bg-slate-400"
+                                : index === 2
+                                  ? "bg-orange-700 hover:bg-orange-700"
+                                  : ""
+                          }
+                          variant={index < 3 ? "default" : "secondary"}
+                          data-testid={`badge-rank-${user.userId}`}
+                        >
+                          {index + 1}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-medium" data-testid={`text-top-user-name-${user.userId}`}>
+                        {user.userName}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold" data-testid={`text-top-user-count-${user.userId}`}>
+                        {user.count}
+                      </TableCell>
+                      <TableCell
+                        className="text-right text-muted-foreground whitespace-nowrap"
+                        data-testid={`text-top-user-active-${user.userId}`}
+                      >
+                        {formatDate(user.lastActive)}
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.topUsers.map((user, index) => (
-                      <TableRow
-                        key={user.userId}
-                        data-testid={`row-top-user-${user.userId}`}
-                      >
-                        <TableCell>
-                          <Badge
-                            variant={index < 3 ? "default" : "secondary"}
-                            data-testid={`badge-rank-${user.userId}`}
-                          >
-                            {index + 1}
-                          </Badge>
-                        </TableCell>
-                        <TableCell
-                          className="font-medium"
-                          data-testid={`text-top-user-name-${user.userId}`}
-                        >
-                          {user.userName}
-                        </TableCell>
-                        <TableCell
-                          className="text-right"
-                          data-testid={`text-top-user-count-${user.userId}`}
-                        >
-                          {user.count}
-                        </TableCell>
-                        <TableCell
-                          className="text-right text-muted-foreground whitespace-nowrap"
-                          data-testid={`text-top-user-active-${user.userId}`}
-                        >
-                          {formatDate(user.lastActive)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </AdminSurface>
 
-        <Card data-testid="card-recent-activity">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {data.recentActivity.length === 0 ? (
-              <div
-                className="text-center py-12 text-muted-foreground"
-                data-testid="text-no-recent-activity"
-              >
-                No recent activity
-              </div>
-            ) : (
-              <div className="space-y-3" data-testid="list-recent-activity">
-                {data.recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start justify-between gap-3 py-2 border-b last:border-b-0"
-                    data-testid={`item-activity-${activity.id}`}
-                  >
+        <AdminSurface
+          title="Recent activity"
+          description="Latest field submissions"
+          action={<Clock className="h-4 w-4 text-slate-400" />}
+          testId="card-recent-activity"
+        >
+          {data.recentActivity.length === 0 ? (
+            <AdminEmptyState icon={<ClipboardList className="h-5 w-5" />} title="No recent activity" />
+          ) : (
+            <div className="space-y-1" data-testid="list-recent-activity">
+              {data.recentActivity.map((activity) => (
+                <div
+                  key={activity.id}
+                  className="flex items-start justify-between gap-3 py-2.5 border-b border-slate-100 last:border-b-0"
+                  data-testid={`item-activity-${activity.id}`}
+                >
+                  <div className="min-w-0 flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[#eef4ff] text-[#0d47a1] flex items-center justify-center text-[10px] font-bold shrink-0">
+                      {activity.userName.slice(0, 2).toUpperCase()}
+                    </div>
                     <div className="min-w-0">
-                      <p
-                        className="text-sm font-medium truncate"
-                        data-testid={`text-activity-user-${activity.id}`}
-                      >
+                      <p className="text-sm font-semibold truncate" data-testid={`text-activity-user-${activity.id}`}>
                         {activity.userName}
                       </p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        <Badge
-                          variant="outline"
-                          className="mr-1"
-                          data-testid={`badge-activity-task-${activity.id}`}
-                        >
-                          {activity.taskName}
-                        </Badge>
-                      </p>
+                      <Badge
+                        variant="outline"
+                        className="mt-1 max-w-full truncate font-normal"
+                        data-testid={`badge-activity-task-${activity.id}`}
+                      >
+                        {activity.taskName}
+                      </Badge>
                     </div>
-                    <span
-                      className="text-xs text-muted-foreground whitespace-nowrap pt-1"
-                      data-testid={`text-activity-time-${activity.id}`}
-                    >
-                      {formatDateTime(activity.createdAt)}
-                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <span
+                    className="text-[11px] text-slate-400 whitespace-nowrap pt-1"
+                    data-testid={`text-activity-time-${activity.id}`}
+                  >
+                    {formatDateTime(activity.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </AdminSurface>
       </div>
     </div>
   );
